@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# evaldctl — evald 的守护启停（板上运行，无需 root；板上无 tmux/screen，用 setsid+nohup+pidfile）
+# evaldctl — evald 的守护启停（板上运行；setsid+nohup+pidfile，无交互终端依赖，适合 @reboot）
 # 用法: evaldctl start|stop|restart|status|logs
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"

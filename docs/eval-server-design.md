@@ -70,7 +70,7 @@ stdout/stderr 全量落盘每作业目录，API 响应只带尾部 4KB。
 
 ## 运维
 
-- 守护：setsid+nohup+pidfile（板上无 tmux/screen）+ 用户级 crontab `@reboot` 自启（无 root）
+- 守护：setsid+nohup+pidfile（无交互终端依赖，适合 @reboot）+ 用户级 crontab `@reboot` 自启（无 root）
 - 日志按大小截断
 
 ## 里程碑

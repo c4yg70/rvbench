@@ -22,7 +22,7 @@ mkdir -p ~/autoke/evald && cd ~/autoke/evald
 cp config.example.json config.json   # 或 scp 一份已生成的
 python3 evald.py --gen-token         # 把输出填进 config.json 的 token
 python3 evald.py --selftest --config config.json
-bash evaldctl start                  # setsid+nohup 守护（板上无 tmux）
+bash evaldctl start                  # setsid+nohup 守护（无交互终端依赖，适合 @reboot）
 crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl start
 ```
 
