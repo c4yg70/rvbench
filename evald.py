@@ -784,7 +784,7 @@ def selftest(cfg):
     store = Store(cfg)
     echo_row = json.dumps({"op": "fake", "torch_ms": 2.0, "gems_ms": 1.0,
                            "speedup": 2.0, "correct": True, "max_abs_err": 0.0})
-    cfg["bench_command_override"] = ["bash", "-c", f"echo '{echo_row}'"]
+    cfg["bench_command_override"] = f"echo '{echo_row}'"  # selftest 专用钩子
     worker = Worker(cfg, store)
     req1 = {"op": "fake", "shape": "1024", "dtype": "float32", "warmup": 1,
             "rep": 1, "bench": "op", "restore": True, "timeout_min": 1, "files": []}
@@ -800,7 +800,7 @@ def selftest(cfg):
     cfg2 = dict(cfg)
     cfg2["data_dir"] = os.path.join(tmp, "data2")
     os.makedirs(cfg2["data_dir"], exist_ok=True)
-    cfg2["bench_command_override"] = ["bash", "-c", "sleep 5"]
+    cfg2["bench_command_override"] = "sleep 30"
     store2 = Store(cfg2)
     worker2 = Worker(cfg2, store2)
     req2 = {"op": "fake", "shape": "1024", "dtype": "float32", "warmup": 1,
