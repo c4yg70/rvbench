@@ -1,0 +1,16 @@
+{
+  "host": "0.0.0.0",
+  "port": 8788,
+  "token": "CHANGE_ME__python3_evald.py_--gen-token",
+  "data_dir": "/home/c4y/autoke/evald",
+  "flag_gems_root": "/home/c4y/autoke/FlagGems/.venv/lib/python3.12/site-packages/flag_gems",
+  "scripts_root": "/home/c4y/autoke/scripts",
+  "run_env": "/home/c4y/autoke/scripts/run_env.sh",
+  "lock_file": "/tmp/k3_bench.lock",
+  "queue_max": 32,
+  "timeout_default_min": 15,
+  "timeout_max_min": 30,
+  "body_max_bytes": 8388608,
+  "history_mem": 1000,
+  "longpoll_max_s": 60
+}
