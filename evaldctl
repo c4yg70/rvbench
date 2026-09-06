@@ -1,35 +1,49 @@
 #!/usr/bin/env bash
-# evaldctl — evald 的 tmux 启停（板上运行，无需 root）
+# evaldctl — evald 的守护启停（板上运行，无需 root；板上无 tmux/screen，用 setsid+nohup+pidfile）
 # 用法: evaldctl start|stop|restart|status|logs
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SESS=evald
+PID_FILE="$DIR/evald.pid"
+LOG="$DIR/evald.log"
+PORT="$(python3 -c "import json;print(json.load(open('$DIR/config.json'))['port'])")"
+
+pid_alive() {
+  [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
 
 start() {
-  if tmux has-session -t "$SESS" 2>/dev/null; then
-    echo "evald 已在运行 (tmux: $SESS)"
+  if pid_alive; then
+    echo "evald 已在运行 (pid $(cat "$PID_FILE"))"
     return 0
   fi
-  tmux new-session -d -s "$SESS" "cd '$DIR' && exec python3 evald.py --config '$DIR/config.json' >> '$DIR/evald.log' 2>&1"
+  rm -f "$PID_FILE"
+  setsid nohup python3 "$DIR/evald.py" --config "$DIR/config.json" >> "$LOG" 2>&1 &
+  echo $! > "$PID_FILE"
   sleep 1
   status
 }
 
 stop() {
-  tmux kill-session -t "$SESS" 2>/dev/null && echo "evald 已停止" || echo "evald 未在运行"
-}
-
-status() {
-  if tmux has-session -t "$SESS" 2>/dev/null; then
-    echo "tmux: running"
-    curl -s --max-time 3 "http://127.0.0.1:$(python3 -c "import json;print(json.load(open('$DIR/config.json'))['port'])")/healthz" || echo "(healthz 无响应)"
-    echo
+  if pid_alive; then
+    kill "$(cat "$PID_FILE")" && echo "evald 已停止"
+    rm -f "$PID_FILE"
   else
-    echo "tmux: stopped"
+    echo "evald 未在运行"
+    rm -f "$PID_FILE"
   fi
 }
 
-logs() { tail -n 200 -f "$DIR/evald.log"; }
+status() {
+  if pid_alive; then
+    echo "process: running (pid $(cat "$PID_FILE"))"
+    curl -s --max-time 3 "http://127.0.0.1:$PORT/healthz" || echo "(healthz 无响应)"
+    echo
+  else
+    echo "process: stopped"
+  fi
+}
+
+logs() { tail -n 200 -f "$LOG"; }
 
 case "${1:-}" in
   start) start ;;
