@@ -77,7 +77,7 @@ stdout/stderr 全量落盘每作业目录，API 响应只带尾部 4KB。
 
 - **M1**：evald.py + SubprocessExecutor + 部署-恢复 + 队列/超时/429；用已归档 4 算子（argmax/sum/abs/add）复测对齐既有结果
 - **M2**：runbook curl 配方（提交/长轮询/历史）+ 子智能体任务书模板改用 API + crontab 自启
-- **M3（v1.1）**：WarmForkExecutor（fork+reload 行为需独立验证轮：torch 线程与 fork 交互、flag_gems 算子重注册）
+- **M3** ✅ WarmForkExecutor（warmd 预热守护；实测 20.2s→15.1s；只预热 torch+triton、子进程全新加载 flag_gems，见 ADR-0004）
 
 ## Backlog（有意不做）
 

@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import shutil
 import signal
 import subprocess
@@ -76,6 +77,9 @@ def load_config(path):
     cfg.setdefault("body_max_bytes", 8 * 1024 * 1024)
     cfg.setdefault("history_mem", 1000)
     cfg.setdefault("longpoll_max_s", 60)
+    cfg.setdefault("executor", "warmfork")  # M3 起默认预热执行器；可回退 "subprocess"
+    cfg.setdefault("warmd_path", os.path.join(cfg["data_dir"], "warmd.py"))
+    cfg.setdefault("warmd_env", {})
     return cfg
 
 
@@ -212,6 +216,9 @@ def validate_request(cfg, body):
     timeout_min = body.get("timeout_min", cfg["timeout_default_min"])
     if not isinstance(timeout_min, (int, float)) or not (0.1 <= timeout_min <= cfg["timeout_max_min"]):
         return None, None, f"timeout_min 必须在 0.1..{cfg['timeout_max_min']} 分钟之间"
+    executor = body.get("executor")
+    if executor is not None and executor not in ("subprocess", "warmfork"):
+        return None, None, "executor 只能是 subprocess | warmfork"
     files = body.get("files", [])
     if not isinstance(files, list) or len(files) > 32:
         return None, None, "files 最多 32 个"
@@ -227,6 +234,7 @@ def validate_request(cfg, body):
     sanitized = {
         "op": op, "shape": shape, "dtype": dtype, "warmup": warmup, "rep": rep,
         "bench": bench, "restore": restore, "timeout_min": timeout_min,
+        "executor": executor,
         "files": [{"path": e["path"], "sha256": sha256_hex(e["content"]),
                    "bytes": len(e["content"].encode("utf-8"))} for e in files],
     }
@@ -438,6 +446,9 @@ class QueueFullError(Exception):
 # ---------------------------------------------------------------- 执行器（v1 子进程）
 
 class SubprocessExecutor:
+    def __init__(self, cfg):
+        self.cfg = cfg
+
     def build_command(self, req):
         # 所有参数均已通过 validate_request 的正则/枚举校验，无注入面
         if req["bench"] == "gemm":
@@ -475,18 +486,22 @@ class SubprocessExecutor:
         rows = _parse_json_lines(out)
         if not rows:
             return "failed", None, None, "no JSON line in stdout"
-        if req["bench"] == "gemm":
-            ok = all(r.get("correct") for r in rows)
-            spd = rows[0].get("speedup")
-            result = rows[0] if len(rows) == 1 else {"metric": "gflops", "rows": rows}
-            if isinstance(result, dict) and "metric" not in result:
-                result = dict(result, metric="gflops")
-            return "done", result, {"speedup": spd, "pass_rate": 1.0 if ok else 0.0}, None
-        row = rows[-1]
-        return "done", row, {
-            "speedup": row.get("speedup"),
-            "pass_rate": 1.0 if row.get("correct") else 0.0,
-        }, None
+        result, kope_mem = _map_rows(req["bench"], rows)
+        return "done", result, kope_mem, None
+
+
+def _map_rows(bench, rows):
+    """把 bench 输出的 JSON 行映射为 (result, kope_mem)。"""
+    if bench == "gemm":
+        ok = all(r.get("correct") for r in rows)
+        spd = rows[0].get("speedup")
+        result = rows[0] if len(rows) == 1 else {"metric": "gflops", "rows": rows}
+        if isinstance(result, dict) and "metric" not in result:
+            result = dict(result, metric="gflops")
+        return result, {"speedup": spd, "pass_rate": 1.0 if ok else 0.0}
+    row = rows[-1]
+    return row, {"speedup": row.get("speedup"),
+                 "pass_rate": 1.0 if row.get("correct") else 0.0}
 
 
 def _parse_json_lines(text):
@@ -507,6 +522,107 @@ def _parse_json_lines(text):
     return rows
 
 
+# ---------------------------------------------------------------- 执行器（M3 预热 fork）
+
+class WarmForkExecutor:
+    """warmd 常驻预热守护 + 每作业 fork 子进程（ADR-0004）。
+
+    父进程只预热 torch+triton（与候选代码无关的不变量）；子进程全新
+    import flag_gems/bench 脚本——候选代码永远从磁盘已部署文件加载。
+    守护异常（起不来/EOF/协议错）时本作业自动回退 SubprocessExecutor。
+    """
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.proc = None
+        self.stderr_tail = []
+        self.lock = threading.Lock()
+
+    def _drain_stderr(self):
+        try:
+            for line in iter(self.proc.stderr.readline, ""):
+                self.stderr_tail.append(line)
+                if len(self.stderr_tail) > 200:
+                    del self.stderr_tail[:100]
+        except (OSError, ValueError):
+            pass
+
+    def _spawn(self):
+        env = dict(os.environ)
+        env["WARMD_SCRIPTS_ROOT"] = self.cfg["scripts_root"]
+        env.update(self.cfg.get("warmd_env", {}))
+        cmd = f"source {self.cfg['run_env']} && exec python {self.cfg['warmd_path']}"
+        self.proc = subprocess.Popen(
+            ["bash", "-c", cmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, bufsize=1, env=env,
+            start_new_session=True)  # 独立进程组：卡死时可 killpg 整树
+        self.stderr_tail = []
+        threading.Thread(target=self._drain_stderr, daemon=True).start()
+        line = self._readline(120)  # 预热 torch+triton 上限
+        try:
+            if line != "" and line and json.loads(line).get("ready"):
+                return
+        except json.JSONDecodeError:
+            pass
+        raise RuntimeError(f"warmd not ready: {line!r} {''.join(self.stderr_tail[-5:])[-300:]}")
+
+    def _readline(self, timeout_s):
+        """限期读一行；None=超时，''=EOF，否则为行内容。"""
+        deadline = time.time() + timeout_s
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            r, _, _ = select.select([self.proc.stdout], [], [], min(remaining, 1.0))
+            if r:
+                line = self.proc.stdout.readline()
+                return line if line else ""
+
+    def _kill(self):
+        if self.proc and self.proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                self.proc.kill()
+        self.proc = None
+
+    def run(self, job):
+        req = job.request
+        timeout_s = req["timeout_min"] * 60
+        with self.lock:
+            try:
+                if self.proc is None or self.proc.poll() is not None:
+                    self._spawn()
+                self.proc.stdin.write(json.dumps({
+                    "id": job.job_id, "timeout_s": timeout_s,
+                    "req": {k: req[k] for k in ("bench", "op", "shape", "dtype",
+                                                "warmup", "rep", "batch") if k in req},
+                }) + "\n")
+                self.proc.stdin.flush()
+                line = self._readline(timeout_s + 30)
+                if not line:
+                    self._kill()
+                    raise RuntimeError(
+                        f"warmd no response: {'EOF' if line == '' else 'deadline'}")
+                resp = json.loads(line)
+            except (RuntimeError, OSError, ValueError) as exc:
+                self._kill()
+                job.stderr = (job.stderr or "") + f"\n[warmd 故障，本作业回退 subprocess: {exc}]"
+                return SubprocessExecutor(self.cfg).run(job)
+        job.stdout = resp.get("stdout") or ""
+        job.stderr = (job.stderr or "") + (resp.get("stderr") or "")
+        state = resp.get("state", "failed")
+        result = kope_mem = None
+        error = resp.get("error")
+        if state == "done":
+            rows = resp.get("result") or []
+            if rows:
+                result, kope_mem = _map_rows(req["bench"], rows)
+            else:
+                state, error = "failed", "warmd done but empty rows"
+        return state, result, kope_mem, error
+
+
 # ---------------------------------------------------------------- worker
 
 class Worker(threading.Thread):
@@ -514,8 +630,12 @@ class Worker(threading.Thread):
         super().__init__(daemon=True, name="evald-worker")
         self.cfg = cfg
         self.store = store
-        self.executor = SubprocessExecutor()
-        self.executor.cfg = cfg
+        self.executors = {"subprocess": SubprocessExecutor(cfg),
+                          "warmfork": WarmForkExecutor(cfg)}
+
+    def _executor_for(self, request):
+        name = request.get("executor") or self.cfg.get("executor", "subprocess")
+        return self.executors.get(name) or self.executors["subprocess"]
 
     def run(self):
         while True:
@@ -551,7 +671,7 @@ class Worker(threading.Thread):
                     except Exception as exc:  # noqa: BLE001
                         job.error = f"rollback failed: {exc!r}"
                     raise
-            state, result, kope_mem, error = self.executor.run(job)
+            state, result, kope_mem, error = self._executor_for(job.request).run(job)
             job.state, job.result, job.kope_mem, job.error = state, result, kope_mem, error
         finally:
             if deployed and job.request.get("restore", True):
@@ -780,6 +900,7 @@ def selftest(cfg):
 
     print("[4] 队列 + 假 bench")
     cfg["data_dir"] = os.path.join(tmp, "data")
+    cfg["executor"] = "subprocess"  # 本节测子进程执行器路径（默认已是 warmfork）
     os.makedirs(cfg["data_dir"], exist_ok=True)
     store = Store(cfg)
     echo_row = json.dumps({"op": "fake", "torch_ms": 2.0, "gems_ms": 1.0,
@@ -811,6 +932,55 @@ def selftest(cfg):
     j2 = store2.get(job2.job_id)
     check("超时标记", j2.state == "timeout", j2.state)
     check("超时及时返回", time.time() - t0 < 15)
+
+    if hasattr(os, "fork"):
+        print("[6] warmd 协议（WARMD_FAKE，不依赖 torch）")
+        warmd_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warmd.py")
+        check("warmd.py 存在", os.path.exists(warmd_src))
+        stub_bin = os.path.join(tmp, "stubbin")
+        os.makedirs(stub_bin, exist_ok=True)
+        try:
+            os.symlink(sys.executable, os.path.join(stub_bin, "python"))
+        except (OSError, NotImplementedError):
+            shutil.copy(sys.executable, os.path.join(stub_bin, "python"))
+        stub_env = os.path.join(tmp, "run_env_stub.sh")
+        with open(stub_env, "w") as f:
+            f.write("#!/bin/bash\nexport PATH=\"%s:$PATH\"\n" % stub_bin)
+        cfg3 = dict(cfg)
+        cfg3["data_dir"] = os.path.join(tmp, "data3")
+        os.makedirs(cfg3["data_dir"], exist_ok=True)
+        cfg3["run_env"] = stub_env
+        cfg3["warmd_path"] = warmd_src
+        cfg3["warmd_env"] = {"WARMD_FAKE": "1"}
+        cfg3["executor"] = "warmfork"
+        store3 = Store(cfg3)
+        worker3 = Worker(cfg3, store3)
+        req3 = {"op": "fake", "shape": "1024", "dtype": "float32", "warmup": 1,
+                "rep": 1, "bench": "op", "restore": True, "timeout_min": 1,
+                "executor": "warmfork", "files": []}
+        job3 = store3.submit(req3, req3)
+        worker3.run_job(store3.get(job3.job_id))
+        j3 = store3.get(job3.job_id)
+        check("warmfork 假作业 done", j3.state == "done", j3.state)
+        check("warmfork speedup=2.0", (j3.result or {}).get("speedup") == 2.0)
+        check("warmfork kope_mem", j3.kope_mem == {"speedup": 2.0, "pass_rate": 1.0})
+
+        print("[7] warmd 子进程超时")
+        cfg4 = dict(cfg3)
+        cfg4["data_dir"] = os.path.join(tmp, "data4")
+        os.makedirs(cfg4["data_dir"], exist_ok=True)
+        cfg4["warmd_env"] = {"WARMD_FAKE": "1", "WARMD_FAKE_SLEEP": "30"}
+        store4 = Store(cfg4)
+        worker4 = Worker(cfg4, store4)
+        req4 = dict(req3, timeout_min=0.1)
+        job4 = store4.submit(req4, req4)
+        t0 = time.time()
+        worker4.run_job(store4.get(job4.job_id))
+        j4 = store4.get(job4.job_id)
+        check("warmd 超时标记", j4.state == "timeout", j4.state)
+        check("warmd 超时及时返回", time.time() - t0 < 15)
+    else:
+        print("[6]/[7] warmd 协议测试需要 POSIX fork，本平台跳过")
 
     shutil.rmtree(tmp, ignore_errors=True)
     print(f"\nselftest: {'ALL PASS' if not failures else 'FAILED: ' + ', '.join(failures)}")

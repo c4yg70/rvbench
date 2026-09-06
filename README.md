@@ -2,7 +2,8 @@
 
 部署在 SpacemiT K3（RISC-V, Bianbu Linux）上的**算子代码评估服务器**：本地优化好的 FlagGems/Triton 算子代码经 HTTP 提交为评估作业，异步等待并获取计时结果——取代逐次 `ssh + flock` 的工作流。
 
-- **单文件服务** `evald.py`，纯 Python stdlib（板上 FlagGems venv 无 pip，见 [ADR-0003](docs/adr/0003-stdlib-python-eval-server.md)）
+- **服务** `evald.py` + 预热执行守护 `warmd.py`，纯 Python stdlib（板上 FlagGems venv 无 pip，见 [ADR-0003](docs/adr/0003-stdlib-python-eval-server.md)）
+- **WarmForkExecutor**（默认）：守护父进程只预热 torch+triton（不变量），每作业 fork 子进程全新加载 flag_gems——省 ~5s/作业且候选代码永远从磁盘部署文件读取（[ADR-0004](docs/adr/0004-warmfork-invariant-preload.md)）；作业可用 `"executor":"subprocess"` 显式回退
 - **异步队列**：单 worker 串行执行（计时纯净），队列上限 32，超时杀进程
 - **部署-恢复自包含**：每个作业评估前备份 site-packages 原文件、断硬链写入候选，评估后自动恢复——杜绝异步队列下"测到上一个作业残留代码"的静默错误（[ADR-0001](docs/adr/0001-eval-job-deploy-restore.md)）
 - **计时互斥**：worker 持有 `/tmp/k3_bench.lock`，与手工 SSH 基准互不污染（[ADR-0002](docs/adr/0002-shared-timing-mutex.md)）
@@ -14,7 +15,7 @@
 
 ```bash
 # 本地推送（Windows 工作区）
-k3scp evald.py Home-SpacemitK3:~/autoke/evald/
+k3scp evald.py warmd.py Home-SpacemitK3:~/autoke/evald/
 k3scp evaldctl Home-SpacemitK3:~/autoke/evald/
 
 # 板上
@@ -99,5 +100,5 @@ curl -s -X DELETE "$BASE/jobs/<job_id>" -H "$H"
 
 - **M1** ✅ evald.py + 子进程执行器 + 部署-恢复 + 队列/超时/429
 - **M2** ✅ runbook 配方 + crontab 自启
-- **M3 (v1.1)**：WarmForkExecutor——常驻预热 import torch+flag_gems，fork 子进程执行（吃掉每作业 ~20s 的 python 启动，预期吞吐 ×2~3）
-- **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）
+- **M3** ✅ WarmForkExecutor（warmd 预热守护 + fork 子进程全新加载；实测同作业 20.2s→15.1s，A/B 交叉验证正确性一致）
+- **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）；进一步压缩子进程 flag_gems 导入（~6.8s，弥散性开销）
