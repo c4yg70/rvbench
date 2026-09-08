@@ -7,10 +7,15 @@
   "scripts_root": "/home/c4y/autoke/scripts",
   "run_env": "/home/c4y/autoke/scripts/run_env.sh",
   "lock_file": "/tmp/k3_bench.lock",
-  "queue_max": 32,
+  "queue_max": 64,
   "timeout_default_min": 15,
   "timeout_max_min": 30,
   "body_max_bytes": 8388608,
   "history_mem": 1000,
-  "longpoll_max_s": 60
+  "longpoll_max_s": 60,
+  "executor": "warmfork",
+  "correctness_workers": 3,
+  "correctness_cpus": "4-6",
+  "correctness_omp_threads": 1,
+  "correctness_executor": null
 }

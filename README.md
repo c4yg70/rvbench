@@ -4,7 +4,9 @@
 
 - **服务** `evald.py` + 预热执行守护 `warmd.py`，纯 Python stdlib（板上 FlagGems venv 无 pip，见 [ADR-0003](docs/adr/0003-stdlib-python-eval-server.md)）
 - **WarmForkExecutor**（默认）：守护父进程只预热 torch+triton（不变量），每作业 fork 子进程全新加载 flag_gems——省 ~5s/作业且候选代码永远从磁盘部署文件读取（[ADR-0004](docs/adr/0004-warmfork-invariant-preload.md)）；作业可用 `"executor":"subprocess"` 显式回退
-- **异步队列**：单 worker 串行执行（计时纯净），队列上限 32，超时杀进程
+- **异步队列·双车道**：timing 车道（默认）单 worker 串行执行（计时纯净）；correctness 车道
+  3 worker 并行（`correctness_workers`，0=关闭）——不持计时锁、强制 warmup=0/rep=1、taskset
+  到车道核（handoff §3-L2）。队列按 lane 分列，上限 64 两车道共享，超时杀进程
 - **部署-恢复自包含**：每个作业评估前备份 site-packages 原文件、断硬链写入候选，评估后自动恢复——杜绝异步队列下"测到上一个作业残留代码"的静默错误（[ADR-0001](docs/adr/0001-eval-job-deploy-restore.md)）
 - **计时互斥**：worker 持有 `/tmp/k3_bench.lock`，与手工 SSH 基准互不污染（[ADR-0002](docs/adr/0002-shared-timing-mutex.md)）
 - **kope-mem 兼容**：响应自带 `kope_mem.speedup / pass_rate`，可直接喂给 K3BenchmarkPort
@@ -37,20 +39,22 @@ crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash
 | `GET /jobs/{id}?wait=N` | 查询；`wait≤60` 长轮询，完成即返回 |
 | `GET /jobs?limit=N&since=<job_id>` | 历史（UUIDv7 时间序游标） |
 | `DELETE /jobs/{id}` | 取消排队中的作业 |
-| `GET /healthz` | 存活 + 队列长度 + loadavg（免 token） |
+| `GET /healthz` | 存活 + 队列长度（顶层为两车道总和）+ 每车道 `lanes` 计数 + loadavg（免 token） |
 
 ### 请求体
 
 ```json
 {
   "op": "add", "shape": "64,512,512", "dtype": "float32",
-  "warmup": 10, "rep": 50, "bench": "op",
+  "warmup": 5, "rep": 5, "bench": "op",
   "restore": true, "timeout_min": 15,
+  "lane": "correctness",
   "files": [{"path": "flag_gems/ops/add.py", "content": "..."}]
 }
 ```
 
 - `bench`: `"op"`（bench_op.py 微基准）| `"gemm"`（bench_gemm.py，op 为 mm/addmm/bmm，shape 为逗号分隔的方阵边长列表，可选 `batch`）
+- `lane`: `"timing"`（默认）| `"correctness"`（L2 并行车道）。**不带 lane 字段 = timing，行为与旧版逐字节一致**。correctness 车道：不获取 `/tmp/k3_bench.lock`、强制 `warmup=0/rep=1`（用户值被覆盖并在 request 回显为 `requested_warmup/requested_rep`）、`K3_LANE=correctness`＋`OMP_NUM_THREADS=1` 注入 bench 环境、taskset 到 `correctness_cpus`（默认 4-6，0-7 内）。仅正确性筛选用——`result.correct` 有效，`speedup` 无统计意义（结果带 `lane` 标注）
 - `files`: 可省略（评估当前已部署代码）；路径白名单：`flag_gems/ops/**`、`flag_gems/runtime/backend/_spacemit/**`、`scripts/bench_op.py`、`scripts/bench_gemm.py`
 - `restore: false` = **定稿作业**：测完保留候选代码于 site-packages
 
@@ -62,7 +66,7 @@ crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash
   "submitted_at": "…", "started_at": "…", "finished_at": "…",
   "queue_wait_s": 3.2, "duration_s": 28.1,
   "request": {"op": "add", "shape": "64,512,512", "dtype": "float32",
-               "warmup": 10, "rep": 50, "bench": "op", "restore": true,
+               "warmup": 5, "rep": 5, "bench": "op", "restore": true,
                "files": [{"path": "flag_gems/ops/add.py", "sha256": "…", "bytes": 1234}]},
   "result": {"torch_ms": 5.1, "gems_ms": 5.4, "speedup": 0.94,
               "correct": true, "max_abs_err": 0.0, "metric": "speedup"},
@@ -81,12 +85,16 @@ H="X-K3-Token: $TOKEN"
 
 # 提交（无文件，评估当前代码）
 curl -s -X POST $BASE/jobs -H "$H" -H "Content-Type: application/json" \
-  -d '{"op":"add","shape":"64,512,512","dtype":"float32","warmup":10,"rep":50}'
+  -d '{"op":"add","shape":"64,512,512","dtype":"float32","warmup":5,"rep":5}'
 
 # 提交（带候选文件；jq 把整文件内容装进 JSON）
 jq -n --rawfile f add.py '{op:"add",shape:"64,512,512",dtype:"float32",
-    warmup:10,rep:50,files:[{path:"flag_gems/ops/add.py",content:$f}]}' \
+    warmup:5,rep:5,files:[{path:"flag_gems/ops/add.py",content:$f}]}' \
   | curl -s -X POST $BASE/jobs -H "$H" -H "Content-Type: application/json" -d @-
+
+# 提交（correctness 车道：不持计时锁、warmup=0/rep=1 强制、3 worker 并行；只看 correct）
+curl -s -X POST $BASE/jobs -H "$H" -H "Content-Type: application/json" \
+  -d '{"op":"add","shape":"64,512,512","dtype":"float32","warmup":5,"rep":5,"lane":"correctness"}'
 
 # 长轮询等结果（≤60s 一轮，未终态就再来一次）
 curl -s "$BASE/jobs/<job_id>?wait=60" -H "$H"

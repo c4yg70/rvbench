@@ -28,7 +28,7 @@
 ```json
 {
   "op": "add", "shape": "64,512,512", "dtype": "float32",
-  "warmup": 10, "rep": 50, "bench": "op | gemm",
+  "warmup": 5, "rep": 5, "bench": "op | gemm",
   "restore": true,
   "files": [{"path": "flag_gems/ops/add.py", "content": "..."}]
 }
@@ -41,7 +41,7 @@
   "job_id": "<uuid7>",
   "state": "queued | running | done | failed | timeout | canceled",
   "submitted_at": "...", "started_at": "...", "finished_at": "...", "queue_wait_s": 0.0,
-  "request": {"op": "...", "shape": "...", "dtype": "...", "warmup": 10, "rep": 50,
+  "request": {"op": "...", "shape": "...", "dtype": "...", "warmup": 5, "rep": 5,
                "restore": true, "files": [{"path": "...", "sha256": "..."}]},
   "result": {"torch_ms": 0.0, "gems_ms": 0.0, "speedup": 0.0, "correct": true,
               "max_abs_err": 0.0, "metric": "speedup | gflops"},
