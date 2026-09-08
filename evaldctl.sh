@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# evaldctl — evald 的守护启停（板上运行；setsid+nohup+pidfile，无交互终端依赖，适合 @reboot）
-# 用法: evaldctl start|start-ai|stop|restart|status|logs
+# evaldctl.sh — evald 的守护启停（板上运行；setsid+nohup+pidfile，无交互终端依赖，适合 @reboot）
+# 用法: evaldctl.sh start|start-ai|stop|restart|status|logs
 #   start-ai: A100 测量簇迁移（ADR-0012）——包装 shell 先把自己的 TID 写
 #   /proc/set_ai_thread 再 exec evald（execve 前注册是唯一安全姿势，运行中
 #   跨簇迁移有 segfault 实证），evald 进程树整簇绑定 cpu8-15。

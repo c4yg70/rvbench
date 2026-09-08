@@ -18,16 +18,18 @@
 ```bash
 # 本地推送（Windows 工作区）
 k3scp evald.py warmd.py Home-SpacemitK3:~/autoke/evald/
-k3scp evaldctl Home-SpacemitK3:~/autoke/evald/
+k3scp evaldctl.sh Home-SpacemitK3:~/autoke/evald/
 
 # 板上
 mkdir -p ~/autoke/evald && cd ~/autoke/evald
 cp config.example.json config.json   # 或 scp 一份已生成的
 python3 evald.py --gen-token         # 把输出填进 config.json 的 token
 python3 evald.py --selftest --config config.json
-bash evaldctl start                  # setsid+nohup 守护（无交互终端依赖，适合 @reboot）
-crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl start
+bash evaldctl.sh start               # setsid+nohup 守护（无交互终端依赖，适合 @reboot）
+crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl.sh start
 ```
+
+> **更名注记（2026-09-09）**：本仓库与 K1-230 板上 `/home/c4y/autoke/evald/evaldctl` 已更名为 `evaldctl.sh`（230 的 c4y crontab `@reboot` 行已同步为 `evaldctl.sh start`）。K3（Home-SpacemitK3）与 233/241/243 板上现存副本**仍叫旧名 `evaldctl`**；同步新名时须同时修改各板 crontab `@reboot` 引用。
 
 ## API
 
@@ -76,6 +78,59 @@ crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash
 ```
 
 全量 stdout/stderr 落盘在板上 `~/autoke/evald/jobs/<job_id>/`，API 只带尾部 4KB。gemm 多 shape 时 `result` 为 `{metric: "gflops", rows: [...]}`。
+
+## 评估器 feature flags（perf/acc/func）
+
+config.json 新增顶层 `evaluators` 节，把三个评估器做成独立开关（契约定稿，代码实现中）：
+
+```json
+"evaluators": {
+  "perf": {"enabled": true, "warmup_times": 5, "repeat_times": 5},
+  "acc":  {"enabled": true, "workers": 4, "cpus": "4-7", "omp_threads": 1},
+  "func": {"enabled": true, "workers": 2, "cpus": "4-7", "omp_threads": 1}
+}
+```
+
+### 三个评估器与车道映射
+
+| 评估器 | 车道 | 执行模型 | 说明 |
+|---|---|---|---|
+| `perf` | timing | 单 worker 串行、持计时锁 | 计时评估器，语义与旧版不变 |
+| `acc` | correctness | 并行池、不持锁 | 数值精度评估器 |
+| `func` | func | 并行池、不持锁 | 功能冒烟评估器：执行成功——stdout 出现 JSON 结果行即 pass；结果带 `lane="func"`，`kope_mem` 只有 `pass_rate` 无 `speedup` |
+
+### 开关与校验（启动即报错）
+
+- 三者独立开关，**至少启用一个**；全停则启动报错（`SystemExit`）。
+- 未知评估器名、或节内未知键，同样启动报错。
+- `force_lane` 必须指向**启用中**的评估器，否则启动报错。
+
+### 缺省推导（config 无 `evaluators` 键时保持旧版行为）
+
+- `perf` 开；
+- `acc` 随旧扁平键 `correctness_workers`（0 即关）；
+- `func` 关。
+
+### 计时轮数与强制覆盖
+
+- `warmup_times` / `repeat_times` 是 **perf** 的计时轮数配置（缺省 25/100）；作业请求体 `warmup` / `rep` 仍可逐作业覆盖。
+- acc / func 两个设置里**恒定强制 `warmup=0`、`rep=1`**：配置写别的值（如 `acc.warmup_times=5`）启动直接报错拒绝；请求体的 `warmup` / `rep` 被覆盖为 0/1，并在 sanitized request 里注记 `requested_warmup` / `requested_rep`。
+
+### 请求车道门禁
+
+- `lane ∈ timing|correctness|func` 分别对应 `perf|acc|func`；对应评估器停用时提交直接 **400**，错误信息注明 `config.evaluators.<name>.enabled=false`。
+- **先门禁、后 `force_lane` 改写**。
+
+### 资源键与 func 环境
+
+- `acc` 的 `workers` / `cpus` / `omp_threads` 缺省回落旧扁平键 `correctness_workers` / `correctness_cpus` / `correctness_omp_threads`。
+- `func` 的 `workers` 缺省 2；`cpus` / `omp_threads` 缺省随 acc 生效值。
+- func 车道进程 env 注入 `K3_LANE=func`，taskset 钉 `func.cpus`。
+
+### 可观测性
+
+- `/healthz` 与 `/metrics`：车道计数新增 `lane="func"` 序列（`evald_queued` / `evald_running`）。
+- 启动横幅打印启用的评估器与各车道 worker 数。
 
 ## curl 配方（Git Bash）
 

@@ -17,5 +17,10 @@
   "correctness_workers": 3,
   "correctness_cpus": "4-6",
   "correctness_omp_threads": 1,
-  "correctness_executor": null
+  "correctness_executor": null,
+  "evaluators": {
+    "perf": {"enabled": true, "warmup_times": 5, "repeat_times": 5},
+    "acc":  {"enabled": true, "workers": 4, "cpus": "4-7", "omp_threads": 1},
+    "func": {"enabled": true, "workers": 2, "cpus": "4-7", "omp_threads": 1}
+  }
 }

@@ -3,10 +3,13 @@
 
 本地优化好的 FlagGems/Triton 算子代码经 HTTP 提交为评估作业（UUIDv7），
 每个作业自包含部署-恢复 site-packages 候选文件（防异步队列下的代码残留）。
-作业按 "lane" 字段分两车道：timing（默认）＝单 worker 串行执行并持有
-/tmp/k3_bench.lock（与手工 SSH 基准互斥，计时语义不变）；correctness＝
-并行 worker 池、不持计时锁、强制 warmup=0/rep=1、taskset 分核（handoff
-a100-x100 §3-L2），仅正确性筛选，speedup 无意义仅作返回兼容。
+作业按 "lane" 字段分三车道，各对应一个可开关的评估器（feature flags，
+config.evaluators，至少启用一个）：timing（默认，perf）＝单 worker 串行
+执行并持有 /tmp/k3_bench.lock（与手工 SSH 基准互斥，计时语义不变）；
+correctness（acc）＝并行 worker 池、不持计时锁、强制 warmup=0/rep=1、
+taskset 分核（handoff a100-x100 §3-L2），仅数值精度筛选；func＝功能冒烟
+车道（资源口径随 acc，K3_LANE=func），warmup=0/rep=1 强制，跑通（产出
+JSON 结果行）即 pass。评估器停用后对应车道请求直接 400。
 
 设计规格：docs/eval-server-design.md；决策：docs/adr/。
 仅用 stdlib（板上 FlagGems venv 无 pip，见 ADR-0003）。
@@ -86,12 +89,98 @@ def load_config(path):
     cfg.setdefault("warmd_path", os.path.join(cfg["data_dir"], "warmd.py"))
     cfg.setdefault("warmd_env", {})
     # L2 correctness 车道（handoff §3-L2）：并行正确性筛选，不持计时锁、不进稳态计时。
-    # 回退开关：correctness_workers=0 即回到纯计时车道（无 lane 字段行为与旧版一致）
+    # 回退开关：correctness_workers=0 即回到纯计时车道（无 lane 字段行为与旧版一致）。
+    # 以下扁平键是旧版兼容缺省：evaluators.acc 未显式给出 workers/cpus/omp_threads 时回落
     cfg.setdefault("correctness_workers", 3)      # correctness 并行 worker 数；0=关闭车道
     cfg.setdefault("correctness_cpus", "4-6")     # 车道 taskset 核（须为守护 allowed_list 子集：X100 部署 4-6；A100 注册 8-15 后用 12-14，disjoint 会 EINVAL）
     cfg.setdefault("correctness_omp_threads", 1)  # 注入 OMP_NUM_THREADS（与分核对齐，防 3 作业超订）
     cfg.setdefault("correctness_executor", None)  # 车道默认执行器；None=跟随请求/全局 cfg（warmfork）
+    normalize_evaluators(cfg)  # 评估器 feature flags（perf/acc/func）归一化 + 启动校验
     return cfg
+
+
+# ---------------------------------------------------------------- 评估器 feature flags
+
+_EVALUATOR_KEYS = {
+    "perf": {"enabled", "warmup_times", "repeat_times"},
+    "acc": {"enabled", "warmup_times", "repeat_times", "workers", "cpus", "omp_threads"},
+    "func": {"enabled", "warmup_times", "repeat_times", "workers", "cpus", "omp_threads"},
+}
+LANE_EVALUATOR = {"timing": "perf", "correctness": "acc", "func": "func"}
+
+
+def normalize_evaluators(cfg):
+    """评估器 feature flags（perf/acc/func）归一化与启动校验。
+
+    perf=计时评估器（timing 车道）；acc=数值精度评估器（correctness 车道）；
+    func=功能冒烟评估器（func 车道，跑通即 pass）。三者独立开关、至少启用
+    一个；缺省推导保持旧版行为（perf 开 / acc 随 correctness_workers / func 关）。
+    acc/func 恒定 warmup=0/rep=1——配置显式给了别的值视为配置错误、启动即拒；
+    请求体 warmup/rep 也会被覆盖为 0/1 并注记 requested_* 原值。
+    归一化结果（含各评估器生效资源）写回 cfg["evaluators"]。
+    """
+    legacy = {"perf": {"enabled": True},
+              "acc": {"enabled": bool(cfg.get("correctness_workers", 3))},
+              "func": {"enabled": False}}
+    ev = cfg.setdefault("evaluators", legacy)
+    if not isinstance(ev, dict) or set(ev) - set(_EVALUATOR_KEYS):
+        raise SystemExit(f"config.evaluators 只接受 {sorted(_EVALUATOR_KEYS)}")
+    norm = {}
+    for name, allowed in _EVALUATOR_KEYS.items():
+        sec = ev.get(name) or {}
+        if not isinstance(sec, dict) or set(sec) - allowed:
+            raise SystemExit(f"evaluators.{name} 只接受键 {sorted(allowed)}")
+        norm[name] = dict(sec)
+    perf = norm["perf"]
+    perf["enabled"] = bool(perf.get("enabled", legacy["perf"]["enabled"]))
+    # perf 计时缺省轮数（请求体 warmup/rep 仍可逐作业覆盖）
+    perf.setdefault("warmup_times", 25)
+    perf.setdefault("repeat_times", 100)
+    for key, lo in (("warmup_times", 0), ("repeat_times", 1)):
+        v = perf[key]
+        if isinstance(v, bool) or not isinstance(v, int) or not lo <= v <= 10000:
+            raise SystemExit(f"evaluators.perf.{key} 必须是 {lo}..10000 的整数")
+    for name in ("acc", "func"):
+        sec = norm[name]
+        sec["enabled"] = bool(sec.get("enabled", legacy[name]["enabled"]))
+        for key, want in (("warmup_times", 0), ("repeat_times", 1)):
+            if key in sec and sec[key] != want:
+                raise SystemExit(f"evaluators.{name}.{key} 恒为 {want}"
+                                 f"（acc/func 不做稳态计时），拒绝 {sec[key]!r}")
+        sec["warmup_times"], sec["repeat_times"] = 0, 1
+        prev = norm["acc"] if name == "func" else None  # func 资源缺省随 acc 生效值
+        sec.setdefault("workers",
+                       cfg.get("correctness_workers", 3) if name == "acc" else 2)
+        sec.setdefault("cpus",
+                       cfg.get("correctness_cpus", "4-6") if prev is None
+                       else prev["cpus"])
+        sec.setdefault("omp_threads",
+                       cfg.get("correctness_omp_threads", 1) if prev is None
+                       else prev["omp_threads"])
+        if not sec["enabled"]:
+            continue  # 旧版兼容：correctness_workers=0 推导 acc 关，资源不做约束
+        if (isinstance(sec["workers"], bool) or not isinstance(sec["workers"], int)
+                or sec["workers"] < 1):
+            raise SystemExit(f"evaluators.{name}.workers 必须是 >=1 的整数")
+        if not isinstance(sec["cpus"], str) or not sec["cpus"]:
+            raise SystemExit(f'evaluators.{name}.cpus 必须是非空字符串（如 "4-7"）')
+    if not any(norm[name]["enabled"] for name in norm):
+        raise SystemExit("config.evaluators: 至少启用一个评估器 (perf/acc/func)")
+    if cfg.get("force_lane"):
+        if cfg["force_lane"] not in LANE_EVALUATOR:
+            raise SystemExit(f"config.force_lane 只能是 {sorted(LANE_EVALUATOR)}")
+        if not norm[LANE_EVALUATOR[cfg["force_lane"]]]["enabled"]:
+            raise SystemExit(f"config.force_lane={cfg['force_lane']} 对应评估器未启用")
+    cfg["evaluators"] = norm
+    return cfg
+
+
+def lane_resources(cfg, lane):
+    """车道生效资源 (cpus, omp_threads)；timing 车道返回 (None, None)。"""
+    if lane == "timing":
+        return None, None
+    sec = cfg["evaluators"][LANE_EVALUATOR[lane]]  # 车道名→评估器名（correctness→acc）
+    return sec["cpus"], sec["omp_threads"]
 
 
 # ---------------------------------------------------------------- 白名单解析
@@ -214,8 +303,9 @@ def validate_request(cfg, body):
     shape = body.get("shape")
     if not isinstance(shape, str) or not RE_SHAPE.match(shape):
         return None, None, "shape 不合法（如 64,512,512）"
-    warmup = body.get("warmup", 25)
-    rep = body.get("rep", 100)
+    perf_cfg = cfg.get("evaluators", {}).get("perf", {})
+    warmup = body.get("warmup", perf_cfg.get("warmup_times", 25))
+    rep = body.get("rep", perf_cfg.get("repeat_times", 100))
     if not isinstance(warmup, int) or not isinstance(rep, int) or not (0 <= warmup <= 10000 and 1 <= rep <= 10000):
         return None, None, "warmup/rep 必须是 0..10000 的整数"
     batch = body.get("batch", 8)
@@ -231,10 +321,15 @@ def validate_request(cfg, body):
     if executor is not None and executor not in ("subprocess", "warmfork"):
         return None, None, "executor 只能是 subprocess | warmfork"
     lane = body.get("lane", "timing")
-    if lane not in ("timing", "correctness"):
-        return None, None, "lane 只能是 timing | correctness"
+    if lane not in LANE_EVALUATOR:
+        return None, None, f"lane 只能是 {' | '.join(LANE_EVALUATOR)}"
+    # feature flag 门禁：对应评估器停用的车道直接拒绝（否则作业无人消费只能超时）；
+    # 先门禁后 force_lane 改写——不该来的车道显式拒绝，而非静默改道。
     # K1 池（board-pool.json must_disable）：force_lane 服务端锁死车道，客户端提交
-    # 任何 lane/缺省都被强制改写；K3 部署不配置此键，行为逐字节不变
+    # 任何 lane/缺省都被强制改写；不配置此键则无改写
+    if not cfg.get("evaluators", {}).get(LANE_EVALUATOR[lane], {}).get("enabled", True):
+        return None, None, (f"评估器 {LANE_EVALUATOR[lane]} 未启用"
+                            f"（config.evaluators.{LANE_EVALUATOR[lane]}.enabled=false）")
     if cfg.get("force_lane"):
         lane = cfg["force_lane"]
     files = body.get("files", [])
@@ -260,10 +355,11 @@ def validate_request(cfg, body):
     # force_lane 生效时必须显式带 lane 键，否则执行层按缺省 timing 处理
     if "lane" in body or cfg.get("force_lane"):
         sanitized["lane"] = lane
-    if lane == "correctness":
-        # 车道语义（handoff §3-L2）：只筛正确性、不做稳态计时——覆盖轮数并注记原值。
-        # bench_op 直调层 do_bench 的 warmup/rep 是时间预算（n=max(1,...)），0/1 安全；
-        # 正确性比较发生在 do_bench 之外，不受影响
+    if lane in ("correctness", "func"):
+        # 车道语义：acc 只筛数值精度（handoff §3-L2）、func 只验功能冒烟——都
+        # 不做稳态计时，恒定覆盖轮数并注记原值。bench_op 直调层 do_bench 的
+        # warmup/rep 是时间预算（n=max(1,...)），0/1 安全；正确性比较发生在
+        # do_bench 之外，不受影响
         sanitized["warmup"], sanitized["rep"] = 0, 1
         sanitized["requested_warmup"], sanitized["requested_rep"] = warmup, rep
     if bench == "gemm":
@@ -322,8 +418,8 @@ class Store:
         self.cond = threading.Condition(self.lock)
         self.jobs = {}
         self.order = deque()          # seq 升序的 job_id（含历史）
-        # 按车道分列的队列；queue_max 对两车道总和生效（L2 提速不放大排队深度）
-        self.queues = {"timing": deque(), "correctness": deque()}
+        # 按车道分列的队列；queue_max 对全部车道总和生效（L2 提速不放大排队深度）
+        self.queues = {"timing": deque(), "correctness": deque(), "func": deque()}
         self.events = {}
         self.seq = 0
         # /metrics 聚合计数器（持久语义：初值由 _init_metrics 扫 spool 衔接历史，
@@ -571,18 +667,20 @@ class SubprocessExecutor:
         self.lane = lane
 
     def _taskset_argv(self):
-        """correctness 车道把 bench 进程钉到车道核；timing 车道返回 []（不改变任何行为）。"""
-        cpus = self.cfg.get("correctness_cpus")
-        if self.lane == "correctness" and cpus and shutil.which("taskset"):
+        """非 timing 车道把 bench 进程钉到车道核；timing 车道返回 []（不改变任何行为）。"""
+        cpus, _ = lane_resources(self.cfg, self.lane)
+        if cpus and shutil.which("taskset"):
             return ["taskset", "-c", str(cpus)]
         return []
 
-    def _correctness_prefix(self):
-        if self.lane != "correctness":
+    def _lane_prefix(self):
+        """非 timing 车道注入 K3_LANE 与对齐核数的 OMP_NUM_THREADS；timing 返回 ''。"""
+        if self.lane == "timing":
             return ""
-        exports = "K3_LANE=correctness"
-        if self.cfg.get("correctness_omp_threads"):
-            exports += f" OMP_NUM_THREADS={self.cfg['correctness_omp_threads']}"
+        exports = f"K3_LANE={self.lane}"
+        _, omp = lane_resources(self.cfg, self.lane)
+        if omp:
+            exports += f" OMP_NUM_THREADS={omp}"
         return f"export {exports} && "
 
     def build_command(self, req):
@@ -596,7 +694,7 @@ class SubprocessExecutor:
             cmd = (f"python {self.cfg['scripts_root']}/bench_op.py --op {req['op']} "
                    f"--shape {req['shape']} --dtype {req['dtype']} "
                    f"--warmup {req['warmup']} --rep {req['rep']}")
-        return f"source {self.cfg['run_env']} && {self._correctness_prefix()}{cmd}"
+        return f"source {self.cfg['run_env']} && {self._lane_prefix()}{cmd}"
 
     def run(self, job):
         """返回 (state, result, kope_mem, error)。超时杀进程组。"""
@@ -604,13 +702,14 @@ class SubprocessExecutor:
         timeout_s = req["timeout_min"] * 60
         bash_cmd = self.cfg.get("bench_command_override") or self.build_command(req)
         popen_kwargs = {}
-        if self.lane == "correctness":
+        if self.lane != "timing":
             # 覆盖 bench_command_override（selftest 钩子）时环境也必须到位；
             # bash 内 export 在 source 之后兜底，防 run_env 再覆盖
             env = dict(os.environ)
-            env["K3_LANE"] = "correctness"
-            if self.cfg.get("correctness_omp_threads"):
-                env["OMP_NUM_THREADS"] = str(self.cfg["correctness_omp_threads"])
+            env["K3_LANE"] = self.lane
+            _, omp = lane_resources(self.cfg, self.lane)
+            if omp:
+                env["OMP_NUM_THREADS"] = str(omp)
             popen_kwargs["env"] = env
         proc = subprocess.Popen(
             [*self._taskset_argv(), "bash", "-c", bash_cmd],
@@ -698,16 +797,17 @@ class WarmForkExecutor:
         env = dict(os.environ)
         env["WARMD_SCRIPTS_ROOT"] = self.cfg["scripts_root"]
         env.update(self.cfg.get("warmd_env", {}))
-        if self.lane == "correctness":
+        if self.lane != "timing":
             # 车道环境随守护 env 被 fork 子进程继承（warmd 不改语义）；
             # 守护整体 taskset → 每个作业子进程天然钉在车道核
-            env["K3_LANE"] = "correctness"
-            if self.cfg.get("correctness_omp_threads"):
-                env["OMP_NUM_THREADS"] = str(self.cfg["correctness_omp_threads"])
+            env["K3_LANE"] = self.lane
+            _, omp = lane_resources(self.cfg, self.lane)
+            if omp:
+                env["OMP_NUM_THREADS"] = str(omp)
         cmd = f"source {self.cfg['run_env']} && exec python {self.cfg['warmd_path']}"
-        cpus = self.cfg.get("correctness_cpus")
+        cpus, _ = lane_resources(self.cfg, self.lane)
         argv = ["bash", "-c", cmd]
-        if self.lane == "correctness" and cpus and shutil.which("taskset"):
+        if cpus and shutil.which("taskset"):
             argv = ["taskset", "-c", str(cpus)] + argv
         self.proc = subprocess.Popen(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -819,10 +919,10 @@ class Worker(threading.Thread):
         job_dir = store.job_dir(jid)
         os.makedirs(job_dir, exist_ok=True)
         deployed = False
-        # timing 车道：持 /tmp/k3_bench.lock 与手工 SSH 基准互斥（ADR-0002，语义不变）；
-        # correctness 车道：整段不碰锁——这是该车道的全部意义（handoff §3-L2）
-        lock_fd = None if lane == "correctness" else \
-            os.open(cfg["lock_file"], os.O_CREAT | os.O_RDWR, 0o644)
+        # 仅 timing 车道持 /tmp/k3_bench.lock 与手工 SSH 基准互斥（ADR-0002，语义不变）；
+        # acc/func 车道整段不碰锁——并行筛选是车道存在的全部意义（handoff §3-L2）
+        lock_fd = os.open(cfg["lock_file"], os.O_CREAT | os.O_RDWR, 0o644) \
+            if lane == "timing" else None
         try:
             if lock_fd is not None:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
@@ -840,9 +940,13 @@ class Worker(threading.Thread):
                     raise
             state, result, kope_mem, error = self._executor_for(job.request).run(job)
             job.state, job.result, job.kope_mem, job.error = state, result, kope_mem, error
-            if lane == "correctness" and isinstance(job.result, dict):
-                # warmup=0/rep=1 下 speedup 无统计意义；lane 标注供下游甄别（correct 仍有效）
-                job.result["lane"] = "correctness"
+            if lane in ("correctness", "func") and isinstance(job.result, dict):
+                # warmup=0/rep=1 下 speedup 无统计意义；lane 标注供下游甄别
+                # （acc 的 correct 仍有效；func 只看跑通，correct 仅参考）
+                job.result["lane"] = lane
+            if lane == "func" and job.state == "done":
+                # 功能冒烟口径：有 JSON 结果行即 pass；不产出 speedup 类计时结论
+                job.kope_mem = {"pass_rate": 1.0}
         finally:
             if deployed and job.request.get("restore", True):
                 try:
@@ -872,13 +976,13 @@ def _render_metrics(m):
         "# HELP evald_queued jobs waiting per lane (authoritative in-memory queue).",
         "# TYPE evald_queued gauge",
     ]
-    for lane in ("timing", "correctness"):
+    for lane in ("timing", "correctness", "func"):
         lines.append('evald_queued{lane="%s"} %d' % (lane, m["lanes"][lane]["queued"]))
     lines += [
         "# HELP evald_running jobs currently executing per lane.",
         "# TYPE evald_running gauge",
     ]
-    for lane in ("timing", "correctness"):
+    for lane in ("timing", "correctness", "func"):
         lines.append('evald_running{lane="%s"} %d' % (lane, m["lanes"][lane]["running"]))
     lines += [
         "# HELP evald_submissions_total jobs submitted since spool creation"
@@ -1071,10 +1175,21 @@ def main():
         sys.exit(selftest(cfg))
 
     store = Store(cfg)
-    Worker(cfg, store).start()  # 计时 worker：锁/串行/warmfork 语义一字不动
-    n_correctness = max(0, int(cfg.get("correctness_workers", 3)))
-    for i in range(n_correctness):
-        Worker(cfg, store, lane="correctness", index=i).start()
+    ev = cfg["evaluators"]
+    booted = []
+    if ev["perf"]["enabled"]:
+        Worker(cfg, store).start()  # 计时 worker：锁/串行/warmfork 语义一字不动
+        booted.append("perf=timing×1")
+    n_correctness = 0
+    if ev["acc"]["enabled"]:
+        n_correctness = ev["acc"]["workers"]
+        for i in range(n_correctness):
+            Worker(cfg, store, lane="correctness", index=i).start()
+        booted.append(f"acc=correctness×{n_correctness}")
+    if ev["func"]["enabled"]:
+        for i in range(ev["func"]["workers"]):
+            Worker(cfg, store, lane="func", index=i).start()
+        booted.append(f"func×{ev['func']['workers']}")
     Handler.store = store
     Handler.cfg = cfg
     httpd = ThreadingHTTPServer((cfg["host"], cfg["port"]), Handler)
@@ -1086,7 +1201,8 @@ def main():
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
     print(f"[evald] listening on {cfg['host']}:{cfg['port']}, data_dir={cfg['data_dir']}, "
-          f"workers: 1 timing + {n_correctness} correctness (cpus={cfg.get('correctness_cpus')})",
+          f"evaluators: {', '.join(booted)} "
+          f"(acc cpus={ev['acc']['cpus']}, func cpus={ev['func']['cpus']})",
           flush=True)
     httpd.serve_forever()
 
@@ -1263,7 +1379,7 @@ def selftest(cfg):
     if shutil.which("taskset"):
         check("correctness 进程 taskset 核亲和（Popen argv）",
               SubprocessExecutor(cfg, lane="correctness")._taskset_argv()
-              == ["taskset", "-c", str(cfg["correctness_cpus"])])
+              == ["taskset", "-c", str(cfg["evaluators"]["acc"]["cpus"])])
         check("timing 车道不加 taskset（语义不变）",
               SubprocessExecutor(cfg)._taskset_argv() == [])
     else:
@@ -1280,7 +1396,8 @@ def selftest(cfg):
     check("correctness 作业入 correctness 队列", jc.job_id in store_r.queues["correctness"])
     stats = store_r.lane_stats()
     check("lane_stats 每车道计数", stats == {"timing": {"queued": 1, "running": 0},
-                                            "correctness": {"queued": 1, "running": 0}}, stats)
+                                            "correctness": {"queued": 1, "running": 0},
+                                            "func": {"queued": 0, "running": 0}}, stats)
     check("position 按车道独立", store_r.position(jt.job_id) == 1
           and store_r.position(jc.job_id) == 1)
     check("next_job 车道分派", store_r.next_job("correctness").job_id == jc.job_id
@@ -1374,7 +1491,7 @@ def selftest(cfg):
     check("timing bench 进程不被注入 K3_LANE",
           "K3_LANE=correctness" not in store_p.get(tmix.job_id).stdout)
     if shutil.which("taskset") and os.path.exists("/proc/self/status"):
-        cpus = str(cfg_p["correctness_cpus"])
+        cpus = str(cfg_p["evaluators"]["acc"]["cpus"])  # acc 车道生效核（非旧扁平键）
         check("correctness bench 进程 affinity=车道核（end-to-end）",
               all(f"Cpus_allowed_list:\t{cpus}" in store_p.get(x.job_id).stdout
                   for x in c_ids))
@@ -1418,6 +1535,117 @@ def selftest(cfg):
           and snap2["jobs"] == {"done": 1, "failed": 1, "timeout": 0}
           and snap2["last_job"] == ("add", "failed")
           and abs(snap2["last_comp_ts"] - snap["last_comp_ts"]) < 1)
+
+    print("[14] 评估器 feature flags（perf/acc/func）")
+
+    def ev_rejects(cand):
+        try:
+            normalize_evaluators(dict(cand))
+            return False
+        except SystemExit:
+            return True
+
+    base = dict(cfg)
+    base.pop("evaluators", None)
+    ev0 = normalize_evaluators(dict(base))["evaluators"]
+    check("缺省推导保持旧版（perf+acc 开、func 关）",
+          [ev0[n]["enabled"] for n in ("perf", "acc", "func")] == [True, True, False], ev0)
+    b2 = dict(base)
+    b2["correctness_workers"] = 0
+    check("correctness_workers=0 推导 acc 关",
+          normalize_evaluators(dict(b2))["evaluators"]["acc"]["enabled"] is False)
+    c1 = dict(base)
+    c1["evaluators"] = {"perf": {"enabled": False}, "acc": {"enabled": False},
+                        "func": {"enabled": False}}
+    check("全停拒绝启动", ev_rejects(c1))
+    c2 = dict(base)
+    c2["evaluators"] = {"perf": {"enabled": True}, "banana": {"enabled": True}}
+    check("未知评估器名拒绝", ev_rejects(c2))
+    c3 = dict(base)
+    c3["evaluators"] = {"acc": {"enabled": True, "warmup": 5}}
+    check("评估器节未知键拒绝", ev_rejects(c3))
+    c4 = dict(base)
+    c4["evaluators"] = {"perf": {"enabled": False},
+                        "acc": {"enabled": True, "warmup_times": 5}}
+    check("acc 配非零 warmup_times 拒绝（恒 0）", ev_rejects(c4))
+    c5 = dict(base)
+    c5["evaluators"] = {"acc": {"enabled": True},
+                        "func": {"enabled": True, "repeat_times": 3}}
+    check("func 配非 1 repeat_times 拒绝（恒 1）", ev_rejects(c5))
+    c6 = dict(base)
+    c6["evaluators"] = {"acc": {"enabled": True, "workers": 0}}
+    check("acc workers=0 拒绝", ev_rejects(c6))
+    c7 = dict(base)
+    c7["evaluators"] = {"perf": {"enabled": False}, "acc": {"enabled": True}}
+    c7["force_lane"] = "timing"
+    check("force_lane 指向停用评估器拒绝", ev_rejects(c7))
+    c8 = dict(base)
+    c8["evaluators"] = {"perf": {"enabled": True, "warmup_times": 5, "repeat_times": 5},
+                        "acc": {"enabled": True, "workers": 2, "cpus": "2-3"},
+                        "func": {"enabled": True, "workers": 1}}
+    cfg_g = normalize_evaluators(dict(c8))
+    check("归一化补全 acc/func 轮数与资源（func 资源随 acc）",
+          cfg_g["evaluators"]["acc"]["warmup_times"] == 0
+          and cfg_g["evaluators"]["acc"]["repeat_times"] == 1
+          and cfg_g["evaluators"]["func"]["cpus"] == "2-3"
+          and cfg_g["evaluators"]["func"]["omp_threads"] == 1,
+          cfg_g["evaluators"])
+
+    s3, _, eg = validate_request(cfg_g, {"op": "add", "shape": "64", "dtype": "float32"})
+    check("perf 请求缺省轮数取 evaluators.perf",
+          eg is None and s3["warmup"] == 5 and s3["rep"] == 5,
+          (eg, s3.get("warmup"), s3.get("rep")))
+    s4, _, eg2 = validate_request(cfg_g, {"op": "add", "shape": "64", "dtype": "float32",
+                                          "warmup": 9, "rep": 9})
+    check("perf 请求显式轮数覆盖配置", eg2 is None and s4["warmup"] == 9 and s4["rep"] == 9)
+    c9 = dict(cfg_g)
+    c9["evaluators"] = dict(cfg_g["evaluators"], perf={"enabled": False})
+    _, _, eg3 = validate_request(c9, {"op": "add", "shape": "64", "dtype": "float32"})
+    check("perf 停用：缺省 lane=timing 拒绝", eg3 is not None, eg3)
+    _, _, eg4 = validate_request(c9, {"op": "add", "shape": "64", "dtype": "float32",
+                                      "lane": "timing"})
+    check("perf 停用：显式 timing 拒绝", eg4 is not None and "perf" in eg4, eg4)
+    s5, _, eg5 = validate_request(c9, {"op": "add", "shape": "64", "dtype": "float32",
+                                       "lane": "func", "warmup": 7, "rep": 9})
+    check("func 车道接受", eg5 is None and s5["lane"] == "func", eg5)
+    check("func 强制 warmup=0/rep=1 并注记原值",
+          s5["warmup"] == 0 and s5["rep"] == 1
+          and s5["requested_warmup"] == 7 and s5["requested_rep"] == 9, s5)
+    _, _, eg6 = validate_request(c9, {"op": "add", "shape": "64", "dtype": "float32",
+                                      "lane": "banana"})
+    check("非法 lane 拒绝（含 func 枚举）", eg6 is not None, eg6)
+
+    cfg_f = normalize_evaluators(dict(c8))
+    cfg_f["data_dir"] = os.path.join(tmp, "dataF")
+    os.makedirs(cfg_f["data_dir"], exist_ok=True)
+    cfg_f["executor"] = "subprocess"
+    func_row = json.dumps({"op": "fake", "torch_ms": 2.0, "gems_ms": 1.0,
+                           "speedup": 2.0, "correct": None, "max_abs_err": None})
+    cfg_f["bench_command_override"] = f"echo '{func_row}'"
+    store_f = Store(cfg_f)
+    reqf = {"op": "fake", "shape": "64", "dtype": "float32", "warmup": 0, "rep": 1,
+            "bench": "op", "restore": True, "timeout_min": 1, "lane": "func", "files": []}
+    jf = store_f.submit(reqf, dict(reqf))
+    check("func 作业路由到 func 队列", jf.job_id in store_f.queues["func"])
+    Worker(cfg_f, store_f, lane="func", index=0).run_job(store_f.get(jf.job_id))
+    jfr = store_f.get(jf.job_id)
+    check("func 作业 done（correct=None 不影响 pass）", jfr.state == "done",
+          (jfr.state, jfr.error))
+    check("func 结果带 lane=func 标注", (jfr.result or {}).get("lane") == "func",
+          jfr.result)
+    check("func kope_mem 只有 pass_rate（无 speedup）",
+          jfr.kope_mem == {"pass_rate": 1.0}, jfr.kope_mem)
+    cmd_f = SubprocessExecutor(cfg_f, lane="func").build_command(dict(s5))
+    check("func 命令注入 K3_LANE=func 与 --warmup 0 --rep 1",
+          "K3_LANE=func" in cmd_f and "OMP_NUM_THREADS=1" in cmd_f
+          and "--warmup 0 --rep 1" in cmd_f, cmd_f)
+    if shutil.which("taskset"):
+        check("func 进程 taskset 用 func 车道核",
+              SubprocessExecutor(cfg_f, lane="func")._taskset_argv()
+              == ["taskset", "-c", "2-3"])
+    check("lane_stats 含 func 车道", store_f.lane_stats().get("func") is not None)
+    check("metrics 渲染含 lane=func 序列",
+          'evald_queued{lane="func"}' in _render_metrics(store_f.metrics_snapshot()))
 
     shutil.rmtree(tmp, ignore_errors=True)
     print(f"\nselftest: {'ALL PASS' if not failures else 'FAILED: ' + ', '.join(failures)}")
