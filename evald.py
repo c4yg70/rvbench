@@ -11,6 +11,11 @@ taskset 分核（handoff a100-x100 §3-L2），仅数值精度筛选；func＝�
 车道（资源口径随 acc，K3_LANE=func），warmup=0/rep=1 强制，跑通（产出
 JSON 结果行）即 pass。评估器停用后对应车道请求直接 400。
 
+可选顶层 `perf` 字段是 perf/acc/func 三评估器的资源调度覆盖层（核数/核id/
+最大并发/每车道队列深度/omp/执行器/超时），字段本身与其中每一项皆可选；
+缺省完全回落 evaluators 与旧扁平键（逐字节兼容），给出时按 perf>evaluators>
+旧扁平键>硬缺省优先级归并（见 normalize_perf_resources）。
+
 设计规格：docs/eval-server-design.md；决策：docs/adr/。
 仅用 stdlib（板上 FlagGems venv 无 pip，见 ADR-0003）。
 
@@ -47,6 +52,9 @@ TAIL_BYTES = 4096
 # 字符集仍限 [a-z0-9_]，天然拒绝点/斜杠等路径危险字符
 RE_OP = re.compile(r"^[a-z_][a-z0-9_]{0,47}$")
 RE_SHAPE = re.compile(r"^[0-9]{1,10}(,[0-9]{1,10}){0,5}$")
+# 单次提交的 shape 数上限：与 _parse_json_lines 的 cap 对齐，防止一行作业吃掉
+# 整条车道的墙钟预算（多 shape 共享一次 import，故上限不宜大）
+MAX_SHAPES = 16
 GEMM_OPS = {"mm", "addmm", "bmm"}
 OP_DTYPES = {"float32", "float16", "int32", "int64", "bool"}
 
@@ -96,17 +104,27 @@ def load_config(path):
     cfg.setdefault("correctness_omp_threads", 1)  # 注入 OMP_NUM_THREADS（与分核对齐，防 3 作业超订）
     cfg.setdefault("correctness_executor", None)  # 车道默认执行器；None=跟随请求/全局 cfg（warmfork）
     normalize_evaluators(cfg)  # 评估器 feature flags（perf/acc/func）归一化 + 启动校验
+    normalize_perf_resources(cfg)  # 可选顶层 perf 字段：资源/调度覆盖层归并（缺省即旧行为）
     return cfg
 
 
 # ---------------------------------------------------------------- 评估器 feature flags
 
 _EVALUATOR_KEYS = {
-    "perf": {"enabled", "warmup_times", "repeat_times"},
-    "acc": {"enabled", "warmup_times", "repeat_times", "workers", "cpus", "omp_threads"},
-    "func": {"enabled", "warmup_times", "repeat_times", "workers", "cpus", "omp_threads"},
+    "perf": {"enabled", "warmup_times", "repeat_times", "workers", "cpus",
+             "omp_threads", "executor", "timeout_min"},
+    "acc": {"enabled", "warmup_times", "repeat_times", "workers", "cpus",
+            "omp_threads", "executor", "timeout_min", "split_cpus"},
+    "func": {"enabled", "warmup_times", "repeat_times", "workers", "cpus",
+             "omp_threads", "executor", "timeout_min", "split_cpus"},
 }
 LANE_EVALUATOR = {"timing": "perf", "correctness": "acc", "func": "func"}
+EVALUATOR_LANE = {v: k for k, v in LANE_EVALUATOR.items()}  # perf→timing、acc→correctness…
+# 顶层可选 `perf` 字段：perf/acc/func 三评估器的资源/调度覆盖层。字段本身与
+# 其中每一项皆可选；缺省完全回落 evaluators/旧扁平键（逐字节兼容）。
+_PERF_NAMES = ("perf", "acc", "func")
+_PERF_SECTION_KEYS = {"cores", "cpu_ids", "max_concurrency", "max_queue",
+                      "omp_threads", "executor", "timeout_min", "split_cpus"}
 
 
 def normalize_evaluators(cfg):
@@ -140,6 +158,19 @@ def normalize_evaluators(cfg):
         v = perf[key]
         if isinstance(v, bool) or not isinstance(v, int) or not lo <= v <= 10000:
             raise SystemExit(f"evaluators.perf.{key} 必须是 {lo}..10000 的整数")
+    # perf（timing 车道）资源缺省：单 worker、不钉核、不注 OMP——与旧版逐字节一致；
+    # 仅当 evaluators.perf 或顶层 perf 字段显式给出时才改变（见 normalize_perf_resources）
+    perf.setdefault("workers", 1)
+    perf.setdefault("cpus", None)
+    perf.setdefault("omp_threads", None)
+    if isinstance(perf["workers"], bool) or not isinstance(perf["workers"], int) \
+            or perf["workers"] < 1:
+        raise SystemExit("evaluators.perf.workers 必须是 >=1 的整数")
+    if perf["cpus"] is not None and (not isinstance(perf["cpus"], str) or not perf["cpus"]):
+        raise SystemExit("evaluators.perf.cpus 必须是非空字符串或 null")
+    if perf["omp_threads"] is not None and (isinstance(perf["omp_threads"], bool)
+            or not isinstance(perf["omp_threads"], int) or perf["omp_threads"] < 1):
+        raise SystemExit("evaluators.perf.omp_threads 必须是 >=1 的整数或 null")
     for name in ("acc", "func"):
         sec = norm[name]
         sec["enabled"] = bool(sec.get("enabled", legacy[name]["enabled"]))
@@ -157,6 +188,8 @@ def normalize_evaluators(cfg):
         sec.setdefault("omp_threads",
                        cfg.get("correctness_omp_threads", 1) if prev is None
                        else prev["omp_threads"])
+        if "split_cpus" in sec and not isinstance(sec["split_cpus"], bool):
+            raise SystemExit(f"evaluators.{name}.split_cpus 必须是布尔值")
         if not sec["enabled"]:
             continue  # 旧版兼容：correctness_workers=0 推导 acc 关，资源不做约束
         if (isinstance(sec["workers"], bool) or not isinstance(sec["workers"], int)
@@ -164,6 +197,18 @@ def normalize_evaluators(cfg):
             raise SystemExit(f"evaluators.{name}.workers 必须是 >=1 的整数")
         if not isinstance(sec["cpus"], str) or not sec["cpus"]:
             raise SystemExit(f'evaluators.{name}.cpus 必须是非空字符串（如 "4-7"）')
+    # executor / timeout_min 是三评估器共用的可选项（亦可由顶层 perf 字段归并进来）；
+    # 此处校验 evaluators 节直接给出的值，perf 字段的值在 normalize_perf_resources 校验
+    for name in _PERF_NAMES:
+        sec = norm[name]
+        if "executor" in sec and sec["executor"] not in ("subprocess", "warmfork"):
+            raise SystemExit(f"evaluators.{name}.executor 只能是 subprocess | warmfork")
+        if "timeout_min" in sec:
+            tm = sec["timeout_min"]
+            if isinstance(tm, bool) or not isinstance(tm, (int, float)) \
+                    or not (0.1 <= tm <= cfg["timeout_max_min"]):
+                raise SystemExit(
+                    f"evaluators.{name}.timeout_min 必须在 0.1..{cfg['timeout_max_min']} 分钟之间")
     if not any(norm[name]["enabled"] for name in norm):
         raise SystemExit("config.evaluators: 至少启用一个评估器 (perf/acc/func)")
     if cfg.get("force_lane"):
@@ -175,12 +220,203 @@ def normalize_evaluators(cfg):
     return cfg
 
 
-def lane_resources(cfg, lane):
-    """车道生效资源 (cpus, omp_threads)；timing 车道返回 (None, None)。"""
-    if lane == "timing":
-        return None, None
+# ---------------------------------------------------------------- perf 资源覆盖层（可选）
+
+def _parse_cpu_spec(spec):
+    """把 taskset 风格 CPU 规格（"12-14"/"0,2,4"/"0-3,8"）或 int 列表解析为
+    升序去重核 id 列表；非法（空/负数/lo>hi/非数字/非 str|list）返回 None。"""
+    if isinstance(spec, list):
+        ids = []
+        for x in spec:
+            if isinstance(x, bool) or not isinstance(x, int) or x < 0:
+                return None
+            ids.append(x)
+        return sorted(set(ids)) or None
+    if not isinstance(spec, str) or not spec.strip():
+        return None
+    ids = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            return None
+        if "-" in part:
+            lo, _, hi = part.partition("-")
+            if not (lo.strip().isdigit() and hi.strip().isdigit()):
+                return None
+            lo, hi = int(lo), int(hi)
+            if lo > hi:
+                return None
+            ids.extend(range(lo, hi + 1))
+        elif part.isdigit():
+            ids.append(int(part))
+        else:
+            return None
+    return sorted(set(ids)) or None
+
+
+def _format_cpu_ids(ids):
+    """升序核 id 列表压回紧凑 taskset 字符串（连续段 a-b，孤立 a）。"""
+    ids = sorted(set(ids))
+    if not ids:
+        return ""
+    out, start, prev = [], ids[0], ids[0]
+    for x in ids[1:]:
+        if x == prev + 1:
+            prev = x
+            continue
+        out.append(str(start) if start == prev else f"{start}-{prev}")
+        start = prev = x
+    out.append(str(start) if start == prev else f"{start}-{prev}")
+    return ",".join(out)
+
+
+def _perf_int(name, key, v, lo, hi=None):
+    """perf 字段整数校验：非 bool 的 int 且 lo<=v(<=hi)；否则 SystemExit。"""
+    if isinstance(v, bool) or not isinstance(v, int) or v < lo or (hi is not None and v > hi):
+        rng = f"{lo}..{hi}" if hi is not None else f">={lo}"
+        raise SystemExit(f"config.perf.{name}.{key} 必须是 {rng} 的整数")
+
+
+def normalize_perf_resources(cfg):
+    """归并可选顶层 `perf` 字段（perf/acc/func 资源与调度覆盖层）。
+
+    优先级：perf 字段 > evaluators > 旧扁平键（correctness_*）> 硬缺省。
+    把 cores/cpu_ids→evaluators.<n>.cpus、max_concurrency→workers、
+    omp_threads/executor/timeout_min→同名键、max_queue→cfg["lane_queue_max"][lane]
+    归并；下游（lane_resources/Worker/Store/validate_request）只读归并后结构。
+    `perf` 的值可为 JSON 对象或其字符串形式（json 字符串），后者自动 json.loads。
+    字段缺省时仅初始化 lane_queue_max 为全 None（不设车道级队列上限）。
+    cpus 归并后仍由 lane_resources 按 worker index/total 进一步均分（已有机制）。
+    """
+    # copy-on-write：避免浅拷贝 cfg 时污染父字典（selftest 大量 dict(cfg)）
+    lq = dict(cfg.get("lane_queue_max") or {})
+    for lane in LANE_EVALUATOR:
+        lq.setdefault(lane, None)
+    cfg["lane_queue_max"] = lq
+
+    raw = cfg.get("perf")
+    if raw is None:
+        return cfg
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"config.perf 为字符串时必须是合法 JSON：{exc}")
+    if not isinstance(raw, dict):
+        raise SystemExit("config.perf 必须是 JSON 对象或其字符串形式")
+    if set(raw) - set(_PERF_NAMES):
+        raise SystemExit(f"config.perf 只接受键 {list(_PERF_NAMES)}")
+
+    ev = cfg["evaluators"]  # 已由 normalize_evaluators 归一（每评估器含 workers/cpus/…）
+    for name in _PERF_NAMES:
+        sec = raw.get(name)
+        if sec is None:
+            continue
+        if not isinstance(sec, dict):
+            raise SystemExit(f"config.perf.{name} 必须是 JSON 对象")
+        if set(sec) - _PERF_SECTION_KEYS:
+            raise SystemExit(f"config.perf.{name} 只接受键 {sorted(_PERF_SECTION_KEYS)}")
+        tgt, lane = ev[name], EVALUATOR_LANE[name]
+
+        # 核 id / 核数 → taskset cpus（cpu_ids 精确指定；cores 在既有核池上裁剪）
+        cpu_ids, cores = sec.get("cpu_ids"), sec.get("cores")
+        if cpu_ids is not None:
+            ids = _parse_cpu_spec(cpu_ids)
+            if ids is None:
+                raise SystemExit(
+                    f'config.perf.{name}.cpu_ids 非法（用 "12-14"/"0,2,4"/[12,13,14]）：{cpu_ids!r}')
+            if cores is not None:
+                _perf_int(name, "cores", cores, 1)
+                if len(ids) != cores:
+                    raise SystemExit(
+                        f"config.perf.{name}: cores={cores} 与 cpu_ids 解析出的 {len(ids)} 核不一致")
+            tgt["cpus"] = _format_cpu_ids(ids)
+        elif cores is not None:
+            _perf_int(name, "cores", cores, 1)
+            pool = _parse_cpu_spec(tgt.get("cpus"))  # 既有 evaluators/旧扁平键核池
+            if pool is None:
+                raise SystemExit(
+                    f"config.perf.{name}.cores 需配合 cpu_ids，或该评估器已有 cpus 核池可裁剪")
+            if cores > len(pool):
+                raise SystemExit(
+                    f"config.perf.{name}.cores={cores} 超过既有核池 {tgt.get('cpus')!r}（{len(pool)} 核）")
+            tgt["cpus"] = _format_cpu_ids(pool[:cores])
+
+        if "max_concurrency" in sec:
+            _perf_int(name, "max_concurrency", sec["max_concurrency"], 1)
+            tgt["workers"] = sec["max_concurrency"]
+        if "omp_threads" in sec:
+            _perf_int(name, "omp_threads", sec["omp_threads"], 1)
+            tgt["omp_threads"] = sec["omp_threads"]
+        if "split_cpus" in sec:
+            if not isinstance(sec["split_cpus"], bool):
+                raise SystemExit(f"config.perf.{name}.split_cpus 必须是布尔值")
+            tgt["split_cpus"] = sec["split_cpus"]
+        if "executor" in sec:
+            if sec["executor"] not in ("subprocess", "warmfork"):
+                raise SystemExit(f"config.perf.{name}.executor 只能是 subprocess | warmfork")
+            tgt["executor"] = sec["executor"]
+        if "timeout_min" in sec:
+            tm = sec["timeout_min"]
+            if isinstance(tm, bool) or not isinstance(tm, (int, float)) \
+                    or not (0.1 <= tm <= cfg["timeout_max_min"]):
+                raise SystemExit(
+                    f"config.perf.{name}.timeout_min 必须在 0.1..{cfg['timeout_max_min']} 分钟之间")
+            tgt["timeout_min"] = float(tm)
+        if "max_queue" in sec:
+            _perf_int(name, "max_queue", sec["max_queue"], 1)
+            lq[lane] = sec["max_queue"]
+
+    return cfg
+
+
+def _split_cpus(spec, index, total):
+    """把车道 cpus 串（"0-7" / "2-5,8"）均分为 total 份，取第 index 份（连续段）。
+
+    长度不整除时前面的份各多 1 个；CPU 数 < total 等不可切分情形返回 None
+    （调用方回落整段共享掩码——共享总比不跑强）。
+    """
+    cpus = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = part.split("-", 1)
+            cpus.extend(range(int(a), int(b) + 1))
+        elif part:
+            cpus.append(int(part))
+    if total < 1 or len(cpus) < total or not 0 <= index < total:
+        return None
+    base, extra = divmod(len(cpus), total)
+    start = index * base + min(index, extra)
+    size = base + (1 if index < extra else 0)
+    chunk = cpus[start:start + size]
+    out, run_start, prev = [], None, None
+    for c in chunk:
+        if prev is None:
+            run_start = prev = c
+        elif c == prev + 1:
+            prev = c
+        else:
+            out.append(str(run_start) if run_start == prev else f"{run_start}-{prev}")
+            run_start = prev = c
+    out.append(str(run_start) if run_start == prev else f"{run_start}-{prev}")
+    return ",".join(out)
+
+
+def lane_resources(cfg, lane, index=None, total=None):
+    """车道生效资源 (cpus, omp_threads)。
+
+    timing 默认 (None, None)（不钉核/不注 OMP，逐字节兼容）；仅当顶层 perf
+    字段为 perf 配了 cpu_ids/omp_threads 时才返回其生效值（opt-in 钉核）。
+    index/total 成对给出且 total>1 时，把车道 cpus 均分给各 worker（每 worker
+    独占一段核，acc/func 并发零争用）；不可切分时回落整段共享。
+    """
     sec = cfg["evaluators"][LANE_EVALUATOR[lane]]  # 车道名→评估器名（correctness→acc）
-    return sec["cpus"], sec["omp_threads"]
+    cpus, omp = sec.get("cpus"), sec.get("omp_threads")
+    if cpus and index is not None and total is not None and total > 1 \
+            and sec.get("split_cpus", True):   # split_cpus=false → 整段共享（软限制对照）
+        cpus = _split_cpus(cpus, index, total) or cpus
+    return cpus, omp
 
 
 # ---------------------------------------------------------------- 白名单解析
@@ -300,9 +536,22 @@ def validate_request(cfg, body):
     dtype = body.get("dtype", "float32")
     if dtype not in OP_DTYPES:
         return None, None, f"dtype 只支持 {sorted(OP_DTYPES)}"
+    # shape 支持两种形态：字符串（单 case，行为与旧版逐字节一致）或字符串
+    # 列表（同 op 多 shape，一次 import 跑完，摊薄 flag_gems/torch 导入成本）
     shape = body.get("shape")
-    if not isinstance(shape, str) or not RE_SHAPE.match(shape):
-        return None, None, "shape 不合法（如 64,512,512）"
+    if isinstance(shape, str):
+        multi, shapes = False, [shape]
+    elif isinstance(shape, list) and shape:
+        multi, shapes = True, list(shape)
+    else:
+        return None, None, "shape 必须是字符串或非空字符串列表（如 64,512,512）"
+    if len(shapes) > MAX_SHAPES:
+        return None, None, f"shape 最多 {MAX_SHAPES} 个"
+    for s in shapes:
+        if not isinstance(s, str) or not RE_SHAPE.match(s):
+            return None, None, f"shape 不合法（如 64,512,512）: {s!r}"
+    if len(set(shapes)) != len(shapes):
+        return None, None, "shape 列表内不可重复"
     perf_cfg = cfg.get("evaluators", {}).get("perf", {})
     warmup = body.get("warmup", perf_cfg.get("warmup_times", 25))
     rep = body.get("rep", perf_cfg.get("repeat_times", 100))
@@ -314,9 +563,16 @@ def validate_request(cfg, body):
     restore = body.get("restore", True)
     if not isinstance(restore, bool):
         return None, None, "restore 必须是 bool"
-    timeout_min = body.get("timeout_min", cfg["timeout_default_min"])
-    if not isinstance(timeout_min, (int, float)) or not (0.1 <= timeout_min <= cfg["timeout_max_min"]):
-        return None, None, f"timeout_min 必须在 0.1..{cfg['timeout_max_min']} 分钟之间"
+    # 车道级默认超时（perf 字段/evaluators.<n>.timeout_min）优先于全局 timeout_default_min；
+    # lane 非法时此处取不到覆盖、随后 lane 校验会拒绝，故用 raw lane 查表是安全的
+    _ev_name = LANE_EVALUATOR.get(body.get("lane", "timing"))
+    _lane_to = cfg["evaluators"].get(_ev_name, {}).get("timeout_min") if _ev_name else None
+    timeout_min = body.get("timeout_min",
+                           _lane_to if _lane_to is not None else cfg["timeout_default_min"])
+    # 多 shape 共用一份墙钟预算（整批 timeout，不是每 case），上限按 case 数放宽
+    timeout_max = cfg["timeout_max_min"] * (len(shapes) if multi else 1)
+    if not isinstance(timeout_min, (int, float)) or not (0.1 <= timeout_min <= timeout_max):
+        return None, None, f"timeout_min 必须在 0.1..{timeout_max} 分钟之间（整批墙钟）"
     executor = body.get("executor")
     if executor is not None and executor not in ("subprocess", "warmfork"):
         return None, None, "executor 只能是 subprocess | warmfork"
@@ -365,6 +621,71 @@ def validate_request(cfg, body):
     if bench == "gemm":
         sanitized["batch"] = batch
     return sanitized, files, None
+
+
+# ---------------------------------------------------------------- 遥测基础设施
+
+# 固定 bucket（写死，不做动态）：进程内语义，evald 重启清零，不从 spool 重建。
+# 与 submissions_total / jobs_total 的持久语义严格区分——后者扫 spool 衔接历史。
+HIST_BUCKETS = {
+    "queue_wait": (1, 5, 15, 30, 60, 120, 300, 600),
+    "job_duration": (5, 15, 30, 60, 90, 120, 300, 600),
+    "psr": (1, 2, 4, 8, 16),
+}
+HIST_METRIC = {
+    "queue_wait": "evald_queue_wait_seconds",
+    "job_duration": "evald_job_duration_seconds",
+    "psr": "evald_psr",
+}
+
+
+def _fmt_le(x):
+    """bucket 上界渲染：整数不带小数点，保持与 Prometheus 惯例一致。"""
+    return str(int(x)) if float(x).is_integer() else ("%g" % x)
+
+
+class Histogram:
+    """进程内 histogram（重启清零）。le 语义为「≤ 该上界的观测数」。"""
+
+    def __init__(self, kind):
+        self.kind = kind
+        self.buckets = HIST_BUCKETS[kind]
+        self.counts = [0] * len(self.buckets)
+        self.count = 0
+        self.sum = 0.0
+
+    def observe(self, v):
+        if v is None:
+            return
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return
+        if v != v or v in (float("inf"), float("-inf")):  # NaN/Inf 不入桶
+            return
+        self.count += 1
+        self.sum += v
+        for i, b in enumerate(self.buckets):
+            if v <= b:
+                self.counts[i] += 1
+
+    def as_tuple(self):
+        return (self.count, self.sum, list(self.counts))
+
+
+_RE_JOB_PATH = re.compile(r"^/jobs/[^/?]+")
+
+
+def normalize_path(p):
+    """HTTP 指标的 path label：把 /jobs/<uuid> 归一为 /jobs/{id}。
+
+    基数控制：作业 id / 算子名绝不进 label（237 算子 × 状态 = 序列爆炸）。
+    """
+    p = (p or "/").split("?")[0]
+    m = _RE_JOB_PATH.match(p)
+    if m:
+        return "/jobs/{id}" + p[m.end():]
+    return p or "/"
 
 
 # ---------------------------------------------------------------- 作业存储
@@ -429,6 +750,16 @@ class Store:
         self.m_last_sub_ts = 0.0
         self.m_last_comp_ts = 0.0
         self.m_last_job = None          # (op, state) —— 只暴露最新一条
+        # 进程内遥测（重启清零；与上面 spool 持久计数的语义严格区分，见 §4.3）
+        self.m_hist = {"queue_wait": {}, "job_duration": {}, "psr": {}}
+        self.m_completed = {}           # {lane: {state: n}}
+        self.m_fallback = {}            # warmd→subprocess 回退 {reason: n}
+        self.m_restore_fail = 0         # restore 失败（P0：实验环境 §4.6 要 HALT）
+        self.m_http = {}                # {(path, status): n}
+        self.m_longpoll = 0             # 长轮询挂起数
+        # 最近 3 个已完成作业（idx0=最新），元素 = (op, state, dur, wait, fin_epoch)。
+        # 与 m_last_job 同源语义：重启由 _init_metrics 扫 spool 重建，之后 finish() 维护。
+        self.m_recent = deque(maxlen=3)
         self._load_history()
         self._sweep_stale()
         self._init_metrics()
@@ -484,6 +815,7 @@ class Store:
         submissions = 0
         last_sub_ts = 0.0
         last_key, last_info = (0.0, ""), None
+        recent_cands = []               # (sort_key, op, state, dur, wait, fin_epoch)
         try:
             names = os.listdir(self.jobs_dir)
         except OSError:
@@ -514,15 +846,33 @@ class Store:
                 last_key = key
                 req = rec.get("request") or {}
                 last_info = (req.get("op") or "unknown", state or "unknown")
+            # 最近 3 条已完成作业（重建面板 K3 卡「最近 3 个作业」）：与 last_job_info
+            # 同源、同排序键；duration_s 缺失（未真正执行）的跳过。fin 用 result.json
+            # mtime（≈完成时刻 epoch），与 finish() 路径的 job.finished_at 毫秒级一致。
+            if state in ("done", "failed", "timeout") and rec.get("duration_s") is not None:
+                rq = rec.get("request") or {}
+                recent_cands.append(
+                    (key, rq.get("op") or "unknown", state,
+                     rec.get("duration_s"), rec.get("queue_wait_s"), comp_ts))
+        recent_cands.sort(key=lambda t: t[0], reverse=True)
         with self.lock:
             self.m_submissions = submissions
             self.m_last_sub_ts = last_sub_ts
             self.m_last_comp_ts = last_key[0]
             self.m_last_job = last_info
+            self.m_recent = deque(
+                [(op, st, dur, wait, fin)
+                 for _k, op, st, dur, wait, fin in recent_cands[:3]], maxlen=3)
 
     def submit(self, sanitized, payload):
         with self.cond:
+            lane = sanitized.get("lane", "timing")
+            # 全局 queue_max（跨车道总和）+ 可选车道级 max_queue（perf 字段）双闸；
+            # 车道级未配置（None）时只受全局闸约束（逐字节兼容旧行为）
             if sum(len(q) for q in self.queues.values()) >= self.cfg["queue_max"]:
+                raise QueueFullError()
+            lqmax = self.cfg.get("lane_queue_max", {}).get(lane)
+            if lqmax is not None and len(self.queues[lane]) >= lqmax:
                 raise QueueFullError()
             self.seq += 1
             job = Job(uuid7(), self.seq, sanitized, extra=self.cfg.get("result_extra"))
@@ -533,7 +883,7 @@ class Store:
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "request.json"), "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False)
-            self.queues[sanitized.get("lane", "timing")].append(job.job_id)
+            self.queues[lane].append(job.job_id)
             self.m_submissions += 1
             self.m_last_sub_ts = job.submitted_at
             # notify_all：waiter 分属两车道，单 notify 可能被错误车道的 waiter
@@ -580,15 +930,70 @@ class Store:
                                           j.request.get("lane", "timing") == lane)}
                     for lane in self.queues}
 
+    # -- 进程内遥测埋点（全部在 self.lock 下；RLock 可重入，被 finish/observe 复用）
+
+    def observe(self, kind, lane, value):
+        """histogram 埋点。进程内语义，重启清零。"""
+        with self.lock:
+            h = self.m_hist[kind].get(lane)
+            if h is None:
+                h = self.m_hist[kind][lane] = Histogram(kind)
+            h.observe(value)
+
+    def count_completed(self, lane, state):
+        with self.lock:
+            d = self.m_completed.setdefault(lane, {})
+            d[state] = d.get(state, 0) + 1
+
+    def count_fallback(self, reason):
+        with self.lock:
+            self.m_fallback[reason] = self.m_fallback.get(reason, 0) + 1
+
+    def count_restore_fail(self):
+        with self.lock:
+            self.m_restore_fail += 1
+
+    def count_http(self, path, code):
+        with self.lock:
+            k = (path, code)
+            self.m_http[k] = self.m_http.get(k, 0) + 1
+
+    def bump_longpoll(self, delta):
+        with self.lock:
+            self.m_longpoll += delta
+
+    def oldest_queued_age(self, lane):
+        """队头作业已等待秒数（O(1)，不扫 spool）；空队列返回 None。"""
+        with self.lock:
+            q = self.queues[lane]
+            if not q:
+                return None
+            j = self.jobs.get(q[0])
+            return (time.time() - j.submitted_at) if j else None
+
     def metrics_snapshot(self):
-        """/metrics 用：聚合计数快照（lane 计数与 lane_stats 同源、同一把锁）。"""
+        """/metrics 用：聚合计数快照（lane 计数与 lane_stats 同源、同一把锁）。
+
+        渲染必须 O(1)：不扫 spool。spool 规模用运行期计数器 m_submissions 表示。
+        """
         with self.lock:
             return {"lanes": self.lane_stats(),
                     "submissions": self.m_submissions,
                     "jobs": dict(self.m_jobs),
                     "last_sub_ts": self.m_last_sub_ts,
                     "last_comp_ts": self.m_last_comp_ts,
-                    "last_job": self.m_last_job}
+                    "last_job": self.m_last_job,
+                    "recent": list(self.m_recent),
+                    "hist": {k: {lane: h.as_tuple() for lane, h in d.items()}
+                             for k, d in self.m_hist.items()},
+                    "completed": {lane: dict(d)
+                                  for lane, d in self.m_completed.items()},
+                    "fallback": dict(self.m_fallback),
+                    "restore_fail": self.m_restore_fail,
+                    "http": dict(self.m_http),
+                    "longpoll": self.m_longpoll,
+                    "oldest_age": {lane: self.oldest_queued_age(lane)
+                                   for lane in self.queues}}
 
     def job_dir(self, job_id):
         return os.path.join(self.jobs_dir, job_id)
@@ -612,6 +1017,24 @@ class Store:
                 self.m_jobs[job.state] += 1
             self.m_last_comp_ts = job.finished_at
             self.m_last_job = (job.request.get("op") or "unknown", job.state)
+            # 最近 3 条已完成作业（idx0=最新）：deque(maxlen=3) 自动淘汰最旧，O(1)
+            dur = (job.finished_at - job.started_at) if job.started_at else None
+            wait = (job.started_at - job.submitted_at) if job.started_at else None
+            self.m_recent.appendleft(
+                (job.request.get("op") or "unknown", job.state,
+                 dur, wait, job.finished_at))
+            # 遥测：按 lane/state 的终态计数（rate 友好）+ 执行时长 + PSR
+            lane = job.request.get("lane", "timing")
+            self.count_completed(lane, job.state)
+            if job.started_at:
+                self.observe("job_duration", lane, job.finished_at - job.started_at)
+            psr = None
+            for src in (job.result, job.kope_mem):
+                if isinstance(src, dict) and src.get("psr") is not None:
+                    psr = src["psr"]
+                    break
+            if psr is not None:
+                self.observe("psr", lane, psr)
             self._persist(job)
         self._fire_event(job.job_id)
         d = self.job_dir(job.job_id)
@@ -662,26 +1085,29 @@ class QueueFullError(Exception):
 # ---------------------------------------------------------------- 执行器（v1 子进程）
 
 class SubprocessExecutor:
-    def __init__(self, cfg, lane="timing"):
+    def __init__(self, cfg, lane="timing", index=None, total=None):
         self.cfg = cfg
         self.lane = lane
+        self.index, self.total = index, total   # 车道 worker 分核参数（total>1 才切分）
 
     def _taskset_argv(self):
-        """非 timing 车道把 bench 进程钉到车道核；timing 车道返回 []（不改变任何行为）。"""
-        cpus, _ = lane_resources(self.cfg, self.lane)
+        """非 timing 车道把 bench 进程钉到本 worker 的核段；timing 车道返回 []（不改变任何行为）。"""
+        cpus, _ = lane_resources(self.cfg, self.lane, self.index, self.total)
         if cpus and shutil.which("taskset"):
             return ["taskset", "-c", str(cpus)]
         return []
 
     def _lane_prefix(self):
-        """非 timing 车道注入 K3_LANE 与对齐核数的 OMP_NUM_THREADS；timing 返回 ''。"""
-        if self.lane == "timing":
-            return ""
-        exports = f"K3_LANE={self.lane}"
+        """注入车道环境：K3_LANE（非 timing）与 OMP_NUM_THREADS（按车道配置）。
+        timing 默认两者皆无（逐字节兼容）；仅当 perf 字段为 perf 配了 omp_threads
+        时才给 timing 注入 OMP（K3_LANE 始终不注入 timing，避免 bench 误判车道）。"""
+        exports = []
+        if self.lane != "timing":
+            exports.append(f"K3_LANE={self.lane}")
         _, omp = lane_resources(self.cfg, self.lane)
         if omp:
-            exports += f" OMP_NUM_THREADS={omp}"
-        return f"export {exports} && "
+            exports.append(f"OMP_NUM_THREADS={omp}")
+        return f"export {' '.join(exports)} && " if exports else ""
 
     def build_command(self, req):
         # 所有参数均已通过 validate_request 的正则/枚举校验，无注入面
@@ -691,9 +1117,14 @@ class SubprocessExecutor:
             if req["op"] == "bmm":
                 cmd += f" --batch {req['batch']}"
         else:
-            cmd = (f"python {self.cfg['scripts_root']}/bench_op.py --op {req['op']} "
-                   f"--shape {req['shape']} --dtype {req['dtype']} "
-                   f"--warmup {req['warmup']} --rep {req['rep']}")
+            # 多 shape：这是 warmd 故障时的降级路径，用 && 串起来保证每个 shape
+            # 都出结果（不追求摊薄 import；摊薄由 warmd 主路径的进程内循环负责）
+            base = (f"python {self.cfg['scripts_root']}/bench_op.py --op {req['op']} "
+                    f"--shape %s --dtype {req['dtype']} "
+                    f"--warmup {req['warmup']} --rep {req['rep']}")
+            shapes = req["shape"]
+            cmd = " && ".join(base % s for s in
+                              (shapes if isinstance(shapes, list) else [shapes]))
         return f"source {self.cfg['run_env']} && {self._lane_prefix()}{cmd}"
 
     def run(self, job):
@@ -702,12 +1133,14 @@ class SubprocessExecutor:
         timeout_s = req["timeout_min"] * 60
         bash_cmd = self.cfg.get("bench_command_override") or self.build_command(req)
         popen_kwargs = {}
-        if self.lane != "timing":
+        _, omp = lane_resources(self.cfg, self.lane)
+        if self.lane != "timing" or omp:
             # 覆盖 bench_command_override（selftest 钩子）时环境也必须到位；
-            # bash 内 export 在 source 之后兜底，防 run_env 再覆盖
+            # bash 内 export 在 source 之后兜底，防 run_env 再覆盖。
+            # timing 默认不进此分支（无 K3_LANE/OMP）；配了 perf.omp_threads 才注入 OMP
             env = dict(os.environ)
-            env["K3_LANE"] = self.lane
-            _, omp = lane_resources(self.cfg, self.lane)
+            if self.lane != "timing":
+                env["K3_LANE"] = self.lane
             if omp:
                 env["OMP_NUM_THREADS"] = str(omp)
             popen_kwargs["env"] = env
@@ -731,12 +1164,17 @@ class SubprocessExecutor:
         rows = _parse_json_lines(out)
         if not rows:
             return "failed", None, None, "no JSON line in stdout"
-        result, kope_mem = _map_rows(req["bench"], rows)
+        result, kope_mem = _map_rows(req["bench"], rows, req.get("shape"))
         return "done", result, kope_mem, None
 
 
-def _map_rows(bench, rows):
-    """把 bench 输出的 JSON 行映射为 (result, kope_mem)。"""
+def _map_rows(bench, rows, shapes=None):
+    """把 bench 输出的 JSON 行映射为 (result, kope_mem)。
+
+    多 shape 提交（shapes 为长度 >1 的列表）时按提交顺序给每行标注 shape，
+    包成 result.cases[]；**顶层不放 speedup 标量**——顶层放一个会让只看
+    speedup 的老驱动静默按第一个 shape 判定，静默错判比显式报错危险得多。
+    """
     if bench == "gemm":
         ok = all(r.get("correct") for r in rows)
         spd = rows[0].get("speedup")
@@ -744,6 +1182,22 @@ def _map_rows(bench, rows):
         if isinstance(result, dict) and "metric" not in result:
             result = dict(result, metric="gflops")
         return result, {"speedup": spd, "pass_rate": 1.0 if ok else 0.0}
+    if isinstance(shapes, list) and len(shapes) > 1:
+        cases = []
+        for i, row in enumerate(rows):
+            c = dict(row)
+            # 按提交顺序标注 shape，一律以提交的字符串为准：真实 bench_op.py 会把
+            # shape 解析成 list（如 [64,512,512]），而结果契约（设计 §1.5）与驱动
+            # eval_pipeline 都按提交原样的字符串对齐，故覆盖 bench 行的解析形态。
+            if i < len(shapes):
+                c["shape"] = shapes[i]
+            cases.append(c)
+        ok = [bool(c.get("correct")) for c in cases]
+        result = {"cases": cases, "shapes": list(shapes),
+                  "cases_expected": len(shapes), "cases_returned": len(rows)}
+        if len(rows) != len(shapes):
+            result["partial"] = True
+        return result, {"pass_rate": (sum(ok) / len(ok)) if ok else 0.0}
     row = rows[-1]
     return row, {"speedup": row.get("speedup"),
                  "pass_rate": 1.0 if row.get("correct") else 0.0}
@@ -777,9 +1231,11 @@ class WarmForkExecutor:
     守护异常（起不来/EOF/协议错）时本作业自动回退 SubprocessExecutor。
     """
 
-    def __init__(self, cfg, lane="timing"):
+    def __init__(self, cfg, lane="timing", store=None, index=None, total=None):
         self.cfg = cfg
         self.lane = lane
+        self.store = store          # 仅用于回退埋点（selftest 可传 None）
+        self.index, self.total = index, total   # 车道 worker 分核参数（total>1 才切分）
         self.proc = None
         self.stderr_tail = []
         self.lock = threading.Lock()
@@ -797,15 +1253,15 @@ class WarmForkExecutor:
         env = dict(os.environ)
         env["WARMD_SCRIPTS_ROOT"] = self.cfg["scripts_root"]
         env.update(self.cfg.get("warmd_env", {}))
+        cpus, omp = lane_resources(self.cfg, self.lane, self.index, self.total)
+        # 车道环境随守护 env 被 fork 子进程继承（warmd 不改语义）；守护整体
+        # taskset → 每个作业子进程天然钉在车道核。timing 默认无 K3_LANE/OMP/钉核；
+        # 仅当 perf 字段为 perf 配了 cpu_ids/omp_threads 时才生效（opt-in）
         if self.lane != "timing":
-            # 车道环境随守护 env 被 fork 子进程继承（warmd 不改语义）；
-            # 守护整体 taskset → 每个作业子进程天然钉在车道核
             env["K3_LANE"] = self.lane
-            _, omp = lane_resources(self.cfg, self.lane)
-            if omp:
-                env["OMP_NUM_THREADS"] = str(omp)
+        if omp:
+            env["OMP_NUM_THREADS"] = str(omp)
         cmd = f"source {self.cfg['run_env']} && exec python {self.cfg['warmd_path']}"
-        cpus, _ = lane_resources(self.cfg, self.lane)
         argv = ["bash", "-c", cmd]
         if cpus and shutil.which("taskset"):
             argv = ["taskset", "-c", str(cpus)] + argv
@@ -865,7 +1321,11 @@ class WarmForkExecutor:
             except (RuntimeError, OSError, ValueError) as exc:
                 self._kill()
                 job.stderr = (job.stderr or "") + f"\n[warmd 故障，本作业回退 subprocess: {exc}]"
-                return SubprocessExecutor(self.cfg, self.lane).run(job)
+                # 遥测：回退此前是隐形故障（零信号），现按异常类型计数
+                if self.store:
+                    self.store.count_fallback(type(exc).__name__)
+                return SubprocessExecutor(self.cfg, self.lane,
+                                          self.index, self.total).run(job)
         job.stdout = resp.get("stdout") or ""
         job.stderr = (job.stderr or "") + (resp.get("stderr") or "")
         state = resp.get("state", "failed")
@@ -874,7 +1334,7 @@ class WarmForkExecutor:
         if state == "done":
             rows = resp.get("result") or []
             if rows:
-                result, kope_mem = _map_rows(req["bench"], rows)
+                result, kope_mem = _map_rows(req["bench"], rows, req.get("shape"))
             else:
                 state, error = "failed", "warmd done but empty rows"
         return state, result, kope_mem, error
@@ -883,19 +1343,27 @@ class WarmForkExecutor:
 # ---------------------------------------------------------------- worker
 
 class Worker(threading.Thread):
-    def __init__(self, cfg, store, lane="timing", index=0):
+    def __init__(self, cfg, store, lane="timing", index=0, total=None):
         super().__init__(daemon=True, name="evald-worker" if lane == "timing"
                          else f"evald-worker-{lane}-{index}")
         self.cfg = cfg
         self.store = store
         self.lane = lane
-        self.executors = {"subprocess": SubprocessExecutor(cfg, lane=lane),
-                          "warmfork": WarmForkExecutor(cfg, lane=lane)}
+        self.index, self.total = index, total   # 车道 worker 分核参数（total>1 才切分）
+        self.executors = {"subprocess": SubprocessExecutor(cfg, lane=lane,
+                                                           index=index, total=total),
+                          "warmfork": WarmForkExecutor(cfg, lane=lane, store=store,
+                                                       index=index, total=total)}
 
     def _executor_for(self, request):
+        # 优先级：请求体 executor > 车道级（perf 字段/evaluators.<n>.executor）
+        # > 旧扁平键 correctness_executor（仅 correctness）> 全局 executor
         name = request.get("executor")
+        if not name:
+            ev_name = LANE_EVALUATOR.get(self.lane)
+            name = self.cfg["evaluators"].get(ev_name, {}).get("executor") if ev_name else None
         if not name and self.lane == "correctness":
-            name = self.cfg.get("correctness_executor")  # 车道级默认（如内存紧可降 subprocess）
+            name = self.cfg.get("correctness_executor")  # 旧扁平键回落（内存紧可降 subprocess）
         name = name or self.cfg.get("executor", "subprocess")
         return self.executors.get(name) or self.executors["subprocess"]
 
@@ -915,6 +1383,8 @@ class Worker(threading.Thread):
         lane = job.request.get("lane", "timing")
         job.started_at = time.time()
         job.state = "running"
+        # 遥测：排队时长（submitted→started）
+        store.observe("queue_wait", lane, job.started_at - job.submitted_at)
         jid = job.job_id
         job_dir = store.job_dir(jid)
         os.makedirs(job_dir, exist_ok=True)
@@ -953,6 +1423,8 @@ class Worker(threading.Thread):
                     restore_files(job_dir)  # 任何路径（含超时/异常）都恢复（ADR-0001）
                 except Exception as exc:  # noqa: BLE001
                     job.error = (job.error or "") + f" | restore failed: {exc!r}"
+                    # 遥测：restore 失败是 P0（实验环境 §4.6 要求 HALT），必须可见
+                    store.count_restore_fail()
             if lock_fd is not None:
                 os.close(lock_fd)
             store.finish(job)
@@ -1011,6 +1483,107 @@ def _render_metrics(m):
     if m["last_job"]:
         op, state = m["last_job"]
         lines.append('evald_last_job_info{op="%s",state="%s"} 1' % (esc(op), esc(state)))
+
+    # ---- 最近 3 个已完成作业（idx0=最新）。与 last_job_info 同源：重启由 spool 重建、
+    #      finish() 维护；op/state 进 label（面板 K3 卡按 idx/op/state 取值，board 由
+    #      Prometheus relabel 注入）。瞬时 gauge，最多 3 条序列/指标，无 bucket 放大。
+    #      finished_timestamp 为 epoch 秒（与 last_completion_timestamp 同语义）。
+    recent = m.get("recent", [])
+    lines += [
+        "# HELP evald_recent_job_duration_seconds execution duration (s) of the 3"
+        " most recently completed jobs, idx=0 newest (rebuilt from spool on"
+        " restart, then maintained in-memory).",
+        "# TYPE evald_recent_job_duration_seconds gauge",
+    ]
+    for i, (op, state, dur, wait, fin) in enumerate(recent):
+        if dur is not None:
+            lines.append('evald_recent_job_duration_seconds{idx="%d",op="%s",state="%s"} %.3f'
+                         % (i, esc(op), esc(state), dur))
+    lines += [
+        "# HELP evald_recent_job_queue_wait_seconds queue wait (s) of the 3 most"
+        " recently completed jobs, idx=0 newest.",
+        "# TYPE evald_recent_job_queue_wait_seconds gauge",
+    ]
+    for i, (op, state, dur, wait, fin) in enumerate(recent):
+        if wait is not None:
+            lines.append('evald_recent_job_queue_wait_seconds{idx="%d",op="%s",state="%s"} %.3f'
+                         % (i, esc(op), esc(state), wait))
+    lines += [
+        "# HELP evald_recent_job_finished_timestamp_seconds epoch time each of the"
+        " 3 most recently completed jobs finished, idx=0 newest.",
+        "# TYPE evald_recent_job_finished_timestamp_seconds gauge",
+    ]
+    for i, (op, state, dur, wait, fin) in enumerate(recent):
+        if fin:
+            lines.append('evald_recent_job_finished_timestamp_seconds{idx="%d",op="%s",state="%s"} %.3f'
+                         % (i, esc(op), esc(state), fin))
+
+    # ---- 进程内遥测（重启清零）。与上面 spool 持久计数严格区分，必须在 HELP 写明，
+    #      否则会被误读为 counter reset。
+    for kind in ("queue_wait", "job_duration", "psr"):
+        metric = HIST_METRIC[kind]
+        lines += [
+            "# HELP %s %s histogram per lane. PROCESS-LOCAL: resets to zero on"
+            " evald restart; unlike evald_submissions_total it is NOT rebuilt"
+            " from the spool." % (metric, kind.replace("_", " ")),
+            "# TYPE %s histogram" % metric,
+        ]
+        for lane in ("timing", "correctness", "func"):
+            t = m.get("hist", {}).get(kind, {}).get(lane)
+            count, total, counts = t if t else (0, 0.0, [0] * len(HIST_BUCKETS[kind]))
+            for i, b in enumerate(HIST_BUCKETS[kind]):
+                lines.append('%s_bucket{lane="%s",le="%s"} %d'
+                             % (metric, lane, _fmt_le(b), counts[i]))
+            lines.append('%s_bucket{lane="%s",le=\"+Inf\"} %d' % (metric, lane, count))
+            lines.append('%s_sum{lane="%s"} %.3f' % (metric, lane, total))
+            lines.append('%s_count{lane="%s"} %d' % (metric, lane, count))
+    lines += [
+        "# HELP evald_jobs_completed_total jobs reaching terminal state since"
+        " evald start, per lane and state (PROCESS-LOCAL: resets on restart).",
+        "# TYPE evald_jobs_completed_total counter",
+    ]
+    for lane in ("timing", "correctness", "func"):
+        for state in ("done", "failed", "timeout", "canceled"):
+            lines.append('evald_jobs_completed_total{lane="%s",state="%s"} %d'
+                         % (lane, state,
+                            m.get("completed", {}).get(lane, {}).get(state, 0)))
+    lines += [
+        "# HELP evald_oldest_queued_age_seconds age of the oldest queued job per"
+        " lane (0 when that lane queue is empty).",
+        "# TYPE evald_oldest_queued_age_seconds gauge",
+    ]
+    for lane in ("timing", "correctness", "func"):
+        lines.append('evald_oldest_queued_age_seconds{lane="%s"} %.3f'
+                     % (lane, m.get("oldest_age", {}).get(lane) or 0.0))
+    lines += [
+        "# HELP evald_executor_fallback_total warmd failures that fell back to"
+        " subprocess, by exception type (previously an invisible failure).",
+        "# TYPE evald_executor_fallback_total counter",
+    ]
+    for reason in sorted(m.get("fallback", {})):
+        lines.append('evald_executor_fallback_total{reason="%s"} %d'
+                     % (esc(reason), m["fallback"][reason]))
+    lines += [
+        "# HELP evald_restore_failures_total restore failures after execution"
+        " (P0: runbook requires HALT).",
+        "# TYPE evald_restore_failures_total counter",
+        "evald_restore_failures_total %d" % m.get("restore_fail", 0),
+        "# HELP evald_spool_jobs_total job directories under the spool (never"
+        " pruned); runtime counter, not a directory scan.",
+        "# TYPE evald_spool_jobs_total gauge",
+        "evald_spool_jobs_total %d" % m["submissions"],
+        "# HELP evald_longpoll_active long-poll /jobs/{id}?wait=N requests"
+        " currently suspended.",
+        "# TYPE evald_longpoll_active gauge",
+        "evald_longpoll_active %d" % m.get("longpoll", 0),
+        "# HELP evald_http_requests_total HTTP requests served since evald start,"
+        " by normalized path and status (PROCESS-LOCAL: resets on restart).",
+        "# TYPE evald_http_requests_total counter",
+    ]
+    for key in sorted(m.get("http", {}), key=lambda kv: (kv[0], kv[1])):
+        path, code = key
+        lines.append('evald_http_requests_total{path="%s",code="%d"} %d'
+                     % (esc(path), code, m["http"][key]))
     return "\n".join(lines) + "\n"
 
 
@@ -1025,7 +1598,13 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("[%s] %s\n" % (now_iso(), fmt % args))
 
     # -- helpers
+    def _count_http(self, code):
+        store = type(self).store
+        if store is not None:
+            store.count_http(normalize_path(self.path), code)
+
     def _reply(self, code, obj):
+        self._count_http(code)
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1039,6 +1618,7 @@ class Handler(BaseHTTPRequestHandler):
     def _reply_metrics(self):
         # 免 token（与 /healthz 同级）：监控抓取端无法发自定义头；本端点只暴露
         # 聚合计数、无作业内容，LAN 内可接受
+        self._count_http(200)
         body = _render_metrics(self.store.metrics_snapshot()).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
@@ -1152,7 +1732,12 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 pass
         if wait > 0 and job.state not in TERMINAL_STATES:
-            self.store.event_for(job_id).wait(wait)
+            # 遥测：长轮询挂起数（此前零信号，连接堆积不可见）
+            self.store.bump_longpoll(1)
+            try:
+                self.store.event_for(job_id).wait(wait)
+            finally:
+                self.store.bump_longpoll(-1)
             job = self.store.get(job_id) or job
         out = job.to_json(full=True)
         if job.state == "queued":
@@ -1178,18 +1763,24 @@ def main():
     ev = cfg["evaluators"]
     booted = []
     if ev["perf"]["enabled"]:
-        Worker(cfg, store).start()  # 计时 worker：锁/串行/warmfork 语义一字不动
-        booted.append("perf=timing×1")
-    n_correctness = 0
+        # 计时 worker：锁/串行/warmfork 语义一字不动。max_concurrency>1 时多 worker
+        # 仍被 /tmp/k3_bench.lock 串行化（计时互斥不变量），并发只影响 pickup 顺序；
+        # 配了 perf.cpu_ids 时按 index/total 分核（与 acc/func 同机制）
+        n_perf = ev["perf"]["workers"]
+        for i in range(n_perf):
+            Worker(cfg, store, lane="timing", index=i, total=n_perf).start()
+        booted.append(f"perf=timing×{n_perf}")
     if ev["acc"]["enabled"]:
         n_correctness = ev["acc"]["workers"]
         for i in range(n_correctness):
-            Worker(cfg, store, lane="correctness", index=i).start()
+            Worker(cfg, store, lane="correctness", index=i,
+                   total=n_correctness).start()
         booted.append(f"acc=correctness×{n_correctness}")
     if ev["func"]["enabled"]:
-        for i in range(ev["func"]["workers"]):
-            Worker(cfg, store, lane="func", index=i).start()
-        booted.append(f"func×{ev['func']['workers']}")
+        n_func = ev["func"]["workers"]
+        for i in range(n_func):
+            Worker(cfg, store, lane="func", index=i, total=n_func).start()
+        booted.append(f"func×{n_func}")
     Handler.store = store
     Handler.cfg = cfg
     httpd = ThreadingHTTPServer((cfg["host"], cfg["port"]), Handler)
@@ -1200,9 +1791,11 @@ def main():
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
+    lq = cfg.get("lane_queue_max", {})
     print(f"[evald] listening on {cfg['host']}:{cfg['port']}, data_dir={cfg['data_dir']}, "
           f"evaluators: {', '.join(booted)} "
-          f"(acc cpus={ev['acc']['cpus']}, func cpus={ev['func']['cpus']})",
+          f"(cpus perf={ev['perf']['cpus']}, acc={ev['acc']['cpus']}, func={ev['func']['cpus']}; "
+          f"lane_queue_max={lq})",
           flush=True)
     httpd.serve_forever()
 
@@ -1360,10 +1953,22 @@ def selftest(cfg):
     s0, _, e0 = validate_request(cfg, dict(good))
     check("无 lane 请求不带 lane 键（向后逐字节兼容）", e0 is None and "lane" not in s0)
     check("无 lane 请求 warmup/rep 原样", s0["warmup"] == 10 and s0["rep"] == 50)
-    s1, _, e1 = validate_request(cfg, dict(good, lane="correctness"))
-    check("correctness 车道接受", e1 is None and s1["lane"] == "correctness")
+    # correctness 车道 feature 断言需要 acc 评估器启用；生产 config 可能停用 acc
+    # （K3 计时板 correctness_workers=0）→ 用强制启用 acc 的 config 变体产出 s1，
+    # 与生产开关解耦（否则 s1=None 会让本节及复用 s1 的 [10]-[15] 全崩）。
+    cfg_acc = dict(cfg)
+    cfg_acc["evaluators"] = {k: dict(v) for k, v in cfg["evaluators"].items()}
+    cfg_acc["evaluators"]["acc"] = dict(cfg["evaluators"].get("acc", {}),
+                                        enabled=True, workers=2, cpus="4-6",
+                                        omp_threads=1, warmup_times=0, repeat_times=1)
+    s1, _, e1 = validate_request(cfg_acc, dict(good, lane="correctness"))
+    check("correctness 车道接受（acc 启用）", e1 is None and s1["lane"] == "correctness")
     check("correctness 覆盖 warmup=0/rep=1", s1["warmup"] == 0 and s1["rep"] == 1)
     check("correctness 注记原值", s1["requested_warmup"] == 10 and s1["requested_rep"] == 50)
+    if not cfg["evaluators"]["acc"]["enabled"]:
+        _, _, e_off = validate_request(cfg, dict(good, lane="correctness"))
+        check("acc 停用时 correctness 车道被拒（生产开关生效，防作业无人消费）",
+              e_off is not None and "未启用" in e_off, e_off)
     s2, _, e2 = validate_request(cfg, dict(good, lane="timing"))
     check("显式 timing 车道接受", e2 is None and s2["lane"] == "timing")
     _, _, e3 = validate_request(cfg, dict(good, lane="banana"))
@@ -1372,14 +1977,14 @@ def selftest(cfg):
     check("timing 命令逐字节不变", cmd_t ==
           (f"source {cfg['run_env']} && python {cfg['scripts_root']}/bench_op.py "
            f"--op add --shape 64,512,512 --dtype float32 --warmup 10 --rep 50"), cmd_t)
-    cmd_c = SubprocessExecutor(cfg, lane="correctness").build_command(s1)
+    cmd_c = SubprocessExecutor(cfg_acc, lane="correctness").build_command(s1)
     check("correctness 命令注入 K3_LANE/OMP/--warmup 0 --rep 1",
           "K3_LANE=correctness" in cmd_c and "OMP_NUM_THREADS=1" in cmd_c
           and "--warmup 0 --rep 1" in cmd_c, cmd_c)
     if shutil.which("taskset"):
         check("correctness 进程 taskset 核亲和（Popen argv）",
-              SubprocessExecutor(cfg, lane="correctness")._taskset_argv()
-              == ["taskset", "-c", str(cfg["evaluators"]["acc"]["cpus"])])
+              SubprocessExecutor(cfg_acc, lane="correctness")._taskset_argv()
+              == ["taskset", "-c", str(cfg_acc["evaluators"]["acc"]["cpus"])])
         check("timing 车道不加 taskset（语义不变）",
               SubprocessExecutor(cfg)._taskset_argv() == [])
     else:
@@ -1495,8 +2100,12 @@ def selftest(cfg):
         check("correctness bench 进程 affinity=车道核（end-to-end）",
               all(f"Cpus_allowed_list:\t{cpus}" in store_p.get(x.job_id).stdout
                   for x in c_ids))
-        check("timing bench 进程 affinity 不受车道影响",
-              f"Cpus_allowed_list:\t{cpus}" not in store_p.get(tmix.job_id).stdout)
+        # timing 车道不钉核：bench 进程 affinity 应等于本进程全核（正向判据）。
+        # 旧判据「不含 acc 车道核串」在 acc=全核（如 K1 8 核板配 cpu_ids 0-7）时恒假。
+        full = _format_cpu_ids(os.sched_getaffinity(0))
+        check("timing bench 进程 affinity=全核（不钉车道核）",
+              f"Cpus_allowed_list:\t{full}" in store_p.get(tmix.job_id).stdout,
+              store_p.get(tmix.job_id).stdout[-200:])
 
     print("[13] /metrics 计数器（spool 持久语义）")
     cfg_m = dict(cfg)
@@ -1646,6 +2255,336 @@ def selftest(cfg):
     check("lane_stats 含 func 车道", store_f.lane_stats().get("func") is not None)
     check("metrics 渲染含 lane=func 序列",
           'evald_queued{lane="func"}' in _render_metrics(store_f.metrics_snapshot()))
+
+    print("[15] /metrics 遥测信号（进程内语义，重启清零）")
+    store_m.observe("queue_wait", "timing", 2.5)
+    store_m.observe("queue_wait", "timing", 42.0)
+    store_m.observe("job_duration", "timing", 84.5)
+    store_m.observe("psr", "timing", 12.0)
+    store_m.count_fallback("RuntimeError")
+    store_m.count_restore_fail()
+    store_m.count_http("/jobs/{id}", 200)
+    snap15 = store_m.metrics_snapshot()
+    text15 = _render_metrics(snap15)
+    for name in ("evald_queue_wait_seconds_bucket", "evald_job_duration_seconds_bucket",
+                 "evald_psr_bucket", "evald_jobs_completed_total",
+                 "evald_oldest_queued_age_seconds", "evald_executor_fallback_total",
+                 "evald_restore_failures_total", "evald_spool_jobs_total",
+                 "evald_longpoll_active", "evald_http_requests_total"):
+        check(f"新指标存在 {name}", name in text15, name)
+    qw = snap15["hist"]["queue_wait"]["timing"]
+    counts15 = qw[2]
+    check("queue_wait 累积语义（2.5→≥5 桶，42→≥60 桶）",
+          qw[0] == 2 and counts15[1] == 1 and counts15[4] == 2, (qw[0], counts15))
+    check("bucket 计数单调不减",
+          all(counts15[i] <= counts15[i + 1] for i in range(len(counts15) - 1)), counts15)
+    check("histogram _sum ≤ _count × 最大 bucket",
+          0 < qw[1] <= qw[0] * HIST_BUCKETS["queue_wait"][-1], qw)
+    check("进程内语义写进 # HELP（否则被误读为 counter reset）",
+          "resets to zero on" in text15)
+    # [13] 的 jm1 是无 lane 请求（→timing/done），jm2 是 correctness（→failed）
+    check("jobs_completed 按 lane/state 分列",
+          'evald_jobs_completed_total{lane="timing",state="done"} 1' in text15
+          and 'evald_jobs_completed_total{lane="correctness",state="failed"} 1' in text15,
+          [ln for ln in text15.splitlines() if "jobs_completed_total" in ln])
+    check("fallback/restore/http 计数可见",
+          'evald_executor_fallback_total{reason="RuntimeError"} 1' in text15
+          and "evald_restore_failures_total 1" in text15
+          and 'evald_http_requests_total{path="/jobs/{id}",code="200"} 1' in text15)
+    # 归一发生在 Handler._count_http（渲染前），这里直接测纯函数
+    check("path 归一：作业 id 不进 label",
+          normalize_path("/jobs/01a08371-4268-718f-a7b9-1feb0b32b45d") == "/jobs/{id}"
+          and normalize_path("/jobs/abc/stdout") == "/jobs/{id}/stdout"
+          and normalize_path("/jobs?since=x") == "/jobs"
+          and normalize_path("/metrics") == "/metrics",
+          [normalize_path(p) for p in
+           ("/jobs/01a08371", "/jobs/abc/stdout", "/jobs?since=x", "/metrics")])
+
+    print("[16] 多 shape 批量（cases[] 契约）")
+    cfg16 = dict(cfg)
+    cfg16["data_dir"] = os.path.join(tmp, "data16")
+    os.makedirs(cfg16["data_dir"], exist_ok=True)
+    shapes16 = ["64,512,512", "128,256,256"]
+    req16 = {"op": "add", "shape": shapes16, "dtype": "float32", "warmup": 1,
+             "rep": 1, "bench": "op", "restore": True, "timeout_min": 2, "files": []}
+    san16, _, err16 = validate_request(cfg16, dict(req16))
+    check("多 shape 通过校验", err16 is None and san16
+          and san16["shape"] == shapes16, err16)
+    _, _, e_bad = validate_request(cfg16, dict(req16, shape=["64,512,512", "not-a-shape"]))
+    check("含非法 shape 拒绝", e_bad is not None and "不合法" in e_bad, e_bad)
+    _, _, e_dup = validate_request(cfg16, dict(req16, shape=["1024", "1024"]))
+    check("重复 shape 拒绝", e_dup is not None, e_dup)
+    _, _, e_big = validate_request(cfg16, dict(req16, shape=["%d" % i for i in range(20)]))
+    check("超 MAX_SHAPES 拒绝", e_big is not None, e_big)
+    _, _, e_to = validate_request(cfg16, dict(req16, timeout_min=999))
+    check("整批 timeout 超限拒绝", e_to is not None, e_to)
+    # 真实 bench_op.py 会把 shape 输出成 list（如 [64,512,512]）；这里照此构造，
+    # 验证 _map_rows 用提交字符串覆盖（否则 cases[i].shape 会是 list，契约漂移）
+    rows16 = [json.dumps({"op": "add", "shape": [int(x) for x in s.split(",")],
+                          "gems_ms": 1.0 + i, "torch_ms": 2.0,
+                          "speedup": 2.0, "correct": True})
+              for i, s in enumerate(shapes16)]
+    cfg16["bench_command_override"] = "printf '%s\\n' " + \
+        " ".join("'%s'" % r for r in rows16)
+    store16 = Store(cfg16)
+    j16 = store16.submit(dict(req16), dict(req16))
+    Worker(cfg16, store16).run_job(store16.get(j16.job_id))
+    r16 = store16.get(j16.job_id)
+    check("多 shape 作业 done", r16.state == "done", (r16.state, r16.error))
+    check("顶层无 speedup 标量（防老驱动只看第一个 shape）",
+          isinstance(r16.result, dict) and "speedup" not in r16.result, r16.result)
+    check("result.cases 按提交顺序标注 shape",
+          [c.get("shape") for c in r16.result.get("cases", [])] == shapes16, r16.result)
+    check("cases_expected == cases_returned，无 partial",
+          r16.result["cases_expected"] == 2 and r16.result["cases_returned"] == 2
+          and "partial" not in r16.result, r16.result)
+    check("kope_mem 不给歧义 speedup（只给 pass_rate）",
+          set(r16.kope_mem or {}) == {"pass_rate"}, r16.kope_mem)
+    # 部分结果：只回来 1 行 → 必须显式标记 partial，不能静默当成功
+    cfg16b = dict(cfg16)
+    cfg16b["data_dir"] = os.path.join(tmp, "data16b")
+    os.makedirs(cfg16b["data_dir"], exist_ok=True)
+    one_row = json.dumps({"op": "add", "gems_ms": 1.0, "torch_ms": 2.0,
+                          "speedup": 2.0, "correct": True})
+    cfg16b["bench_command_override"] = f"printf '%s\\n' '{one_row}'"
+    store16b = Store(cfg16b)
+    jb = store16b.submit(dict(req16), dict(req16))
+    Worker(cfg16b, store16b).run_job(store16b.get(jb.job_id))
+    rb = store16b.get(jb.job_id)
+    check("部分结果显式标 partial",
+          (rb.result or {}).get("partial") is True
+          and rb.result["cases_returned"] == 1, rb.result)
+    # 降级路径（warmd 故障走 subprocess）：多 shape 必须逐 shape 出命令
+    cmd16 = SubprocessExecutor(cfg16).build_command(dict(req16))
+    check("多 shape 命令逐 shape 展开（&& 串联）",
+          cmd16.count("--shape") == 2 and " && " in cmd16, cmd16)
+
+    print("[17] 最近 3 个作业指标（recent-job gauges，面板 K3 卡契约）")
+    cfg17 = dict(cfg)
+    cfg17["data_dir"] = os.path.join(tmp, "data17")
+    cfg17["executor"] = "subprocess"      # 不走 warmfork，避免 selftest 拉起 warmd
+    os.makedirs(cfg17["data_dir"], exist_ok=True)
+    row17 = json.dumps({"op": "add", "torch_ms": 2.0, "gems_ms": 1.0,
+                        "speedup": 2.0, "correct": True, "max_abs_err": 0.0})
+    cfg17["bench_command_override"] = f"echo '{row17}'"
+    store17 = Store(cfg17)
+    for op in ("add", "mul", "sub", "div"):     # 4 个作业 → ring buffer 只留最近 3
+        r17 = {"op": op, "shape": "1024", "dtype": "float32", "warmup": 1,
+               "rep": 1, "bench": "op", "restore": True, "timeout_min": 1, "files": []}
+        j17 = store17.submit(r17, r17)
+        Worker(cfg17, store17).run_job(store17.get(j17.job_id))
+        time.sleep(0.02)                        # 保证 result.json mtime 严格递增
+    snap17 = store17.metrics_snapshot()
+    text17 = _render_metrics(snap17)
+    rec17 = snap17["recent"]
+    check("ring buffer 只保留最近 3 条", len(rec17) == 3, rec17)
+    check("idx0=最新，完成倒序 div>sub>mul（add 已淘汰）",
+          [t[0] for t in rec17] == ["div", "sub", "mul"], [t[0] for t in rec17])
+    for name in ("evald_recent_job_duration_seconds",
+                 "evald_recent_job_queue_wait_seconds",
+                 "evald_recent_job_finished_timestamp_seconds"):
+        check(f"recent 指标存在 {name}", name in text17, name)
+    check("recent 指标带 idx/op/state 三标签，idx0=div/done",
+          'evald_recent_job_duration_seconds{idx="0",op="div",state="done"}' in text17,
+          [ln for ln in text17.splitlines() if "recent_job_duration" in ln])
+    fin_lines = [ln for ln in text17.splitlines()
+                 if ln.startswith("evald_recent_job_finished_timestamp_seconds{")]
+    check("finished_timestamp 为 epoch 秒（>1e9；面板 now-ts 算「多久之前」）",
+          len(fin_lines) == 3
+          and all(float(ln.rsplit(" ", 1)[1]) > 1e9 for ln in fin_lines),
+          fin_lines)
+    # 重启重建：新 Store 扫 spool 应恢复最近 3 条（与 last_job_info 同源语义）
+    rec17b = Store(cfg17).metrics_snapshot()["recent"]
+    check("重启后从 spool 重建最近 3 条（顺序一致）",
+          [t[0] for t in rec17b] == ["div", "sub", "mul"], [t[0] for t in rec17b])
+
+    print("[18] lane cpus 分核（每 worker 独占一段，不可切分回落整段）")
+    ok18 = (_split_cpus("0-7", 0, 2) == "0-3"
+            and _split_cpus("0-7", 1, 2) == "4-7"
+            and _split_cpus("2-7", 0, 4) == "2-3"      # 6核/4人：前两份多 1
+            and _split_cpus("2-7", 3, 4) == "7"
+            and _split_cpus("2-5,8", 2, 4) == "5"      # 非连续段也能切
+            and _split_cpus("0-2", 1, 4) is None)      # CPU 数不足 → 回落
+    check("均分/余数/非连续段/回落", ok18)
+    cfg18 = dict(cfg)
+    cfg18["evaluators"] = {"perf": {"enabled": True},
+                           "acc": {"enabled": True, "workers": 2,
+                                   "cpus": "0-7", "omp_threads": 4},
+                           "func": {"enabled": False}}
+    check("lane_resources 分核生效",
+          lane_resources(cfg18, "correctness", 1, 2) == ("4-7", 4))
+    check("lane_resources 不传 index/total 维持整段共享",
+          lane_resources(cfg18, "correctness") == ("0-7", 4))
+    cfg18b = dict(cfg)
+    cfg18b["evaluators"] = {"perf": {"enabled": True},
+                            "acc": {"enabled": True, "workers": 2,
+                                    "cpus": "0-7", "omp_threads": 4,
+                                    "split_cpus": False},
+                            "func": {"enabled": False}}
+    check("split_cpus=false 回落整段共享（软限制对照）",
+          lane_resources(cfg18b, "correctness", 1, 2) == ("0-7", 4))
+    cfg18c = dict(cfg)
+    cfg18c["evaluators"] = {"perf": {"enabled": True},
+                            "acc": {"enabled": True, "workers": 4,
+                                    "cpus": "2-7", "omp_threads": 1},
+                            "func": {"enabled": False}}
+    cfg18c["perf"] = {"acc": {"max_concurrency": 2, "cpu_ids": "0-7",
+                             "omp_threads": 4, "split_cpus": False}}
+    normalize_perf_resources(cfg18c)
+    acc18 = cfg18c["evaluators"]["acc"]
+    check("perf 覆盖层归并 workers/cpus/omp/split_cpus",
+          acc18["workers"] == 2 and acc18["cpus"] == "0-7"
+          and acc18["omp_threads"] == 4 and acc18["split_cpus"] is False, acc18)
+
+    print("[19] 可选顶层 perf 字段（perf/acc/func 资源调度覆盖层）")
+
+    def perf_norm(cand):
+        return normalize_perf_resources(normalize_evaluators(dict(cand)))
+
+    def perf_rejects(cand):
+        try:
+            perf_norm(cand)
+            return False
+        except SystemExit:
+            return True
+
+    # 合成基线：无 evaluators、无 perf，旧扁平键取确定值——断言与生产 config 解耦
+    syn = dict(cfg)
+    syn.pop("evaluators", None)
+    syn.pop("perf", None)
+    syn["correctness_workers"], syn["correctness_cpus"] = 3, "4-6"
+    syn["correctness_omp_threads"] = 1
+    syn["timeout_max_min"], syn["timeout_default_min"] = 30, 15
+    syn["queue_max"] = 64
+
+    g0 = perf_norm(syn)
+    check("perf 缺省：lane_queue_max 全 None（只受全局 queue_max）",
+          g0["lane_queue_max"] == {"timing": None, "correctness": None, "func": None},
+          g0["lane_queue_max"])
+    check("perf 缺省：perf workers=1/cpus=None/omp=None（timing 不钉核，逐字节兼容）",
+          g0["evaluators"]["perf"]["workers"] == 1
+          and g0["evaluators"]["perf"]["cpus"] is None
+          and g0["evaluators"]["perf"]["omp_threads"] is None, g0["evaluators"]["perf"])
+    check("perf 缺省：acc 回落旧扁平键（workers=3/cpus=4-6/omp=1）",
+          g0["evaluators"]["acc"]["workers"] == 3
+          and g0["evaluators"]["acc"]["cpus"] == "4-6"
+          and g0["evaluators"]["acc"]["omp_threads"] == 1, g0["evaluators"]["acc"])
+    check("perf 缺省：timing lane_resources=(None,None)",
+          lane_resources(g0, "timing") == (None, None), lane_resources(g0, "timing"))
+
+    # 对象形态：核id/并发/队列/omp/执行器/超时 全量覆盖
+    p1 = dict(syn)
+    p1["perf"] = {
+        "perf": {"max_concurrency": 2, "max_queue": 8, "cpu_ids": "0-1", "omp_threads": 2},
+        "acc": {"cpu_ids": [12, 13, 14], "max_concurrency": 5, "max_queue": 16,
+                "executor": "subprocess", "timeout_min": 6},
+        "func": {"cpu_ids": "4,6", "max_concurrency": 1, "max_queue": 4},
+    }
+    g1 = perf_norm(p1)
+    check("cpu_ids 列表→紧凑 taskset 串（acc=[12,13,14]→12-14）",
+          g1["evaluators"]["acc"]["cpus"] == "12-14", g1["evaluators"]["acc"]["cpus"])
+    check("max_concurrency→workers（perf=2/acc=5/func=1）",
+          g1["evaluators"]["perf"]["workers"] == 2
+          and g1["evaluators"]["acc"]["workers"] == 5
+          and g1["evaluators"]["func"]["workers"] == 1, g1["evaluators"])
+    check("max_queue→lane_queue_max（按车道）",
+          g1["lane_queue_max"] == {"timing": 8, "correctness": 16, "func": 4},
+          g1["lane_queue_max"])
+    check("perf 配 cpu_ids/omp→timing 钉核+注 OMP（opt-in）",
+          lane_resources(g1, "timing") == ("0-1", 2), lane_resources(g1, "timing"))
+    check("executor/timeout_min 归并进 evaluators.acc",
+          g1["evaluators"]["acc"]["executor"] == "subprocess"
+          and abs(g1["evaluators"]["acc"]["timeout_min"] - 6.0) < 1e-9, g1["evaluators"]["acc"])
+    check("func cpu_ids '4,6' 原样保留", g1["evaluators"]["func"]["cpus"] == "4,6",
+          g1["evaluators"]["func"]["cpus"])
+    check("acc 核数<并发时分核回落整段共享（3核/5人）",
+          lane_resources(g1, "correctness", 0, 5) == ("12-14", 1),
+          lane_resources(g1, "correctness", 0, 5))
+
+    # perf 字段 cpu_ids 流入已有分核机制（8-15 / 4 worker）
+    g5 = perf_norm(dict(syn, perf={"acc": {"cpu_ids": "8-15", "max_concurrency": 4}}))
+    check("perf 字段 cpu_ids 流入分核（8-15/4人 → worker1 得 10-11）",
+          lane_resources(g5, "correctness", 1, 4) == ("10-11", 1),
+          lane_resources(g5, "correctness", 1, 4))
+
+    # 字符串形态（json 字符串）：与对象形态等价
+    g2 = perf_norm(dict(syn, perf=json.dumps({"acc": {"cpu_ids": "8-9", "max_concurrency": 2}})))
+    check("perf 字段为 json 字符串时自动解析",
+          g2["evaluators"]["acc"]["cpus"] == "8-9"
+          and g2["evaluators"]["acc"]["workers"] == 2, g2["evaluators"]["acc"])
+
+    # cores 在既有核池上裁剪（无 cpu_ids）：acc 旧池 4-6（3 核）裁到 2 → 4-5
+    g3 = perf_norm(dict(syn, perf={"acc": {"cores": 2}}))
+    check("cores 无 cpu_ids 时在既有核池裁剪（4-6 取前 2→4-5）",
+          g3["evaluators"]["acc"]["cpus"] == "4-5", g3["evaluators"]["acc"]["cpus"])
+    check("cores 与 cpu_ids 数目一致时通过",
+          perf_norm(dict(syn, perf={"acc": {"cores": 3, "cpu_ids": "12-14"}}))
+          ["evaluators"]["acc"]["cpus"] == "12-14")
+
+    # 覆盖优先级：perf 字段 > evaluators
+    syn_ev = dict(syn)
+    syn_ev["evaluators"] = {"acc": {"enabled": True, "workers": 2, "cpus": "2-3",
+                                    "omp_threads": 1}}
+    syn_ev["perf"] = {"acc": {"cpu_ids": "8-9", "max_concurrency": 4}}
+    g4 = perf_norm(syn_ev)
+    check("perf 字段覆盖 evaluators（cpus 2-3→8-9，workers 2→4）",
+          g4["evaluators"]["acc"]["cpus"] == "8-9"
+          and g4["evaluators"]["acc"]["workers"] == 4, g4["evaluators"]["acc"])
+
+    # 拒绝用例（启动即 SystemExit）
+    check("perf 顶层未知键拒绝", perf_rejects(dict(syn, perf={"banana": {}})))
+    check("perf.<n> 未知键拒绝", perf_rejects(dict(syn, perf={"acc": {"nice": 0}})))
+    check("perf 非对象/非 json 串拒绝", perf_rejects(dict(syn, perf=42)))
+    check("perf 串非法 JSON 拒绝", perf_rejects(dict(syn, perf="{not json")))
+    check("cpu_ids 非法拒绝", perf_rejects(dict(syn, perf={"acc": {"cpu_ids": "x-y"}})))
+    check("cores 与 cpu_ids 数目不一致拒绝",
+          perf_rejects(dict(syn, perf={"acc": {"cores": 2, "cpu_ids": "12-14"}})))
+    check("cores 超过既有核池拒绝", perf_rejects(dict(syn, perf={"acc": {"cores": 99}})))
+    check("perf 给 cores 但 timing 无核池拒绝",
+          perf_rejects(dict(syn, perf={"perf": {"cores": 2}})))
+    check("max_concurrency<1 拒绝",
+          perf_rejects(dict(syn, perf={"acc": {"max_concurrency": 0}})))
+    check("max_queue<1 拒绝", perf_rejects(dict(syn, perf={"acc": {"max_queue": 0}})))
+    check("executor 非法拒绝", perf_rejects(dict(syn, perf={"acc": {"executor": "magic"}})))
+    check("timeout_min 超限拒绝",
+          perf_rejects(dict(syn, perf={"acc": {"timeout_min": 9999}})))
+    check("omp_threads<1 拒绝", perf_rejects(dict(syn, perf={"acc": {"omp_threads": 0}})))
+
+    # 车道级队列闸（Store.submit）：func max_queue=1 时第二条同车道 429
+    cfg_pq = dict(g1)
+    cfg_pq["data_dir"] = os.path.join(tmp, "dataPQ")
+    os.makedirs(cfg_pq["data_dir"], exist_ok=True)
+    cfg_pq["queue_max"] = 64                       # 全局闸放宽，孤立车道闸
+    cfg_pq["lane_queue_max"] = dict(g1["lane_queue_max"], func=1)
+    store_pq = Store(cfg_pq)
+    spq = {"op": "add", "shape": "64", "dtype": "float32", "warmup": 0, "rep": 1,
+           "bench": "op", "restore": True, "timeout_min": 1, "lane": "func", "files": []}
+    store_pq.submit(dict(spq), dict(spq))
+    try:
+        store_pq.submit(dict(spq), dict(spq))
+        pq_full = False
+    except QueueFullError:
+        pq_full = True
+    check("func max_queue=1 时第 2 条 429（车道闸生效）", pq_full)
+    stq = dict(spq)
+    stq.pop("lane")                                # 无 lane=timing，不受 func 闸影响
+    try:
+        store_pq.submit(dict(stq), dict(stq))
+        cross_ok = True
+    except QueueFullError:
+        cross_ok = False
+    check("车道闸按车道独立（func 满不挡 timing）", cross_ok)
+
+    # 车道级默认超时（validate_request 取 evaluators.<n>.timeout_min）
+    s_to, _, e_to = validate_request(g1, {"op": "add", "shape": "64", "dtype": "float32",
+                                          "lane": "correctness"})
+    check("correctness 缺省 timeout 取 perf 字段 acc.timeout_min=6",
+          e_to is None and abs(s_to["timeout_min"] - 6.0) < 1e-9,
+          (e_to, s_to and s_to.get("timeout_min")))
+    s_to2, _, e_to2 = validate_request(g1, {"op": "add", "shape": "64", "dtype": "float32"})
+    check("timing 无 timeout_min 覆盖→回落全局默认 15",
+          e_to2 is None and s_to2["timeout_min"] == 15,
+          (e_to2, s_to2 and s_to2.get("timeout_min")))
 
     shutil.rmtree(tmp, ignore_errors=True)
     print(f"\nselftest: {'ALL PASS' if not failures else 'FAILED: ' + ', '.join(failures)}")

@@ -9,7 +9,13 @@ set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PID_FILE="$DIR/evald.pid"
 LOG="$DIR/evald.log"
-PORT="$(python3 -c "import json;print(json.load(open('$DIR/config.json'))['port'])")"
+# 解释器：默认系统 python3。切换方式二选一（板端优先级高于仓库默认值）：
+#   1) 同目录放 evald.env（板端持久化，不进 git）：  PY=/path/to/python3.14
+#   2) 环境变量：PY=/path/to/python3.14 ./evaldctl.sh start
+# 注意：只影响 evald 控制面 —— warmd 走 run_env.sh 的 venv python，不受此变量影响。
+[ -f "$DIR/evald.env" ] && . "$DIR/evald.env"
+PY="${PY:-python3}"
+PORT="$("$PY" -c "import json;print(json.load(open('$DIR/config.json'))['port'])")"
 
 pid_alive() {
   [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
@@ -17,7 +23,7 @@ pid_alive() {
 
 start_ai() {
   start_common \
-    "sh -c \"echo \$\$ > /proc/set_ai_thread && exec python3 '$DIR/evald.py' --config '$DIR/config.json'\"" \
+    "sh -c \"echo \$\$ > /proc/set_ai_thread && exec '$PY' '$DIR/evald.py' --config '$DIR/config.json'\"" \
     "ai"
 }
 
@@ -46,7 +52,7 @@ start() {
     return 0
   fi
   rm -f "$PID_FILE"
-  setsid nohup python3 "$DIR/evald.py" --config "$DIR/config.json" >> "$LOG" 2>&1 &
+  setsid nohup "$PY" "$DIR/evald.py" --config "$DIR/config.json" >> "$LOG" 2>&1 &
   echo $! > "$PID_FILE"
   sleep 1
   status
@@ -81,5 +87,8 @@ case "${1:-}" in
   restart) stop; start ;;
   status) status ;;
   logs) logs ;;
-  *) echo "用法: $0 start|start-ai|stop|restart|status|logs"; exit 1 ;;
+  *)
+    echo "用法: $0 start|start-ai|stop|restart|status|logs"
+    echo "  PY=<解释器> $0 start   覆盖解释器（当前: $PY）"
+    exit 1 ;;
 esac

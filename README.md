@@ -132,6 +132,44 @@ config.json 新增顶层 `evaluators` 节，把三个评估器做成独立开关
 - `/healthz` 与 `/metrics`：车道计数新增 `lane="func"` 序列（`evald_queued` / `evald_running`）。
 - 启动横幅打印启用的评估器与各车道 worker 数。
 
+## 资源调度字段 `perf`（可选）
+
+顶层 `perf` 是 perf/acc/func 三评估器的**资源与调度覆盖层**：分别配置每个评估器分配的核数、核 id、最大并发数、最大队列深度等。**字段本身与其中每一项都是可选的**——缺省时完全回落到 `evaluators` 与旧扁平键（`correctness_*`）的既有行为，逐字节兼容。
+
+值可以是 JSON 对象，**也可以是其字符串形式（json 字符串）**，后者启动时自动 `json.loads`：
+
+```json
+"perf": {
+  "perf": {"max_concurrency": 1, "max_queue": 32},
+  "acc":  {"cores": 4, "cpu_ids": "4-7", "max_concurrency": 4, "max_queue": 32, "omp_threads": 1, "timeout_min": 10},
+  "func": {"cores": 2, "cpu_ids": "4-5", "max_concurrency": 2, "max_queue": 16, "executor": "subprocess"}
+}
+```
+
+### 子字段（每个评估器节内，全部可选）
+
+| 键 | 类型 | 含义 | 归并去向 |
+|---|---|---|---|
+| `cpu_ids` | 字符串或 int 列表 | 精确核 id：taskset 规格（`"12-14"` / `"0,2,4"` / `"0-3,8"`）或列表（`[12,13,14]`） | `evaluators.<n>.cpus` |
+| `cores` | int ≥1 | 分配核数。与 `cpu_ids` 同给时**数目必须一致**（否则启动报错）；单独给时在**既有核池**（`evaluators`/旧扁平键的 `cpus`）上取前 N 个裁剪，无核池则报错 | `evaluators.<n>.cpus` |
+| `max_concurrency` | int ≥1 | 该车道最大并发 worker 数 | `evaluators.<n>.workers` |
+| `max_queue` | int ≥1 | 该车道**额外**的排队深度上限；与全局 `queue_max` 双闸，任一触顶即 429。缺省（不设）= 无车道级上限，只受全局 `queue_max` | `lane_queue_max[<lane>]` |
+| `omp_threads` | int ≥1 | 注入 bench 进程的 `OMP_NUM_THREADS` | `evaluators.<n>.omp_threads` |
+| `executor` | `subprocess`｜`warmfork` | 该车道默认执行器（请求体 `executor` 仍可逐作业覆盖） | `evaluators.<n>.executor` |
+| `timeout_min` | 0.1..`timeout_max_min` | 该车道默认墙钟超时（请求体 `timeout_min` 仍可逐作业覆盖） | `evaluators.<n>.timeout_min` |
+
+### 优先级与语义
+
+- **优先级**：`perf` 字段 > `evaluators.<n>` > 旧扁平键（`correctness_workers/cpus/omp_threads`）> 硬缺省。归并后下游（`lane_resources` / `Worker` / `Store` / `validate_request`）只读归并结果。
+- **车道映射**：`perf`→`timing`、`acc`→`correctness`、`func`→`func`。
+- **分核**：归并出的 `cpus` 仍按既有机制在各 worker 间均分（`lane_resources(cfg, lane, index, total)`，`total>1` 时每 worker 独占一段核；核数不足以切分时回落整段共享）。
+- **timing（perf）车道**：默认不钉核、不注 OMP（与旧版逐字节一致）。仅当显式给 `perf.perf.cpu_ids` / `omp_threads` 时才 opt-in 钉核/注 OMP；`K3_LANE` 始终不注入 timing。`max_concurrency>1` 时多 worker 仍被 `/tmp/k3_bench.lock` 串行化（计时互斥不变量），并发只影响 pickup 顺序。
+- **校验**：未知顶层键、未知子字段键、非法 `cpu_ids`、`cores` 与 `cpu_ids` 数目不一致、`cores` 超核池、`max_concurrency/max_queue/omp_threads < 1`、非法 `executor`、`timeout_min` 越界——一律启动即 `SystemExit`。
+
+### 与 `evaluators` 的分工
+
+`evaluators.<n>.enabled` 与 `warmup_times/repeat_times` 仍是评估器开关与计时轮数的正本；`perf` 字段只覆盖**资源与调度**（核/并发/队列/omp/执行器/超时），不改开关与轮数。两者可并存，`perf` 字段就资源键覆盖 `evaluators`。
+
 ## curl 配方（Git Bash）
 
 ```bash

@@ -22,5 +22,10 @@
     "perf": {"enabled": true, "warmup_times": 5, "repeat_times": 5},
     "acc":  {"enabled": true, "workers": 4, "cpus": "4-7", "omp_threads": 1},
     "func": {"enabled": true, "workers": 2, "cpus": "4-7", "omp_threads": 1}
+  },
+  "perf": {
+    "perf": {"max_concurrency": 1, "max_queue": 32},
+    "acc":  {"cores": 4, "cpu_ids": "4-7", "max_concurrency": 4, "max_queue": 32, "omp_threads": 1, "timeout_min": 10},
+    "func": {"cores": 2, "cpu_ids": "4-5", "max_concurrency": 2, "max_queue": 16, "omp_threads": 1, "executor": "subprocess", "timeout_min": 5}
   }
 }
