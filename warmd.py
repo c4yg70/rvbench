@@ -14,12 +14,18 @@ launcher/编译管线状态，fork 出的子进程在自己第一次 launch 上*
 必付的固定成本，只能靠“每进程多干活”或“多车道并行”摊薄。
 
 协议（stdin/stdout，每作业各一行 JSON）：
-  请求  {"id": <job_id>, "timeout_s": <float>, "req": {bench, op, shape, dtype, warmup, rep, batch}}
+  请求  {"id": <job_id>, "timeout_s": <float>,
+         "req": {bench, op, shape, dtype, warmup, rep, batch, skip_torch, seed}}
   响应  {"id", "state": "done|failed|timeout", "rc", "result", "stdout", "stderr", "error"}
   启动就绪时先发 {"ready": true, "fake": bool}
 自检/单测：WARMD_FAKE=1 跳过 torch（配合 WARMD_FAKE_SLEEP/WARMD_FAKE_ECHO 模拟 bench）。
+输出写后自检（grp-DIAG 模式 A）：WARMD_OUTPUT_SELFCHECK=1 时子进程对 stdout 全量字节
+做 sha256、收尾追加一行 {"warmd_selfcheck": {bytes, sha256}} trailer（不计入摘要），
+父进程复算字节前缀核对——不一致/trailer 缺失 → 作业显式 failed。开关链见 evald
+config["warmd_output_selfcheck"]（默认 False，行为与改前逐字节一致）。
 """
 
+import hashlib
 import json
 import os
 import signal
@@ -56,6 +62,92 @@ def _parse_json_lines(text, cap=16):
     return rows
 
 
+# ---------------------------------------------------------------- 输出写后自检
+# （grp-DIAG 模式 A 建议）：timing 车道曾出现 stdout JSON 行数值异常、疑似部分写/
+# 脏内存的作业。自检给 warmd 子进程的 stdout 全量字节做 sha256，收尾写一行 trailer
+#（trailer 本身不计入摘要），父进程按字节前缀复算核对：不一致或 trailer 缺失 →
+# 作业显式 failed（行能解析 ≠ 行没被改）。文本层计数：只覆盖经 sys.stdout 的写
+#（bench 脚本全走 print，够用）；直接写 fd 1 的路径不在 coverage 内。
+_SELFCHECK_ENV = "WARMD_OUTPUT_SELFCHECK"
+_SELFCHECK_KEY = "warmd_selfcheck"
+
+
+def _selfcheck_enabled():
+    return os.environ.get(_SELFCHECK_ENV) == "1"
+
+
+class _SelfCheckStream:
+    """包一层 sys.stdout：写穿透 + 累计字节/sha256；trailer 经 raw 写出、不进摘要。"""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self._n = 0
+        self._h = hashlib.sha256()
+
+    def write(self, s):
+        b = s.encode("utf-8", "replace") if isinstance(s, str) else bytes(s)
+        self._n += len(b)
+        self._h.update(b)
+        return self._raw.write(s)
+
+    def writelines(self, lines):
+        for ln in lines:
+            self.write(ln)
+
+    def flush(self):
+        return self._raw.flush()
+
+    def isatty(self):
+        return False
+
+    @property
+    def encoding(self):
+        return getattr(self._raw, "encoding", "utf-8")
+
+    def emit_trailer(self):
+        """收尾：把 trailer 写到真 stdout（不经过计数层，避免自引用）。"""
+        trailer = json.dumps({_SELFCHECK_KEY: {"bytes": self._n,
+                                               "sha256": self._h.hexdigest()}})
+        self._raw.write(trailer + "\n")
+        self._raw.flush()
+
+
+def _selfcheck_emit(sc):
+    """尽力补 trailer；失败静默——trailer 缺失由父进程按完整性失败处理，不在
+    子进程退出路径上二次抛异常。"""
+    if sc is None:
+        return
+    try:
+        sc.emit_trailer()
+    except Exception:  # noqa: BLE001 — 退出路径上的兜底，异常吞掉
+        pass
+
+
+def _selfcheck_verify(out_b):
+    """父进程侧核对：剥 trailer、复算字节前缀 sha256/长度。
+
+    返回 (剥 trailer 后的字节, error)；error 非 None 即完整性失败（结果行照常
+    解析带回，但 state 由调用方压成 failed，供排障看坏在哪个字节）。
+    """
+    stripped = out_b.rstrip(b"\n")
+    nl = stripped.rfind(b"\n")
+    line_b = stripped[nl + 1:]
+    try:
+        trailer = json.loads(line_b.decode("utf-8", "replace"))
+    except json.JSONDecodeError:
+        return out_b, "selfcheck: 末行不是 JSON，trailer 缺失"
+    if not (isinstance(trailer, dict) and isinstance(trailer.get(_SELFCHECK_KEY), dict)):
+        return out_b, "selfcheck: trailer 缺失"
+    meta = trailer[_SELFCHECK_KEY]
+    prefix = stripped[:nl + 1] if nl >= 0 else b""
+    want = hashlib.sha256(prefix).hexdigest()
+    if meta.get("bytes") != len(prefix) or meta.get("sha256") != want:
+        return out_b, (f"selfcheck: 输出完整性不一致（child 报 {meta.get('bytes')}B/"
+                       f"{str(meta.get('sha256'))[:12]}…，parent 复算 {len(prefix)}B/"
+                       f"{want[:12]}…）")
+    return prefix, None
+
+
 def _run_bench(breq, fake):
     """在 fork 子进程里执行；父进程保证此刻 sys.modules 里没有 flag_gems/bench_*。"""
     if fake:
@@ -88,6 +180,14 @@ def _run_bench(breq, fake):
                     "--dtype", breq["dtype"],
                     "--warmup", str(breq.get("warmup", 25)),
                     "--rep", str(breq.get("rep", 100))]
+        # torch 臂外提/输入播种（handoff-torch-arm §3.2.2）：与 subprocess 降级
+        # 路径（evald SubprocessExecutor.build_command）保持两条执行器路径等价；
+        # seed 在循环内每 shape 重播一次（bench_op.main 内部 manual_seed），
+        # 同请求多 shape 取同一 seed 的确定性采样
+        if breq.get("skip_torch"):
+            sys.argv += ["--skip-torch"]
+        if breq.get("seed") is not None:
+            sys.argv += ["--seed", str(breq["seed"])]
         _call_main(mod)
         sys.stdout.flush()
 
@@ -127,17 +227,29 @@ def handle(req):
         os.dup2(err_w, 2)
         os.close(out_w)
         os.close(err_w)
+        # 输出写后自检（默认关）：包住 sys.stdout 计数/摘要，trailer 不进摘要
+        sc = _SelfCheckStream(sys.stdout) if _selfcheck_enabled() else None
+        if sc is not None:
+            sys.stdout = sc
         try:
             _run_bench(breq, os.environ.get("WARMD_FAKE") == "1")
+            _selfcheck_emit(sc)
             sys.stdout.flush()
             sys.stderr.flush()
             os._exit(0)
         except SystemExit as e:  # bench 脚本 argparse 错误等
+            _selfcheck_emit(sc)
             sys.stdout.flush()
             sys.stderr.flush()
             os._exit(e.code if isinstance(e.code, int) else 1)
         except BaseException as exc:  # noqa: BLE001
-            sys.stderr.write(f"warmd child error: {exc!r}\n")
+            # DIAG 模式 B 修复：原单行 f"warmd child error: {exc!r}" 吞掉调用链，
+            # 板上排障拿不到栈——改打完整 traceback（与 diag_b_warmfork.py 探针
+            # 同语义），再尽力补自检 trailer 后退出
+            import traceback
+            traceback.print_exc()
+            _selfcheck_emit(sc)
+            sys.stdout.flush()
             sys.stderr.flush()
             os._exit(1)
     # ---- 父进程：双管道读线程（防 64KB 管道写满死锁）+ 限期 waitpid ----
@@ -177,8 +289,14 @@ def handle(req):
         time.sleep(0.05)
     for t in ths:
         t.join(timeout=5)
-    out = bufs.get("out", b"").decode("utf-8", "replace")
+    out_b = bufs.get("out", b"")
     err = bufs.get("err", b"").decode("utf-8", "replace")
+    # 输出写后自检（父进程侧）：先核对完整性并剥掉 trailer，再按既有语义判态；
+    # 完整性失败压过 done（行能解析≠行没被改），failed/timeout 只追加注记
+    integ_err = None
+    if _selfcheck_enabled():
+        out_b, integ_err = _selfcheck_verify(out_b)
+    out = out_b.decode("utf-8", "replace")
     rc = os.waitstatus_to_exitcode(status) if not timed_out else -9
     if timed_out:
         state, result, error = "timeout", None, f"exceeded {timeout_s:.0f}s"
@@ -198,8 +316,21 @@ def handle(req):
             state, result, error = "done", rows, None
         else:
             state, result, error = "failed", None, "no JSON line in stdout"
-    _send({"id": rid, "state": state, "rc": rc, "result": result,
-           "stdout": out, "stderr": err, "error": error})
+    if integ_err:
+        if state == "done":
+            state, error = "failed", integ_err
+        else:
+            error = f"{error}; {integ_err}" if error else integ_err
+    # P1-1 失败可诊断：rc<0（POSIX wait 语义 = 被信号 -rc 杀死）时把信号名一并
+    # 写进响应（SIGSEGV/SIGABRT 直接可读）；timeout 的 -9 是本进程合成值，不标
+    resp = {"id": rid, "state": state, "rc": rc, "result": result,
+            "stdout": out, "stderr": err, "error": error}
+    if not timed_out and isinstance(rc, int) and rc < 0:
+        try:
+            resp["signal_name"] = signal.Signals(-rc).name
+        except ValueError:
+            resp["signal_name"] = "SIG%d" % (-rc)
+    _send(resp)
 
 
 def main():

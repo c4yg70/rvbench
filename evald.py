@@ -77,6 +77,18 @@ def sha256_hex(data: str) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
+def sha256_file(path) -> str:
+    """按文件实际字节算 sha256（与板上 sha256sum 同口径）。
+
+    P0-1 的 deploy/restore 身份闭环依赖本函数（槽位 expect 校验、备份 orig_sha256、
+    恢复回读），二进制读避免文本模式换行翻译造成的假失配（CRLF/LF 事故史）。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def load_config(path):
     with open(path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -96,6 +108,26 @@ def load_config(path):
     cfg.setdefault("executor", "warmfork")  # M3 起默认预热执行器；可回退 "subprocess"
     cfg.setdefault("warmd_path", os.path.join(cfg["data_dir"], "warmd.py"))
     cfg.setdefault("warmd_env", {})
+    # warmd 子进程 stdout 写后自检（grp-DIAG 模式 A 建议）：默认 False=保守，
+    # 行为与改前逐字节一致。开启后 _spawn 向 warmd 注入 WARMD_OUTPUT_SELFCHECK=1，
+    # 子进程对 stdout 全量字节做 sha256 + trailer、warmd 父进程复算核对，
+    # 不一致/trailer 缺失 → 作业显式 failed。timing 车道整条回退 subprocess 用
+    # 既有开关 evaluators.perf.executor="subprocess"（或逐作业 executor 字段）。
+    cfg.setdefault("warmd_output_selfcheck", False)
+    if not isinstance(cfg["warmd_output_selfcheck"], bool):
+        raise SystemExit("config.warmd_output_selfcheck 必须是 bool")
+    # 跨服务共享路径互斥（P0-3）：部署路径文件锁的锁文件目录。8788（timing）与
+    # 8791（correctness）共享同一块板/同一个 site-packages 文件系统，两实例的
+    # path_lock_dir 必须同值（默认 /tmp/evald-pathlocks），否则互斥退化回进程内。
+    cfg.setdefault("path_lock_dir", "/tmp/evald-pathlocks")
+    if not isinstance(cfg["path_lock_dir"], str) or not cfg["path_lock_dir"]:
+        raise SystemExit("config.path_lock_dir 必须是非空字符串")
+    # base 票语义显式化（P1-3）：默认 false=完全向后兼容（裸"无 files 且无 mode"
+    # 的请求照旧接受——驱动的 baseline 与 base 票正是这种形态）；为 true 时才对
+    # 裸请求返回 400，倒逼客户端显式 mode=current_verified + expect_sha256。
+    cfg.setdefault("require_verified_base", False)
+    if not isinstance(cfg["require_verified_base"], bool):
+        raise SystemExit("config.require_verified_base 必须是 bool")
     # L2 correctness 车道（handoff §3-L2）：并行正确性筛选，不持计时锁、不进稳态计时。
     # 回退开关：correctness_workers=0 即回到纯计时车道（无 lane 字段行为与旧版一致）。
     # 以下扁平键是旧版兼容缺省：evaluators.acc 未显式给出 workers/cpus/omp_threads 时回落
@@ -419,6 +451,24 @@ def lane_resources(cfg, lane, index=None, total=None):
     return cpus, omp
 
 
+def timing_lock_path(cfg, index=None, total=None):
+    """timing 车道的计时锁路径（ADR-0002 计时互斥不变量的分区扩展）。
+
+    单 worker（total 为 None 或 1）→ 就是 `cfg["lock_file"]`，与旧版逐字节一致；
+    多 worker（perf.perf.max_concurrency>1）→ 按 worker index 分区
+    （`<lock_file>.<index>`），每条车道在自己的核段内独占——互斥语义从
+    “全局串行”收窄为“同分区串行”，这是双计时车道的启用前提（否则多 worker
+    仍被同一把锁串行化，并发只影响 pickup 顺序）。
+
+    部署为多 worker 时，**手工 SSH 基准与任何抢锁的回退路径必须同时持有
+    全部分区锁**（`flock <lock>.0 flock <lock>.1 ...`），否则会与某条车道重叠。
+    """
+    base = cfg["lock_file"]
+    if not isinstance(total, int) or total <= 1:
+        return base
+    return f"{base}.{index or 0}"
+
+
 # ---------------------------------------------------------------- 白名单解析
 
 def resolve_path(cfg, relpath):
@@ -453,37 +503,116 @@ def resolve_path(cfg, relpath):
 
 # ---------------------------------------------------------------- 部署-恢复
 
+class SlotDriftError(ValueError):
+    """请求声明的 expect_sha256 与槽位实际内容不符（毒槽检出），拒绝部署。
+
+    与裸 ValueError 区分的意义：Worker 捕获后计入 evald_slot_drift_total
+    （P2-3 观测），部署前验身份失败从此有专属信号。"""
+
+
+class LoadedMismatchError(ValueError):
+    """部署后回读内容与请求内容不一致（写盘截断/编码差异），判失败。
+
+    P0-2：'写成功'不能只看 write() 返回——回读 sha 必须等于请求内容 sha，
+    否则 loaded_mismatch 计数并显式 failed，不静默。"""
+
+
+def _save_manifest(job_dir, manifest):
+    with open(os.path.join(job_dir, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=1)
+
+
 def deploy_files(cfg, job_dir, files):
-    """备份原文件 → rm 断硬链 → 写候选。每写一个文件就更新 manifest，
-    部署中途失败时 restore_files 可按已有 manifest 回滚。"""
+    """原子部署候选文件（P2-2 两阶段全有或全无）+ 实际加载身份回读（P0-2）。
+
+    阶段 1（暂存，不触碰 site-packages 现有文件）：逐文件——expect_sha256 槽位
+    身份校验（不符 → SlotDriftError，拒绝部署以免毒文件被固化）→ 备份原文件
+    （记 orig_sha256）→ 写临时文件 `<path>.<jobid>.tmp`。每文件完成即更新
+    manifest（中途失败时 restore_files 可按已有 manifest 回滚）。
+    阶段 2（原子替换）：全部 tmp 就绪后逐个 os.replace 到位（同目录原子改名，
+    天然断 site-packages 硬链），每个替换后回读实际内容算 sha——manifest 记
+    deployed_sha256/deployed_bytes；回读 != 请求内容 sha → LoadedMismatchError
+    （已替换部分由调用方按 manifest 回滚）。
+    返回 manifest 列表；任一步失败清理未替换的 tmp 后原样抛出。"""
     backup_root = os.path.join(job_dir, "backup")
+    jid = os.path.basename(os.path.normpath(job_dir)) or "job"
     manifest = []
-    for ent in files:
-        abs_path = resolve_path(cfg, ent["path"])
-        if abs_path is None:
-            raise ValueError(f"路径不在白名单内: {ent['path']}")
-        existed = os.path.lexists(abs_path)
-        backup_path = os.path.join(backup_root, ent["path"])
-        os.makedirs(os.path.dirname(backup_path), exist_ok=True)
-        created_dirs = _missing_parents(abs_path)
-        if existed:
-            shutil.copy2(abs_path, backup_path)
-            mode = os.stat(abs_path).st_mode & 0o777
-            os.remove(abs_path)  # 断 site-packages 硬链
-        else:
-            mode = 0o644
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "w", encoding="utf-8") as f:
-            f.write(ent["content"])
-        os.chmod(abs_path, mode)
-        manifest.append({
-            "path": ent["path"], "abs": abs_path, "backup": backup_path,
-            "existed": existed, "created_dirs": created_dirs,
-            "sha256": sha256_hex(ent["content"]),
-        })
-        with open(os.path.join(job_dir, "manifest.json"), "w", encoding="utf-8") as f:
-            json.dump(manifest, f, ensure_ascii=False, indent=1)
-    return manifest
+    _save_manifest(job_dir, manifest)
+    staged = []  # 阶段 1 的暂存记录（tmp 尚未 replace）
+    tmp_paths = []  # 所有已尝试写出的 tmp（含写失败的——清理必须全覆盖）
+    try:
+        for ent in files:
+            abs_path = resolve_path(cfg, ent["path"])
+            if abs_path is None:
+                raise ValueError(f"路径不在白名单内: {ent['path']}")
+            existed = os.path.lexists(abs_path)
+            if existed and ent.get("expect_sha256"):
+                actual = sha256_file(abs_path)
+                if actual != ent["expect_sha256"]:
+                    raise SlotDriftError(
+                        f"槽位投毒检出: {ent['path']} sha={actual[:12]} != expect={ent['expect_sha256'][:12]}"
+                        f"（拒绝部署以免毒文件被固化；需先恢复槽位）")
+            orig_sha = sha256_file(abs_path) if existed else None
+            backup_path = os.path.join(backup_root, ent["path"])
+            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+            created_dirs = _missing_parents(abs_path)
+            if existed:
+                shutil.copy2(abs_path, backup_path)
+                mode = os.stat(abs_path).st_mode & 0o777
+            else:
+                mode = 0o644
+            tmp_path = f"{abs_path}.{jid}.tmp"
+            tmp_paths.append(tmp_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            # 二进制写：不做任何换行翻译，回读 sha 与请求内容 sha 严格可比
+            with open(tmp_path, "wb") as f:
+                f.write(ent["content"].encode("utf-8"))
+            os.chmod(tmp_path, mode)
+            staged.append({"ent": ent, "abs": abs_path, "tmp": tmp_path})
+            manifest.append({
+                "path": ent["path"], "abs": abs_path, "backup": backup_path,
+                "existed": existed, "created_dirs": created_dirs,
+                "sha256": sha256_hex(ent["content"]), "orig_sha256": orig_sha,
+                "deployed_sha256": None, "deployed_bytes": None,
+            })
+            _save_manifest(job_dir, manifest)
+        for i, st in enumerate(staged):
+            os.replace(st["tmp"], st["abs"])
+            deployed_sha = sha256_file(st["abs"])
+            manifest[i]["deployed_sha256"] = deployed_sha
+            manifest[i]["deployed_bytes"] = os.path.getsize(st["abs"])
+            _save_manifest(job_dir, manifest)
+            want = manifest[i]["sha256"]
+            if deployed_sha != want:
+                raise LoadedMismatchError(
+                    f"loaded_mismatch: {st['ent']['path']} 回读 sha={deployed_sha[:12]}"
+                    f" != 请求 {want[:12]}（写盘截断/编码差异，判失败）")
+        return manifest
+    except BaseException:
+        # 清理未替换的 tmp（含阶段 1 写失败的那个；已替换的 site-packages 文件
+        # 由调用方 restore_files 按 manifest 回滚——manifest 阶段 1 已落盘）
+        for tp in tmp_paths:
+            try:
+                if os.path.lexists(tp):
+                    os.remove(tp)
+            except OSError:
+                pass
+        raise
+
+
+def verify_slot(cfg, path: str, expect_sha256: str):
+    """base 票 fail-fast：槽位 sha 必须 == 声明的 base sha，否则判 infra_blocked。
+    返回 (ok, detail)。path 为白名单内相对路径。"""
+    abs_path = resolve_path(cfg, path)
+    if abs_path is None:
+        return False, f"路径不在白名单内: {path}"
+    if not os.path.exists(abs_path):
+        return False, f"槽位不存在: {path}"
+    actual = sha256_file(abs_path)
+    if actual != expect_sha256:
+        return False, (f"槽位身份不符: {path} sha={actual[:12]} != expect={expect_sha256[:12]}"
+                       f"（槽位可能被未恢复的候选毒化）")
+    return True, actual
 
 
 def _missing_parents(abs_path):
@@ -498,12 +627,16 @@ def _missing_parents(abs_path):
 
 def restore_files(job_dir):
     """按 manifest 恢复原文件（新文件则删除候选）；空目录回收。
-    manifest 缺失（部署一个文件都没写成）时静默返回。"""
+    manifest 缺失（部署一个文件都没写成）时静默返回。
+    2026-09-11：恢复后回读 sha 校验（orig_sha256），不符即抛异常→计 restore 失败。
+    P0-2：每个条目回读后的实际 sha 记回 manifest（restored_sha256），审计可查
+    "恢复到的到底是什么"，而非只看 restore 是否抛错。"""
     mp = os.path.join(job_dir, "manifest.json")
     if not os.path.exists(mp):
         return
     with open(mp, encoding="utf-8") as f:
         manifest = json.load(f)
+    bad = []
     for ent in manifest:
         abs_path, backup = ent["abs"], ent["backup"]
         if os.path.lexists(abs_path):
@@ -511,12 +644,22 @@ def restore_files(job_dir):
         if ent["existed"]:
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             shutil.copy2(backup, abs_path)
+            exp = ent.get("orig_sha256")
+            if exp and os.path.exists(abs_path):
+                got = sha256_file(abs_path)
+                if got != exp:
+                    bad.append(f"{ent['path']} got={got[:12]} exp={exp[:12]}")
+        ent["restored_sha256"] = sha256_file(abs_path) \
+            if os.path.exists(abs_path) and not os.path.isdir(abs_path) else None
         for d in sorted(ent["created_dirs"], key=len, reverse=True):
             try:
                 if os.path.isdir(d) and not os.listdir(d):
                     os.rmdir(d)
             except OSError:
                 pass
+    _save_manifest(job_dir, manifest)
+    if bad:
+        raise RuntimeError(f"restore 回读校验失败（{len(bad)} 个）: {'; '.join(bad)}")
 
 
 # ---------------------------------------------------------------- 请求校验
@@ -560,6 +703,23 @@ def validate_request(cfg, body):
     batch = body.get("batch", 8)
     if not isinstance(batch, int) or not (1 <= batch <= 4096):
         return None, None, "batch 必须是 1..4096 的整数"
+    # torch 臂外提 / 输入播种（handoff-torch-arm §3.2）：可选透传字段，仅 bench=op
+    # 有意义（gemm 无独立 torch 参照臂）。回显约定同 lane：body 不带该键 →
+    # sanitized 不带该键（request 回显/落盘逐字节不变）；带了则值必须合法
+    # （显式 null 同样 400——不做静默吞并，项目有静默错判事故史）
+    if "skip_torch" in body:
+        skip_torch = body["skip_torch"]
+        if not isinstance(skip_torch, bool):
+            return None, None, "skip_torch 必须是 bool"
+        if bench != "op":
+            return None, None, "skip_torch 仅支持 bench=op"
+    if "seed" in body:
+        # bool 是 int 子类，必须显式排除（True 会伪装成 seed=1）
+        seed = body["seed"]
+        if isinstance(seed, bool) or not isinstance(seed, int) or not (0 <= seed <= 2**31 - 1):
+            return None, None, "seed 必须是 0..2^31-1 的整数"
+        if bench != "op":
+            return None, None, "seed 仅支持 bench=op"
     restore = body.get("restore", True)
     if not isinstance(restore, bool):
         return None, None, "restore 必须是 bool"
@@ -600,6 +760,28 @@ def validate_request(cfg, body):
         seen.add(ent["path"])
         if resolve_path(cfg, ent["path"]) is None:
             return None, None, f"路径不在白名单内: {ent['path']}"
+    # P1-3 base 票语义显式化：mode ∈ {deploy, current_verified}。
+    #   deploy           = 常规部署测量（必须带 files）；
+    #   current_verified = 不部署，测量"已验证身份的当前槽位"（必须带
+    #                      expect_path/expect_sha256，Worker 复用 verify_slot
+    #                      校验，不符即 infra_blocked——杜绝静默测毒槽）。
+    # 向后兼容：不带 mode 的请求不走以下任何分支（require_verified_base=false
+    # 时"无 files 且无 mode"的裸请求照旧接受——驱动的 baseline/base 票正是
+    # 这种形态，硬拒会打断全部现有客户端）。
+    mode = body.get("mode")
+    if "mode" in body:
+        if mode not in ("deploy", "current_verified"):
+            return None, None, "mode 只能是 deploy | current_verified"
+        if mode == "deploy" and not files:
+            return None, None, "mode=deploy 需要 files（先部署候选再测量）"
+        if mode == "current_verified" and files:
+            return None, None, "mode=current_verified 不部署，不可带 files"
+        if mode == "current_verified" and not (body.get("expect_path") and body.get("expect_sha256")):
+            return None, None, "mode=current_verified 必须带 expect_path/expect_sha256（否则等于无声测量未知内容）"
+    if cfg.get("require_verified_base") and not files and "mode" not in body:
+        return None, None, ("require_verified_base：裸作业（无 files 且无 mode）拒绝——"
+                            "改用 mode=current_verified + expect_path/expect_sha256 测量已验证槽位，"
+                            "或 mode=deploy + files 部署候选")
     sanitized = {
         "op": op, "shape": shape, "dtype": dtype, "warmup": warmup, "rep": rep,
         "bench": bench, "restore": restore, "timeout_min": timeout_min,
@@ -607,6 +789,33 @@ def validate_request(cfg, body):
         "files": [{"path": e["path"], "sha256": sha256_hex(e["content"]),
                    "bytes": len(e["content"].encode("utf-8"))} for e in files],
     }
+    # torch 臂外提/输入播种回显：约定同 lane——body 不带该键 → sanitized 不带该键
+    # （老客户端 request 回显/落盘逐字节不变）
+    if "skip_torch" in body:
+        sanitized["skip_torch"] = skip_torch
+    if "seed" in body:
+        sanitized["seed"] = seed
+    # P1-3：mode 回显（不带则不带该键，老客户端回显逐字节不变）
+    if "mode" in body:
+        sanitized["mode"] = mode
+    # 2026-09-11 槽位投毒加固：可选槽位身份声明（base 票 fail-fast 用）。
+    # body 不带该键 → sanitized 不带该键（老客户端回显逐字节不变）。
+    if "expect_path" in body or "expect_sha256" in body:
+        ep, es = body.get("expect_path"), body.get("expect_sha256")
+        if not isinstance(ep, str) or not isinstance(es, str) or len(es) != 64:
+            return None, None, "expect_path 必须是字符串、expect_sha256 必须是 64 位 hex"
+        if resolve_path(cfg, ep) is None:
+            return None, None, f"expect_path 不在白名单内: {ep}"
+        sanitized["expect_path"] = ep
+        sanitized["expect_sha256"] = es
+    # P1-2 幂等提交：可选 client_request_id（≤64 字符，[A-Za-z0-9_.:-]）。
+    # 不带该字段行为逐字节不变；带了则服务端对同 id 返回既有 job_id +
+    # deduplicated=true（见 Handler.do_POST / Store.idempotent_lookup）。
+    if "client_request_id" in body:
+        cid = body["client_request_id"]
+        if not isinstance(cid, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", cid):
+            return None, None, "client_request_id 必须是 1..64 字符且仅含 [A-Za-z0-9_.:-]"
+        sanitized["client_request_id"] = cid
     # 向后兼容：body 无 lane 字段时 sanitized 不带 lane 键（request 回显/落盘逐字节不变）；
     # force_lane 生效时必须显式带 lane 键，否则执行层按缺省 timing 处理
     if "lane" in body or cfg.get("force_lane"):
@@ -627,16 +836,26 @@ def validate_request(cfg, body):
 
 # 固定 bucket（写死，不做动态）：进程内语义，evald 重启清零，不从 spool 重建。
 # 与 submissions_total / jobs_total 的持久语义严格区分——后者扫 spool 衔接历史。
+# queue_wait/job_duration/psr 按 lane 分列；deploy/restore/pathlock_wait 是
+# 全局量（渲染无 lane label，观测键固定为 "all"，见 _render_metrics）。
 HIST_BUCKETS = {
     "queue_wait": (1, 5, 15, 30, 60, 120, 300, 600),
     "job_duration": (5, 15, 30, 60, 90, 120, 300, 600),
     "psr": (1, 2, 4, 8, 16),
+    "deploy": (0.1, 0.5, 1, 2, 5, 10, 30, 60),
+    "restore": (0.1, 0.5, 1, 2, 5, 10, 30, 60),
+    "pathlock_wait": (0.001, 0.01, 0.05, 0.1, 0.5, 1, 5, 30),
 }
 HIST_METRIC = {
     "queue_wait": "evald_queue_wait_seconds",
     "job_duration": "evald_job_duration_seconds",
     "psr": "evald_psr",
+    "deploy": "evald_deploy_seconds",
+    "restore": "evald_restore_seconds",
+    "pathlock_wait": "evald_pathlock_wait_seconds",
 }
+# 全局（无 lane label）直方图种类；其余按 lane 分列
+HIST_GLOBAL_KINDS = ("deploy", "restore", "pathlock_wait")
 
 
 def _fmt_le(x):
@@ -703,6 +922,9 @@ class Job:
         self.error = None
         self.stdout = ""
         self.stderr = ""
+        # P1-2 幂等：同 client_request_id 重复提交的命中次数（0=从无命中）。
+        # to_json 仅在 >0 时输出 dedup_hit 键（老作业/老客户端回显逐字节不变）
+        self.dedup_hit = 0
         self.submitted_at = time.time()
         self.started_at = None
         self.finished_at = None
@@ -719,6 +941,8 @@ class Job:
             "request": self.request, "result": self.result, "kope_mem": self.kope_mem,
             "error": self.error,
         }
+        if self.dedup_hit:
+            o["dedup_hit"] = self.dedup_hit
         if getattr(self, "extra", None):
             o.update(self.extra)
         if full:
@@ -743,6 +967,10 @@ class Store:
         self.queues = {"timing": deque(), "correctness": deque(), "func": deque()}
         self.events = {}
         self.seq = 0
+        # 部署路径互斥表（进程内、惰性建）：同一 site-packages 目标文件的
+        # deploy→run→restore 全程只允许一个作业持有，跨车道/跨 worker 生效。
+        # 详见 path_lock()。
+        self._path_locks = {}
         # /metrics 聚合计数器（持久语义：初值由 _init_metrics 扫 spool 衔接历史，
         # 之后由 submit()/finish() 维护；与 textfile 探针的 spool 扫描口径一致）
         self.m_submissions = 0
@@ -751,12 +979,18 @@ class Store:
         self.m_last_comp_ts = 0.0
         self.m_last_job = None          # (op, state) —— 只暴露最新一条
         # 进程内遥测（重启清零；与上面 spool 持久计数的语义严格区分，见 §4.3）
-        self.m_hist = {"queue_wait": {}, "job_duration": {}, "psr": {}}
+        self.m_hist = {k: {} for k in HIST_BUCKETS}
         self.m_completed = {}           # {lane: {state: n}}
         self.m_fallback = {}            # warmd→subprocess 回退 {reason: n}
         self.m_restore_fail = 0         # restore 失败（P0：实验环境 §4.6 要 HALT）
         self.m_http = {}                # {(path, status): n}
         self.m_longpoll = 0             # 长轮询挂起数
+        # P0-3/P2-3 观测计数（进程内语义）
+        self.m_slot_drift = 0           # expect_sha256 校验失败（毒槽检出）次数
+        self.m_loaded_mismatch = 0      # 部署回读 != 请求内容（loaded_mismatch）次数
+        # P1-2 幂等：client_request_id → job_id（history_mem 窗口内 + 重启扫
+        # spool 重建；同 id 重复提交返回既有作业）
+        self._idem = {}
         # 最近 3 个已完成作业（idx0=最新），元素 = (op, state, dur, wait, fin_epoch)。
         # 与 m_last_job 同源语义：重启由 _init_metrics 扫 spool 重建，之后 finish() 维护。
         self.m_recent = deque(maxlen=3)
@@ -782,9 +1016,15 @@ class Store:
             job.submitted_at = rec.get("submitted_epoch", 0)
             job.started_at = rec.get("started_epoch")
             job.finished_at = rec.get("finished_epoch")
+            job.dedup_hit = rec.get("dedup_hit", 0)
             self.jobs[job.job_id] = job
             self.order.append(job.job_id)
             self.seq = max(self.seq, job.seq)
+            # P1-2 幂等映射重建（history_mem 窗口内）：重启后同 client_request_id
+            # 仍能命中既有作业
+            cid = (rec.get("request") or {}).get("client_request_id")
+            if cid:
+                self._idem[cid] = job.job_id
 
     def _sweep_stale(self):
         """上次服务器重启时被打断的作业（有目录无终态记录）标记 failed。"""
@@ -886,6 +1126,10 @@ class Store:
             self.queues[lane].append(job.job_id)
             self.m_submissions += 1
             self.m_last_sub_ts = job.submitted_at
+            # P1-2 幂等：注册 client_request_id → job_id（后续同 id 提交在本表命中）
+            cid = sanitized.get("client_request_id")
+            if cid:
+                self._idem[cid] = job.job_id
             # notify_all：waiter 分属两车道，单 notify 可能被错误车道的 waiter
             # 消费掉（其队列仍空 → 回去睡），作业滞留到下一次提交才被捡起
             self.cond.notify_all()
@@ -935,7 +1179,7 @@ class Store:
     def observe(self, kind, lane, value):
         """histogram 埋点。进程内语义，重启清零。"""
         with self.lock:
-            h = self.m_hist[kind].get(lane)
+            h = self.m_hist.setdefault(kind, {}).get(lane)
             if h is None:
                 h = self.m_hist[kind][lane] = Histogram(kind)
             h.observe(value)
@@ -952,6 +1196,58 @@ class Store:
     def count_restore_fail(self):
         with self.lock:
             self.m_restore_fail += 1
+
+    def count_slot_drift(self):
+        """P2-3：expect_sha256 校验失败（毒槽检出）计数。"""
+        with self.lock:
+            self.m_slot_drift += 1
+
+    def count_loaded_mismatch(self):
+        """P0-2/P2-3：部署回读与请求内容不一致计数。"""
+        with self.lock:
+            self.m_loaded_mismatch += 1
+
+    def idempotent_lookup(self, cid):
+        """P1-2 幂等提交：同 client_request_id 的既有作业；无则 None。
+
+        命中即把既有作业的 dedup_hit +1 并落账本（jobs.jsonl 追加一条带
+        dedup_hit 的记录），重复提交从此可见、可统计。"""
+        with self.cond:
+            jid = self._idem.get(cid)
+            job = self.jobs.get(jid) if jid else None
+            if job is not None:
+                job.dedup_hit += 1
+                self._persist(job)
+            return job
+
+    def path_lock(self, abs_path):
+        """同一部署目标路径的互斥锁：跨进程文件锁（flock）+ 进程内二次保护。
+
+        多计时车道下两个 worker 可能同时拿到同一 op 的不同候选（deploy 路径都是
+        flag_gems/ops/<op>.py）；若并发 deploy→run→restore，会互相覆盖候选、
+        restore 还原成对方的备份 → 候选错配 / 安装树写坏（本仓库有越权写者
+        事故史）。timing 车道的分区计时锁管不住这件事（不同分区不互斥），
+        acc/func 车道更是全程不碰计时锁——所以需要这把按路径的锁。
+        P0-3：8788 与 8791 共享同一块板/同一个 site-packages 文件系统，进程内
+        锁不够——改用 FilePathLock（flock 于 <path_lock_dir>/path.<sha16(abs)>.lock，
+        两实例 config.path_lock_dir 必须同值）。锁粒度＝绝对路径（语义不变），
+        同路径永远拿到同一把（惰性建，进程内表）；获取顺序＝按路径排序（调用方
+        保持，避免死锁）。客户端（bin/eval_pipeline.py 的 busy_paths）本来就
+        串行化同路径作业，这里是服务端兜底：任何客户端都撞不坏。
+        """
+        with self.lock:
+            lk = self._path_locks.get(abs_path)
+            if lk is None:
+                lock_dir = self.cfg.get("path_lock_dir") or "/tmp/evald-pathlocks"
+                try:
+                    os.makedirs(lock_dir, exist_ok=True)
+                    lk = FilePathLock(_path_lock_file(lock_dir, abs_path))
+                except OSError:
+                    # 锁目录不可建/不可写：退回纯进程内锁（互斥收窄到本进程，
+                    # 服务可用性优先；正常板上部署不会走到这里）
+                    lk = threading.Lock()
+                self._path_locks[abs_path] = lk
+            return lk
 
     def count_http(self, path, code):
         with self.lock:
@@ -978,6 +1274,8 @@ class Store:
         """
         with self.lock:
             return {"lanes": self.lane_stats(),
+                    "queue_max": self.cfg["queue_max"],
+                    "lane_queue_max": dict(self.cfg.get("lane_queue_max") or {}),
                     "submissions": self.m_submissions,
                     "jobs": dict(self.m_jobs),
                     "last_sub_ts": self.m_last_sub_ts,
@@ -990,6 +1288,8 @@ class Store:
                                   for lane, d in self.m_completed.items()},
                     "fallback": dict(self.m_fallback),
                     "restore_fail": self.m_restore_fail,
+                    "slot_drift": self.m_slot_drift,
+                    "loaded_mismatch": self.m_loaded_mismatch,
                     "http": dict(self.m_http),
                     "longpoll": self.m_longpoll,
                     "oldest_age": {lane: self.oldest_queued_age(lane)
@@ -1082,7 +1382,86 @@ class QueueFullError(Exception):
     pass
 
 
+# ---------------------------------------------------------------- 跨进程路径文件锁（P0-3）
+
+def _path_lock_file(lock_dir, abs_path):
+    """共享路径 → 锁文件路径：<lock_dir>/path.<sha16(abs_path)>.lock。
+
+    sha16 = sha256(abs_path utf-8) 前 16 hex——8788 与 8791 对同一绝对路径算出
+    同一锁文件名（前提：两实例 config.path_lock_dir 同值），即板级互斥。"""
+    return os.path.join(
+        lock_dir, "path.%s.lock"
+        % hashlib.sha256(abs_path.encode("utf-8", "replace")).hexdigest()[:16])
+
+
+class FilePathLock:
+    """flock 文件锁：acquire()/release() 接口与 threading.Lock 同型（不可重入）。
+
+    P0-3：8788（timing）与 8791（correctness）是同一块板上两个独立进程、共享
+    同一个 site-packages 文件系统，进程内 threading.Lock 管不住跨进程的并发
+    deploy→run→restore。本锁在共享锁文件上 fcntl.flock(LOCK_EX)：
+    - 跨进程互斥（板级）；同进程不同 fd 的 flock 同样互斥（Linux 语义），行为
+      与 threading.Lock 等价；
+    - 进程内再叠一把 threading.Lock 作二次保护：同进程多线程先在进程内排队，
+      减少同一锁文件的 open()/fd 抖动（锁目录不可用时由 Store 退回纯进程内锁）；
+    - acquire(blocking=False) 抢不到返回 False；release() 未持有时 RuntimeError
+      （与 threading.Lock 一致）；调用方仍按"按路径排序获取"避免死锁。
+    """
+
+    def __init__(self, lock_path):
+        self._lock_path = lock_path
+        self._inproc = threading.Lock()
+        self._fd = None
+
+    def acquire(self, blocking=True, timeout=None):
+        if not self._inproc.acquire(blocking, -1 if timeout is None else timeout):
+            return False
+        try:
+            fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX if blocking
+                            else fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                os.close(fd)
+                raise
+        except BaseException:
+            self._inproc.release()
+            raise
+        self._fd = fd
+        return True
+
+    def release(self):
+        fd, self._fd = self._fd, None
+        if fd is None:
+            raise RuntimeError("release() of un-acquired FilePathLock")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+        self._inproc.release()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+        return False
+
+
 # ---------------------------------------------------------------- 执行器（v1 子进程）
+
+def _signal_name(rc):
+    """负退出码 → 信号名（POSIX wait 语义：-N = 被信号 N 杀死）。非信号 None。
+
+    P1-1：SIGSEGV/SIGABRT 直接可读，rc=1 无 stderr 类失败不再靠猜。"""
+    if not isinstance(rc, int) or isinstance(rc, bool) or rc >= 0:
+        return None
+    try:
+        return signal.Signals(-rc).name
+    except ValueError:
+        return "SIG%d" % (-rc)
+
 
 class SubprocessExecutor:
     def __init__(self, cfg, lane="timing", index=None, total=None):
@@ -1122,6 +1501,13 @@ class SubprocessExecutor:
             base = (f"python {self.cfg['scripts_root']}/bench_op.py --op {req['op']} "
                     f"--shape %s --dtype {req['dtype']} "
                     f"--warmup {req['warmup']} --rep {req['rep']}")
+            # torch 臂外提/输入播种（handoff-torch-arm §3.2.3）：与 warmd 主路径
+            # （_run_bench argv）保持两条执行器路径等价；字段仅 bench=op 合法
+            #（validate_request 已保证），此处只按存在与否拼接
+            if req.get("skip_torch"):
+                base += " --skip-torch"
+            if req.get("seed") is not None:
+                base += f" --seed {req['seed']}"
             shapes = req["shape"]
             cmd = " && ".join(base % s for s in
                               (shapes if isinstance(shapes, list) else [shapes]))
@@ -1160,6 +1546,12 @@ class SubprocessExecutor:
             return "timeout", None, None, f"exceeded {req['timeout_min']} min"
         job.stdout, job.stderr = out or "", err or ""
         if proc.returncode != 0:
+            # P1-1：退出码/信号随 job 交给 Worker 落进 result（exit_code 为负值
+            # 即 -signal；signal_name 如 SIGSEGV）
+            job.exit_code = proc.returncode
+            sig = _signal_name(proc.returncode)
+            if sig:
+                job.signal_name = sig
             return "failed", None, None, f"bench rc={proc.returncode}"
         rows = _parse_json_lines(out)
         if not rows:
@@ -1253,6 +1645,10 @@ class WarmForkExecutor:
         env = dict(os.environ)
         env["WARMD_SCRIPTS_ROOT"] = self.cfg["scripts_root"]
         env.update(self.cfg.get("warmd_env", {}))
+        # 输出写后自检（grp-DIAG 模式 A）：config 显式开启才注入（默认关=保守）；
+        # 与 warmd.py 的 _SELFCHECK_ENV 约定同一字符串
+        if self.cfg.get("warmd_output_selfcheck"):
+            env["WARMD_OUTPUT_SELFCHECK"] = "1"
         cpus, omp = lane_resources(self.cfg, self.lane, self.index, self.total)
         # 车道环境随守护 env 被 fork 子进程继承（warmd 不改语义）；守护整体
         # taskset → 每个作业子进程天然钉在车道核。timing 默认无 K3_LANE/OMP/钉核；
@@ -1309,7 +1705,8 @@ class WarmForkExecutor:
                 self.proc.stdin.write(json.dumps({
                     "id": job.job_id, "timeout_s": timeout_s,
                     "req": {k: req[k] for k in ("bench", "op", "shape", "dtype",
-                                                "warmup", "rep", "batch") if k in req},
+                                                "warmup", "rep", "batch",
+                                                "skip_torch", "seed") if k in req},
                 }) + "\n")
                 self.proc.stdin.flush()
                 line = self._readline(timeout_s + 30)
@@ -1331,6 +1728,16 @@ class WarmForkExecutor:
         state = resp.get("state", "failed")
         result = kope_mem = None
         error = resp.get("error")
+        if state == "failed":
+            # P1-1：warmd 子进程 returncode/signal 进 job（Worker 落进 result）。
+            # rc 为负值即 -signal（os.waitstatus_to_exitcode 语义），signal_name
+            # 优先取 warmd 报的（warmd 也可能带），否则本地由 rc 推导
+            rc = resp.get("rc")
+            if isinstance(rc, int) and not isinstance(rc, bool) and rc != 0:
+                job.exit_code = rc
+                sig = resp.get("signal_name") or _signal_name(rc)
+                if sig:
+                    job.signal_name = sig
         if state == "done":
             rows = resp.get("result") or []
             if rows:
@@ -1389,26 +1796,63 @@ class Worker(threading.Thread):
         job_dir = store.job_dir(jid)
         os.makedirs(job_dir, exist_ok=True)
         deployed = False
-        # 仅 timing 车道持 /tmp/k3_bench.lock 与手工 SSH 基准互斥（ADR-0002，语义不变）；
-        # acc/func 车道整段不碰锁——并行筛选是车道存在的全部意义（handoff §3-L2）
-        lock_fd = os.open(cfg["lock_file"], os.O_CREAT | os.O_RDWR, 0o644) \
+        manifest = None
+        # 部署路径互斥（跨车道/跨 worker/跨进程 P0-3）：**先于计时锁**获取——不为
+        # 等一把 per-path 锁而占着整条车道的计时锁。多文件作业按路径排序获取，
+        # 避免互相死锁。P0-3 观测：每把锁的获取耗时进 pathlock_wait 直方图。
+        dep_paths = sorted({p for p in (resolve_path(cfg, e.get("path"))
+                                       for e in (job.request.get("files") or [])
+                                       if isinstance(e, dict)) if p})
+        path_locks = [store.path_lock(p) for p in dep_paths]
+        for _plk in path_locks:
+            _t_plk = time.time()
+            _plk.acquire()
+            store.observe("pathlock_wait", "all", time.time() - _t_plk)
+        # 仅 timing 车道持计时锁与手工 SSH 基准互斥（ADR-0002）；锁路径按 worker
+        # 分区（单 worker 时即 cfg["lock_file"]，行为与旧版逐字节一致，见
+        # timing_lock_path）；acc/func 车道整段不碰锁——并行筛选是车道存在的全部意义
+        lock_fd = os.open(timing_lock_path(cfg, self.index, self.total),
+                          os.O_CREAT | os.O_RDWR, 0o644) \
             if lane == "timing" else None
         try:
             if lock_fd is not None:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            if job.request.get("files"):
+            slot_blocked = False
+            if job.request.get("expect_sha256"):
+                ok, detail = verify_slot(cfg, job.request["expect_path"],
+                                         job.request["expect_sha256"])
+                if not ok:
+                    # base 票 fail-fast：槽位被毒化时**不**静默测量毒槽；
+                    # 置标志走正常 finally（锁释放/落盘由既有路径完成）
+                    slot_blocked = True
+                    job.state = "failed"
+                    job.error = f"slot_poisoned: {detail}"
+                    job.result = {"infra_blocked": True, "reason": detail}
+                    store.count_slot_drift()  # P2-3：毒槽检出可观测
+            if not slot_blocked and job.request.get("files"):
                 with open(os.path.join(job_dir, "request.json"), encoding="utf-8") as f:
                     payload = json.load(f)
                 try:
-                    deploy_files(cfg, job_dir, payload["files"])
+                    _t_dep = time.time()
+                    manifest = deploy_files(cfg, job_dir, payload["files"])
+                    store.observe("deploy", "all", time.time() - _t_dep)  # P2-3
                     deployed = True
-                except Exception:
-                    try:
-                        restore_files(job_dir)  # 部署中途失败，按已写 manifest 回滚
-                    except Exception as exc:  # noqa: BLE001
-                        job.error = f"rollback failed: {exc!r}"
+                except SlotDriftError:
+                    store.count_slot_drift()      # P2-3：部署前 expect 校验失败
                     raise
-            state, result, kope_mem, error = self._executor_for(job.request).run(job)
+                except LoadedMismatchError:
+                    store.count_loaded_mismatch()  # P0-2/P2-3：回读不一致
+                    raise
+                finally:
+                    if not deployed:
+                        try:
+                            restore_files(job_dir)  # 部署中途失败，按已写 manifest 回滚
+                        except Exception as exc:  # noqa: BLE001
+                            job.error = f"rollback failed: {exc!r}"
+            if slot_blocked:
+                state, result, kope_mem, error = job.state, job.result, None, job.error
+            else:
+                state, result, kope_mem, error = self._executor_for(job.request).run(job)
             job.state, job.result, job.kope_mem, job.error = state, result, kope_mem, error
             if lane in ("correctness", "func") and isinstance(job.result, dict):
                 # warmup=0/rep=1 下 speedup 无统计意义；lane 标注供下游甄别
@@ -1417,10 +1861,13 @@ class Worker(threading.Thread):
             if lane == "func" and job.state == "done":
                 # 功能冒烟口径：有 JSON 结果行即 pass；不产出 speedup 类计时结论
                 job.kope_mem = {"pass_rate": 1.0}
+            self._enrich_result(job, job_dir, manifest)
         finally:
             if deployed and job.request.get("restore", True):
                 try:
+                    _t_res = time.time()
                     restore_files(job_dir)  # 任何路径（含超时/异常）都恢复（ADR-0001）
+                    store.observe("restore", "all", time.time() - _t_res)  # P2-3
                 except Exception as exc:  # noqa: BLE001
                     job.error = (job.error or "") + f" | restore failed: {exc!r}"
                     # 遥测：restore 失败是 P0（实验环境 §4.6 要求 HALT），必须可见
@@ -1428,6 +1875,42 @@ class Worker(threading.Thread):
             if lock_fd is not None:
                 os.close(lock_fd)
             store.finish(job)
+            # 恢复完成、作业已终态之后才放行同路径的下一个作业（否则对方
+            # 会读到未恢复的安装树）；反序释放与获取对称
+            for _plk in reversed(path_locks):
+                _plk.release()
+
+    def _enrich_result(self, job, job_dir, manifest):
+        """作业结果富化（P0-2/P1-1/P2-4）：全部为附加披露，done 作业的既有键不动。
+
+        - loaded_files：实际部署内容的身份（与请求侧 sanitized.files 对照，
+          identity-ledger 的 loaded_sha 输入）；
+        - exit_code/signal_name/stderr_path：失败可诊断（负 exit_code = -signal；
+          完整 stderr 本就落 job_dir/stderr.log，此处给路径字段）；
+        - output_selfcheck：timing 车道显式披露 stdout 写后自检开关状态（P2-4，
+          自检未启用也明说 false，防"输出完整性未验证"被误读为已验证）。
+        """
+        res = job.result if isinstance(job.result, dict) else None
+        if manifest and res is not None:
+            res["loaded_files"] = [
+                {"path": m["path"], "sha256": m["deployed_sha256"],
+                 "bytes": m["deployed_bytes"]} for m in manifest]
+        if job.state == "failed":
+            if res is None:
+                res = job.result = {}
+            ec = getattr(job, "exit_code", None)
+            if ec is not None:
+                res.setdefault("exit_code", ec)
+                sig = getattr(job, "signal_name", None)
+                if sig:
+                    res.setdefault("signal_name", sig)
+            # stderr_tail 只有尾部 4KB；完整 stderr 在作业目录（finish() 落盘），
+            # 给出路径即可按需取全文——不再有"截断后丢弃"的死角
+            res.setdefault("stderr_path", os.path.join(job_dir, "stderr.log"))
+        lane = job.request.get("lane", "timing")
+        if lane == "timing" and isinstance(job.result, dict):
+            job.result.setdefault(
+                "output_selfcheck", bool(self.cfg.get("warmd_output_selfcheck")))
 
 
 # ---------------------------------------------------------------- /metrics 渲染
@@ -1456,6 +1939,25 @@ def _render_metrics(m):
     ]
     for lane in ("timing", "correctness", "func"):
         lines.append('evald_running{lane="%s"} %d' % (lane, m["lanes"][lane]["running"]))
+    # ---- 队列容量（调度器算「空位」用：容量 - 占用）。全局 queue_max 恒输出；
+    #      车道级 lane_queue_max 只对真配了上限（perf.<lane>.max_queue）的车道输出，
+    #      未配的车道不出序列——避免调度端把 None 误读成 0 容量。
+    lines += [
+        "# HELP evald_queue_max global queue capacity (upper bound summed across"
+        " all lanes); submit returns 429 once reached.",
+        "# TYPE evald_queue_max gauge",
+        "evald_queue_max %d" % m.get("queue_max", 0),
+    ]
+    lq = {k: v for k, v in (m.get("lane_queue_max") or {}).items() if v}
+    if lq:
+        lines += [
+            "# HELP evald_lane_queue_max per-lane queue capacity override"
+            " (perf.<lane>.max_queue); emitted only for lanes that set one.",
+            "# TYPE evald_lane_queue_max gauge",
+        ]
+        for lane in ("timing", "correctness", "func"):
+            if lane in lq:
+                lines.append('evald_lane_queue_max{lane="%s"} %d' % (lane, lq[lane]))
     lines += [
         "# HELP evald_submissions_total jobs submitted since spool creation"
         " (persists across restarts via spool scan).",
@@ -1537,6 +2039,22 @@ def _render_metrics(m):
             lines.append('%s_bucket{lane="%s",le=\"+Inf\"} %d' % (metric, lane, count))
             lines.append('%s_sum{lane="%s"} %.3f' % (metric, lane, total))
             lines.append('%s_count{lane="%s"} %d' % (metric, lane, count))
+    # ---- 全局直方图（无 lane label）：deploy/restore 耗时（P2-3）与路径锁等待
+    #      （P0-3）。观测键固定为 "all"，进程内语义（重启清零）与上面一致。
+    for kind in HIST_GLOBAL_KINDS:
+        metric = HIST_METRIC[kind]
+        t = m.get("hist", {}).get(kind, {}).get("all")
+        count, total, counts = t if t else (0, 0.0, [0] * len(HIST_BUCKETS[kind]))
+        lines += [
+            "# HELP %s %s (PROCESS-LOCAL: resets to zero on evald restart;"
+            " global, no lane label)." % (metric, kind.replace("_", " ")),
+            "# TYPE %s histogram" % metric,
+        ]
+        for i, b in enumerate(HIST_BUCKETS[kind]):
+            lines.append('%s_bucket{le="%s"} %d' % (metric, _fmt_le(b), counts[i]))
+        lines.append('%s_bucket{le="+Inf"} %d' % (metric, count))
+        lines.append('%s_sum %.3f' % (metric, total))
+        lines.append('%s_count %d' % (metric, count))
     lines += [
         "# HELP evald_jobs_completed_total jobs reaching terminal state since"
         " evald start, per lane and state (PROCESS-LOCAL: resets on restart).",
@@ -1568,6 +2086,16 @@ def _render_metrics(m):
         " (P0: runbook requires HALT).",
         "# TYPE evald_restore_failures_total counter",
         "evald_restore_failures_total %d" % m.get("restore_fail", 0),
+        "# HELP evald_slot_drift_total slot identity (expect_sha256) verification"
+        " failures before deploy/run (poisoned-slot detected; PROCESS-LOCAL:"
+        " resets on restart).",
+        "# TYPE evald_slot_drift_total counter",
+        "evald_slot_drift_total %d" % m.get("slot_drift", 0),
+        "# HELP evald_loaded_mismatch_total deploy read-back sha mismatching the"
+        " requested content (truncated write / encoding drift; PROCESS-LOCAL:"
+        " resets on restart).",
+        "# TYPE evald_loaded_mismatch_total counter",
+        "evald_loaded_mismatch_total %d" % m.get("loaded_mismatch", 0),
         "# HELP evald_spool_jobs_total job directories under the spool (never"
         " pruned); runtime counter, not a directory scan.",
         "# TYPE evald_spool_jobs_total gauge",
@@ -1675,6 +2203,17 @@ class Handler(BaseHTTPRequestHandler):
         if err:
             self._reply(400, {"error": err})
             return
+        # P1-2 幂等提交：同 client_request_id 重复提交返回既有 job_id +
+        # deduplicated=true（不重复入队、不重复跑）；不带该字段的请求不经此分支，
+        # 行为逐字节不变
+        cid = sanitized.get("client_request_id")
+        if cid:
+            dup = self.store.idempotent_lookup(cid)
+            if dup is not None:
+                self._reply(202, {"job_id": dup.job_id, "state": dup.state,
+                                  "position": self.store.position(dup.job_id),
+                                  "deduplicated": True})
+                return
         try:
             job = self.store.submit(sanitized, body)
         except QueueFullError:
@@ -1763,9 +2302,11 @@ def main():
     ev = cfg["evaluators"]
     booted = []
     if ev["perf"]["enabled"]:
-        # 计时 worker：锁/串行/warmfork 语义一字不动。max_concurrency>1 时多 worker
-        # 仍被 /tmp/k3_bench.lock 串行化（计时互斥不变量），并发只影响 pickup 顺序；
-        # 配了 perf.cpu_ids 时按 index/total 分核（与 acc/func 同机制）
+        # 计时 worker：warmfork 语义一字不动。max_concurrency=1 时锁路径就是
+        # cfg["lock_file"]（与旧版逐字节一致，全局串行）；>1 时锁按 worker 分区
+        # （timing_lock_path）、配了 perf.cpu_ids 再按 index/total 分核（与 acc/func
+        # 同机制）→ 多车道真并行。代价：互斥不变量收窄为“同分区串行”，手工 SSH
+        # 基准在多 worker 部署下必须同时持有全部分区锁（见 timing_lock_path docstring）。
         n_perf = ev["perf"]["workers"]
         for i in range(n_perf):
             Worker(cfg, store, lane="timing", index=i, total=n_perf).start()
@@ -1853,6 +2394,80 @@ def selftest(cfg):
     check("恢复原内容", open(orig).read() == "ORIG")
     check("新文件已回收", not os.path.exists(os.path.join(ops_dir, "new_dir", "new.py")))
     check("空目录已清理", not os.path.exists(os.path.join(ops_dir, "new_dir")))
+    # 部署路径互斥（多计时车道前提）：同路径串行、异路径异锁、恢复完整
+    cfg3 = dict(cfg)
+    cfg3["data_dir"] = os.path.join(tmp, "dataPL")
+    cfg3["executor"] = "subprocess"
+    os.makedirs(cfg3["data_dir"], exist_ok=True)
+    store3 = Store(cfg3)
+    p_add = resolve_path(cfg3, "flag_gems/ops/add.py")
+    check("path_lock 同路径永远同一把锁、异路径不同锁",
+          store3.path_lock(p_add) is store3.path_lock(p_add)
+          and store3.path_lock(p_add) is not store3.path_lock(p_add + ".other"),
+          (p_add, id(store3.path_lock(p_add))))
+    # 正斜杠路径：bash 重定向目标在本机（Windows shim）与板上（POSIX）都成立
+    marks = os.path.join(tmp, "pathlock_marks.txt").replace(os.sep, "/")
+    row_pl = json.dumps({"op": "add", "torch_ms": 2.0, "gems_ms": 1.0, "speedup": 2.0,
+                         "correct": True, "max_abs_err": 0.0})
+    # sleep 1 远大于线程启动抖动：无锁时必得 enter,enter,exit,exit（交错）
+    cfg3["bench_command_override"] = (
+        f"echo enter >> {marks}; sleep 1; echo exit >> {marks}; echo '{row_pl}'")
+    req_pl = {"op": "add", "shape": "1024", "dtype": "float32", "warmup": 1, "rep": 1,
+              "bench": "op", "restore": True, "timeout_min": 1, "lane": "correctness",
+              "files": [{"path": "flag_gems/ops/add.py", "content": "CAND_PL"}]}
+    jpl = [store3.submit(dict(req_pl), dict(req_pl)) for _ in range(2)]
+    ths_pl = [threading.Thread(
+        target=Worker(cfg3, store3, lane="correctness", index=i).run_job,
+        args=(store3.get(j.job_id),), daemon=True) for i, j in enumerate(jpl)]
+    for t in ths_pl:
+        t.start()
+    for t in ths_pl:
+        t.join(timeout=30)
+    seq_pl = open(marks, encoding="utf-8").read().split()
+    check("同部署路径的两个作业不重叠（enter/exit 成对不交错）",
+          seq_pl == ["enter", "exit", "enter", "exit"], seq_pl)
+    check("两作业均 done 且安装树已恢复 ORIG（无候选残留）",
+          all(store3.get(j.job_id).state == "done" for j in jpl)
+          and open(orig, encoding="utf-8").read() == "ORIG",
+          [(j.job_id, store3.get(j.job_id).state, store3.get(j.job_id).error)
+           for j in jpl])
+
+    print("[3b] FilePathLock 跨进程语义（P0-3，fcntl 直测）")
+    p_cross = p_add + ".cross"
+    flk = store3.path_lock(p_cross)
+    check("FilePathLock 类型与锁文件命名（path.<sha16(abs)>.lock）",
+          isinstance(flk, FilePathLock)
+          and os.path.basename(flk._lock_path)
+          == "path.%s.lock" % hashlib.sha256(p_cross.encode("utf-8")).hexdigest()[:16],
+          getattr(flk, "_lock_path", None))
+    check("锁文件落在 path_lock_dir 下", os.path.normpath(os.path.dirname(flk._lock_path))
+          == os.path.normpath(cfg3["path_lock_dir"]), flk._lock_path)
+    flk.acquire()
+    probe_fd = os.open(flk._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    cross_excl = True
+    try:
+        # 另一 fd 直抢 flock：等价于另一进程（8791）抢同一锁文件
+        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(probe_fd, fcntl.LOCK_UN)
+        cross_excl = False
+    except OSError:
+        pass
+    check("持锁期间另一 fd/进程 flock 非阻塞抢锁被拒（真实跨进程互斥）", cross_excl)
+    flk.release()
+    got_after = False
+    try:
+        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        got_after = True
+        fcntl.flock(probe_fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    os.close(probe_fd)
+    check("release 后另一 fd 可获取（锁真实生效而非恒拒）", got_after)
+    check("acquire(blocking=False) 已持有时返回 False（Lock 同型语义）",
+          flk.acquire() is True and flk.acquire(blocking=False) is False)
+    flk.release()
+    check("release 后可再次获取", flk.acquire(blocking=False) is True)
+    flk.release()
 
     print("[4] 队列 + 假 bench")
     cfg["data_dir"] = os.path.join(tmp, "data")
@@ -1935,8 +2550,54 @@ def selftest(cfg):
         j4 = store4.get(job4.job_id)
         check("warmd 超时标记", j4.state == "timeout", j4.state)
         check("warmd 超时及时返回", time.time() - t0 < 15)
+
+        print("[7b] warmd 输出写后自检（WARMD_FAKE + WARMD_OUTPUT_SELFCHECK=1）")
+        cfg5 = dict(cfg3)
+        cfg5["data_dir"] = os.path.join(tmp, "data5")
+        os.makedirs(cfg5["data_dir"], exist_ok=True)
+        cfg5["warmd_env"] = {"WARMD_FAKE": "1", "WARMD_OUTPUT_SELFCHECK": "1"}
+        store5 = Store(cfg5)
+        worker5 = Worker(cfg5, store5)
+        job5 = store5.submit(req3, req3)
+        worker5.run_job(store5.get(job5.job_id))
+        j5 = store5.get(job5.job_id)
+        check("自检开+输出完好 → done 且 speedup 照常",
+              j5.state == "done" and (j5.result or {}).get("speedup") == 2.0,
+              (j5.state, j5.error))
+        check("trailer 已剥（result/stdout 不含 warmd_selfcheck 键）",
+              "warmd_selfcheck" not in (j5.result or {})
+              and "warmd_selfcheck" not in (j5.stdout or ""),
+              j5.stdout)
     else:
-        print("[6]/[7] warmd 协议测试需要 POSIX fork，本平台跳过")
+        print("[6]/[7]/[7b] warmd 协议测试需要 POSIX fork，本平台跳过")
+
+    # [7c] 自检核对纯函数：importlib 直接加载 warmd.py（模块级仅 stdlib，
+    # 不触 torch），fork 不可用的平台也能验 verify 语义
+    print("[7c] warmd _selfcheck_verify 纯函数")
+    warmd_mod_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warmd.py")
+    if os.path.exists(warmd_mod_src):
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location("_warmd_selftest_mod", warmd_mod_src)
+        _wmod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_wmod)
+        _row = (json.dumps({"op": "fake", "speedup": 2.0}) + "\n").encode()
+        # 修复：trailer 行须 encode 成 bytes 再与 _row（bytes）拼接（原式 bytes+str TypeError）
+        _good = (_row + (json.dumps({"warmd_selfcheck": {
+            "bytes": len(_row),
+            "sha256": hashlib.sha256(_row).hexdigest()}}) + "\n").encode())
+        clean, ie = _wmod._selfcheck_verify(_good)
+        check("verify 好输出：剥 trailer、零错误", ie is None and clean == _row,
+              (ie, clean))
+        _tampered = _good.replace(b"2.0", b"9.9", 1)
+        _, ie2 = _wmod._selfcheck_verify(_tampered)
+        check("verify 字节被篡改：报完整性不一致",
+              ie2 is not None and "不一致" in ie2, ie2)
+        _, ie3 = _wmod._selfcheck_verify(_row)
+        check("verify 缺 trailer：报缺失", ie3 is not None and "缺失" in ie3, ie3)
+        _, ie4 = _wmod._selfcheck_verify(b"")
+        check("verify 空 stdout：报 trailer 缺失", ie4 is not None, ie4)
+    else:
+        check("warmd.py 存在（verify 纯函数前置）", False, warmd_mod_src)
 
     print("[8] op 名校验（RE_OP）")
     ok_ops = ["add", "_reshape_alias",
@@ -1981,6 +2642,41 @@ def selftest(cfg):
     check("correctness 命令注入 K3_LANE/OMP/--warmup 0 --rep 1",
           "K3_LANE=correctness" in cmd_c and "OMP_NUM_THREADS=1" in cmd_c
           and "--warmup 0 --rep 1" in cmd_c, cmd_c)
+    # torch 臂外提/输入播种透传（handoff-torch-arm §3.2.5）：不带键=逐字节兼容，
+    # 带键=校验+回显+命令拼接；非法值 400 同源拒绝
+    check("不带 skip_torch/seed 的 sanitized 不带该键",
+          "skip_torch" not in s0 and "seed" not in s0, (list(s0),))
+    s_sk, _, e_sk = validate_request(cfg, dict(good, skip_torch=True, seed=7))
+    check("skip_torch/seed 合法值透传回显",
+          e_sk is None and s_sk["skip_torch"] is True and s_sk["seed"] == 7, (e_sk, s_sk))
+    s_s0, _, e_s0 = validate_request(cfg, dict(good, seed=0))
+    check("显式 seed=0 接受并回显（与缺省行为同值但显式）",
+          e_s0 is None and s_s0["seed"] == 0, e_s0)
+    _, _, e_nb = validate_request(cfg, dict(good, skip_torch="yes"))
+    check("skip_torch 非 bool 拒绝", e_nb is not None, e_nb)
+    _, _, e_null = validate_request(cfg, dict(good, skip_torch=None))
+    check("skip_torch 显式 null 拒绝（不静默吞并）", e_null is not None, e_null)
+    _, _, e_neg = validate_request(cfg, dict(good, seed=-1))
+    check("seed 负数拒绝", e_neg is not None, e_neg)
+    _, _, e_big = validate_request(cfg, dict(good, seed=2**31))
+    check("seed 超 2^31-1 拒绝", e_big is not None, e_big)
+    _, _, e_boolseed = validate_request(cfg, dict(good, seed=True))
+    check("seed bool 拒绝（防 int 子类偷渡）", e_boolseed is not None, e_boolseed)
+    _, _, e_gsk = validate_request(cfg, dict(good, bench="gemm", op="mm",
+                                             skip_torch=True))
+    _, _, e_gsk2 = validate_request(cfg, dict(good, bench="gemm", op="mm",
+                                              seed=1))
+    check("gemm 拒绝 skip_torch/seed（无独立 torch 臂）",
+          e_gsk is not None and e_gsk2 is not None
+          and "仅支持 bench=op" in e_gsk and "仅支持 bench=op" in e_gsk2,
+          (e_gsk, e_gsk2))
+    cmd_sk = SubprocessExecutor(cfg).build_command(s_sk)
+    check("build_command 拼接 --skip-torch --seed 7（多 shape 逐段生效）",
+          "--skip-torch --seed 7" in cmd_sk and "--skip-torch" not in cmd_t, cmd_sk)
+    s_multi, _, e_multi = validate_request(
+        cfg, dict(good, skip_torch=True, shape=["64,512,512", "128,512,512"]))
+    cmd_multi = SubprocessExecutor(cfg).build_command(s_multi)
+    check("多 shape 命令每段都带旗标", cmd_multi.count("--skip-torch") == 2, cmd_multi)
     if shutil.which("taskset"):
         check("correctness 进程 taskset 核亲和（Popen argv）",
               SubprocessExecutor(cfg_acc, lane="correctness")._taskset_argv()
@@ -2066,6 +2762,38 @@ def selftest(cfg):
     else:
         print("  （本平台 flock 无真实互斥语义，timing 排队断言由板上 selftest 覆盖）")
     os.close(probe)
+    # 锁分区（多计时车道的前提）：路径兼容性 + 跨分区不互斥 + 同分区仍互斥
+    check("单 worker 锁路径 == cfg.lock_file（与旧版逐字节兼容）",
+          timing_lock_path(cfg_l, 0, 1) == cfg_l["lock_file"]
+          and timing_lock_path(cfg_l, None, None) == cfg_l["lock_file"]
+          and timing_lock_path(cfg_l, 0, 0) == cfg_l["lock_file"],
+          (timing_lock_path(cfg_l, 0, 1), timing_lock_path(cfg_l, None, None)))
+    check("多 worker 锁路径按 index 分区且互不相同",
+          timing_lock_path(cfg_l, 0, 2) == cfg_l["lock_file"] + ".0"
+          and timing_lock_path(cfg_l, 1, 2) == cfg_l["lock_file"] + ".1"
+          and timing_lock_path(cfg_l, 0, 2) != timing_lock_path(cfg_l, 1, 2))
+    if real_lock:
+        p0 = os.open(timing_lock_path(cfg_l, 0, 2), os.O_CREAT | os.O_RDWR, 0o644)
+        fcntl.flock(p0, fcntl.LOCK_EX)          # 人为占住分区 0（模拟车道 0 在跑）
+        w1 = Worker(cfg_l, store_l, lane="timing", index=1, total=2)
+        jx = store_l.submit(dict(s0), dict(s0))
+        w1.run_job(store_l.get(jx.job_id))
+        check("分区 0 被占时分区 1 的 timing 作业照常完成（双车道真并行前提）",
+              store_l.get(jx.job_id).state == "done",
+              (jx.job_id, store_l.get(jx.job_id).state, store_l.get(jx.job_id).error))
+        w0 = Worker(cfg_l, store_l, lane="timing", index=0, total=2)
+        jy = store_l.submit(dict(s0), dict(s0))
+        th0 = threading.Thread(target=w0.run_job,
+                               args=(store_l.get(jy.job_id),), daemon=True)
+        th0.start()
+        time.sleep(1.5)
+        blocked0 = store_l.get(jy.job_id).finished_at is None
+        fcntl.flock(p0, fcntl.LOCK_UN)
+        th0.join(timeout=30)
+        check("同分区内仍互斥（持锁排队、释放后完成）",
+              blocked0 and store_l.get(jy.job_id).state == "done",
+              (blocked0, store_l.get(jy.job_id).state))
+        os.close(p0)
 
     print("[12] correctness 3 worker 并行互不阻塞（真实 Worker 线程）")
     cfg_p = dict(cfg_l)
@@ -2137,6 +2865,30 @@ def selftest(cfg):
           and 'evald_jobs_total{state="failed"} 1' in text
           and 'evald_last_job_info{op="add",state="failed"} 1' in text
           and text.startswith("# HELP evald_up"), text)
+    # 队列容量（调度器算空位用）：全局恒输出、车道级只输出已配置的。
+    # 断言一律用受控 config（显式置 lane_queue_max），与传入的生产 config 解耦。
+    check("evald_queue_max 暴露全局队列容量（= cfg.queue_max）",
+          "evald_queue_max %d" % cfg_m["queue_max"] in text
+          and "# TYPE evald_queue_max gauge" in text, cfg_m["queue_max"])
+    cfg_mq0 = dict(cfg_m)
+    cfg_mq0["lane_queue_max"] = {ln: None for ln in ("timing", "correctness", "func")}
+    text_mq0 = _render_metrics(Store(cfg_mq0).metrics_snapshot())
+    check("未配车道级上限时不输出 evald_lane_queue_max 任何序列",
+          "evald_lane_queue_max" not in text_mq0,
+          [ln for ln in text_mq0.splitlines() if "lane_queue_max" in ln])
+    cfg_mq = dict(cfg_m)
+    cfg_mq["perf"] = {"acc": {"max_queue": 3}, "func": {"max_queue": 1}}
+    normalize_perf_resources(cfg_mq)
+    text_mq = _render_metrics(Store(cfg_mq).metrics_snapshot())
+    check("配了 max_queue 的车道输出 evald_lane_queue_max，未配车道不出序列",
+          'evald_lane_queue_max{lane="correctness"} 3' in text_mq
+          and 'evald_lane_queue_max{lane="func"} 1' in text_mq
+          and 'evald_lane_queue_max{lane="timing"}' not in text_mq,
+          [ln for ln in text_mq.splitlines() if "lane_queue_max" in ln])
+    check("perf 归并不污染受控基线的 lane_queue_max（copy-on-write）",
+          all(v is None for v in cfg_mq0["lane_queue_max"].values())
+          and cfg_mq["lane_queue_max"].get("correctness") == 3,
+          (cfg_mq0["lane_queue_max"], cfg_mq["lane_queue_max"]))
     store_m2 = Store(cfg_m)  # 模拟重启：同一 spool 重新扫描
     snap2 = store_m2.metrics_snapshot()
     check("重启后计数无缝衔接",
@@ -2452,6 +3204,7 @@ def selftest(cfg):
     syn = dict(cfg)
     syn.pop("evaluators", None)
     syn.pop("perf", None)
+    syn.pop("lane_queue_max", None)   # 否则继承生产 config 已归并的车道上限，断言不再解耦
     syn["correctness_workers"], syn["correctness_cpus"] = 3, "4-6"
     syn["correctness_omp_threads"] = 1
     syn["timeout_max_min"], syn["timeout_default_min"] = 30, 15
@@ -2585,6 +3338,213 @@ def selftest(cfg):
     check("timing 无 timeout_min 覆盖→回落全局默认 15",
           e_to2 is None and s_to2["timeout_min"] == 15,
           (e_to2, s_to2 and s_to2.get("timeout_min")))
+
+    print("[20] evald-harden：loaded_sha/原子部署/loaded_mismatch/幂等/mode/失败诊断/新 metrics")
+
+    # ---- P0-2 loaded_sha：manifest.deployed_sha256（回读=请求内容）+ restored_sha256
+    jd20 = os.path.join(tmp, "job20")
+    os.makedirs(jd20)
+    man20 = deploy_files(cfg, jd20, [
+        {"path": "flag_gems/ops/add.py", "content": "CAND20"},
+        {"path": "flag_gems/ops/n20/sub.py", "content": "SUB20"},
+    ])
+    check("manifest 记录 deployed_sha256/deployed_bytes（回读=请求内容）",
+          man20[0]["deployed_sha256"] == sha256_hex("CAND20")
+          and man20[1]["deployed_sha256"] == sha256_hex("SUB20")
+          and man20[0]["deployed_bytes"] == len(b"CAND20"), man20)
+    restore_files(jd20)
+    man20r = json.load(open(os.path.join(jd20, "manifest.json"), encoding="utf-8"))
+    check("restore 后 manifest 追加 restored_sha256（旧文件=orig、新文件=None）",
+          man20r[0]["restored_sha256"] == sha256_hex("ORIG")
+          and man20r[1]["restored_sha256"] is None
+          and not os.path.exists(os.path.join(ops_dir, "n20", "sub.py")), man20r)
+
+    # ---- P2-2 原子部署：第二文件 tmp 写失败 → 第一文件未被替换、无 tmp 残留
+    jd21 = os.path.join(tmp, "job21")
+    os.makedirs(jd21)
+    rolled = False
+    try:
+        deploy_files(cfg, jd21, [
+            {"path": "flag_gems/ops/add.py", "content": "HALF"},
+            {"path": "flag_gems/ops/second.py", "content": 123},  # 非法：int 无 .encode
+        ])
+    except (TypeError, AttributeError):
+        rolled = True
+    check("第二文件写失败：部署抛错", rolled)
+    check("原子性：第一文件未被替换（槽位保持 ORIG）",
+          open(orig, encoding="utf-8").read() == "ORIG")
+    check("原子性：无 .tmp 残留",
+          not [f for f in os.listdir(ops_dir) if f.endswith(".tmp")], os.listdir(ops_dir))
+    restore_files(jd21)  # 按 manifest 回滚（幂等：原样恢复）
+
+    # ---- P0-2 loaded_mismatch：replace 后回读 != 请求 → LoadedMismatchError
+    jd22 = os.path.join(tmp, "job22")
+    os.makedirs(jd22)
+    real_replace = os.replace
+
+    def _tamper(src, dst):
+        real_replace(src, dst)
+        with open(dst, "ab") as f:
+            f.write(b"\n# tampered")
+
+    os.replace = _tamper
+    try:
+        deploy_files(cfg, jd22, [{"path": "flag_gems/ops/add.py", "content": "CLEAN"}])
+        mismatch = False
+    except LoadedMismatchError:
+        mismatch = True
+    finally:
+        os.replace = real_replace
+    check("回读 != 请求内容 → LoadedMismatchError（不再静默）", mismatch)
+    restore_files(jd22)
+    check("loaded_mismatch 后槽位回滚为 ORIG", open(orig, encoding="utf-8").read() == "ORIG")
+
+    # ---- P1-2 幂等提交（client_request_id）
+    good20 = {"op": "add", "shape": "64", "dtype": "float32", "warmup": 1, "rep": 1,
+              "bench": "op", "restore": True, "timeout_min": 1}
+    s_c, _, e_c = validate_request(cfg, dict(good20, client_request_id="drv-1:op:0001"))
+    check("client_request_id 合法接受并回显",
+          e_c is None and s_c["client_request_id"] == "drv-1:op:0001", e_c)
+    s_nc, _, e_nc = validate_request(cfg, dict(good20))
+    check("不带 client_request_id 的 sanitized 不带该键（逐字节兼容）",
+          e_nc is None and "client_request_id" not in s_nc)
+    e_bad = None
+    for bad_cid in ("", "x" * 65, "bad id", "bad/id", 7):
+        _, _, e_bad = validate_request(cfg, dict(good20, client_request_id=bad_cid))
+        if e_bad is None:
+            break
+    check("client_request_id 非法值拒绝（空/超长/空格/斜杠/非串）", e_bad is not None)
+    cfg20 = dict(cfg)
+    cfg20["data_dir"] = os.path.join(tmp, "data20")
+    cfg20["executor"] = "subprocess"
+    os.makedirs(cfg20["data_dir"], exist_ok=True)
+    cfg20["bench_command_override"] = f"echo '{echo_row}'"
+    store20 = Store(cfg20)
+    san20, _, _ = validate_request(cfg20, dict(good20, client_request_id="cid-dup"))
+    j_a = store20.submit(dict(san20), dict(good20))
+    dup = store20.idempotent_lookup("cid-dup")
+    check("同 client_request_id 命中既有作业（同一 job_id，不重复入队）",
+          dup is not None and dup.job_id == j_a.job_id
+          and len(store20.queues["timing"]) == 1, (dup and dup.job_id, j_a.job_id))
+    check("账本记录 dedup_hit（+1 且 to_json 输出该键）",
+          dup.dedup_hit == 1 and dup.to_json().get("dedup_hit") == 1)
+    check("未知 cid 查无命中", store20.idempotent_lookup("nope") is None)
+    fresh = store20.submit(dict(s_nc), dict(good20))
+    check("无 cid 提交不受影响（dedup_hit=0，to_json 无该键）",
+          fresh.dedup_hit == 0 and "dedup_hit" not in fresh.to_json())
+
+    # ---- P1-3 base 票语义显式化（mode）+ require_verified_base 兼容门
+    s_cv, _, e_cv = validate_request(cfg, dict(good20, mode="current_verified",
+                                               expect_path="flag_gems/ops/add.py",
+                                               expect_sha256="a" * 64))
+    check("mode=current_verified + expect 接受并回显 mode",
+          e_cv is None and s_cv["mode"] == "current_verified", e_cv)
+    _, _, e_cv2 = validate_request(cfg, dict(good20, mode="current_verified"))
+    check("current_verified 缺 expect_path/expect_sha256 拒绝", e_cv2 is not None)
+    _, _, e_cv3 = validate_request(cfg, dict(good20, mode="current_verified",
+                                             files=[{"path": "flag_gems/ops/add.py",
+                                                     "content": "X"}]))
+    check("current_verified 带 files 拒绝（不部署语义）", e_cv3 is not None)
+    _, _, e_dp = validate_request(cfg, dict(good20, mode="deploy"))
+    check("mode=deploy 无 files 拒绝", e_dp is not None)
+    s_dp, _, e_dp2 = validate_request(cfg, dict(good20, mode="deploy",
+                                                files=[{"path": "flag_gems/ops/add.py",
+                                                        "content": "X"}]))
+    check("mode=deploy + files 接受", e_dp2 is None and s_dp["mode"] == "deploy", e_dp2)
+    _, _, e_md = validate_request(cfg, dict(good20, mode="banana"))
+    check("mode 非法值拒绝", e_md is not None)
+    s_bare, _, e_bare = validate_request(cfg, dict(good20))
+    check("require_verified_base=false（默认）：裸请求（无 files 无 mode）仍通过",
+          e_bare is None and s_bare["files"] == [] and "mode" not in s_bare, e_bare)
+    cfg_rvb = dict(cfg)
+    cfg_rvb["require_verified_base"] = True
+    _, _, e_rvb = validate_request(cfg_rvb, dict(good20))
+    check("require_verified_base=true：裸请求 400 拒绝（提示 current_verified）",
+          e_rvb is not None and "current_verified" in e_rvb, e_rvb)
+    _, _, e_rvb2 = validate_request(cfg_rvb, dict(good20, mode="current_verified",
+                                                  expect_path="flag_gems/ops/add.py",
+                                                  expect_sha256="a" * 64))
+    check("require_verified_base=true：显式 current_verified 放行", e_rvb2 is None, e_rvb2)
+    _, _, e_rvb3 = validate_request(cfg_rvb, dict(good20, files=[
+        {"path": "flag_gems/ops/add.py", "content": "X"}]))
+    check("require_verified_base=true：带 files 的常规请求放行", e_rvb3 is None, e_rvb3)
+
+    # P1-1 失败可诊断：exit_code/signal_name/stderr_path + _signal_name
+    # （SIGKILL 仅 POSIX 枚举存在；Windows 本地回落 SIG9——板上为 SIGKILL）
+    _sig9 = "SIGKILL" if hasattr(signal, "SIGKILL") and hasattr(signal.Signals, "SIGKILL") else "SIG9"
+    check("_signal_name：-11→SIGSEGV、-9→SIGKILL(板上)/SIG9(Win shim)、非负/None→None",
+          _signal_name(-11) == "SIGSEGV" and _signal_name(-9) == _sig9
+          and _signal_name(1) is None and _signal_name(None) is None,
+          (_signal_name(-11), _signal_name(-9), _signal_name(1)))
+    cfg20["bench_command_override"] = "echo oops >&2; exit 42"
+    j_e = store20.submit(dict(s_bare), dict(good20))
+    Worker(cfg20, store20).run_job(store20.get(j_e.job_id))
+    je = store20.get(j_e.job_id)
+    check("rc!=0 作业 failed 且 result 带 exit_code=42",
+          je.state == "failed" and (je.result or {}).get("exit_code") == 42,
+          (je.state, je.result))
+    check("failed 作业 result 带 stderr_path，完整 stderr 可读（不截断丢弃）",
+          (je.result or {}).get("stderr_path", "").endswith("stderr.log")
+          and os.path.exists(je.result["stderr_path"])
+          and "oops" in open(je.result["stderr_path"], encoding="utf-8").read(),
+          je.result)
+    check("正 rc 无 signal_name", "signal_name" not in (je.result or {}))
+    cfg20["bench_command_override"] = f"echo '{echo_row}'"
+    j_ok = store20.submit(dict(s_bare), dict(good20))
+    Worker(cfg20, store20).run_job(store20.get(j_ok.job_id))
+    jok = store20.get(j_ok.job_id)
+    check("done 作业无 exit_code/stderr_path（失败专属披露）",
+          jok.state == "done" and "exit_code" not in jok.result
+          and "stderr_path" not in jok.result, jok.result)
+    check("P2-4：timing 作业 result 显式披露 output_selfcheck（未启用=false）",
+          jok.result.get("output_selfcheck") is False, jok.result)
+
+    # ---- P0-2 端到端：done+files 作业 result.loaded_files 与 restore 审计
+    payload20 = dict(good20, files=[{"path": "flag_gems/ops/add.py",
+                                     "content": "CANDIDATE_E2E"}])
+    s_files, _, e_f = validate_request(cfg20, dict(payload20))
+    j_f = store20.submit(dict(s_files), dict(payload20))
+    Worker(cfg20, store20).run_job(store20.get(j_f.job_id))
+    jf = store20.get(j_f.job_id)
+    lf = (jf.result or {}).get("loaded_files")
+    check("done+files 作业 result 带 loaded_files（path/sha256/bytes=实际加载）",
+          e_f is None and jf.state == "done" and lf
+          and lf[0]["path"] == "flag_gems/ops/add.py"
+          and lf[0]["sha256"] == sha256_hex("CANDIDATE_E2E")
+          and lf[0]["bytes"] == len(b"CANDIDATE_E2E"), (e_f, jf.state, jf.result))
+    man_f = json.load(open(os.path.join(store20.job_dir(jf.job_id), "manifest.json"),
+                           encoding="utf-8"))
+    check("restore 后 manifest.restored_sha256==ORIG（审计可查恢复对象）",
+          man_f[0]["restored_sha256"] == sha256_hex("ORIG")
+          and open(orig, encoding="utf-8").read() == "ORIG", man_f)
+
+    # ---- P0-3/P2-3 毒槽 fail-fast 计数 + 新 metrics 渲染
+    s_sp, _, _ = validate_request(cfg20, dict(good20, expect_path="flag_gems/ops/add.py",
+                                              expect_sha256="b" * 64))
+    j_sp = store20.submit(dict(s_sp), dict(good20))
+    Worker(cfg20, store20).run_job(store20.get(j_sp.job_id))
+    jsp = store20.get(j_sp.job_id)
+    check("expect 不符 → failed/infra_blocked（绝不静默测毒槽）",
+          jsp.state == "failed" and (jsp.result or {}).get("infra_blocked") is True
+          and (jsp.error or "").startswith("slot_poisoned"), (jsp.state, jsp.error))
+    check("slot_drift 计数 +1", store20.m_slot_drift == 1, store20.m_slot_drift)
+    store20.count_loaded_mismatch()  # 直接调用 deploy_files 不经 Worker，按 Worker 语义补计数
+    snap20 = store20.metrics_snapshot()
+    check("deploy/restore/pathlock_wait 直方有观测（all 键）",
+          snap20["hist"]["deploy"]["all"][0] >= 1
+          and snap20["hist"]["restore"]["all"][0] >= 1
+          and snap20["hist"]["pathlock_wait"]["all"][0] >= 1,
+          {k: snap20["hist"][k] for k in ("deploy", "restore", "pathlock_wait")})
+    text20 = _render_metrics(snap20)
+    for name in ("evald_pathlock_wait_seconds_bucket", "evald_deploy_seconds_bucket",
+                 "evald_restore_seconds_bucket", "evald_slot_drift_total",
+                 "evald_loaded_mismatch_total"):
+        check(f"新指标存在 {name}", name in text20, name)
+    check("slot_drift/loaded_mismatch 渲染数值正确",
+          text20.count("evald_slot_drift_total 1") == 1
+          and text20.count("evald_loaded_mismatch_total 1") == 1,
+          [ln for ln in text20.splitlines()
+           if "slot_drift_total" in ln or "loaded_mismatch_total" in ln])
 
     shutil.rmtree(tmp, ignore_errors=True)
     print(f"\nselftest: {'ALL PASS' if not failures else 'FAILED: ' + ', '.join(failures)}")

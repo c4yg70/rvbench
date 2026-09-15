@@ -4,11 +4,19 @@
 
 - **服务** `evald.py` + 预热执行守护 `warmd.py`，纯 Python stdlib（板上 FlagGems venv 无 pip，见 [ADR-0003](docs/adr/0003-stdlib-python-eval-server.md)）
 - **WarmForkExecutor**（默认）：守护父进程只预热 torch+triton（不变量），每作业 fork 子进程全新加载 flag_gems——省 ~5s/作业且候选代码永远从磁盘部署文件读取（[ADR-0004](docs/adr/0004-warmfork-invariant-preload.md)）；作业可用 `"executor":"subprocess"` 显式回退
-- **异步队列·双车道**：timing 车道（默认）单 worker 串行执行（计时纯净）；correctness 车道
+- **异步队列·多车道**：timing 车道（默认）缺省单 worker 串行（计时纯净），可用
+  `perf.perf.max_concurrency>1` 开**多计时车道**（配 `cpu_ids` 按 worker 均分核段、`omp_threads`
+  限线程）——K3 生产为 2 车道 × 4 核（8-11 / 12-15），实测 2.0× 吞吐且 gems_ms CV 从 119% 降到
+  3.2%（[ADR-0014](../../docs/adr/0014-dual-timing-lanes-a100.md)）；correctness 车道
   3 worker 并行（`correctness_workers`，0=关闭）——不持计时锁、强制 warmup=0/rep=1、taskset
   到车道核（handoff §3-L2）。队列按 lane 分列，上限 64 两车道共享，超时杀进程
-- **部署-恢复自包含**：每个作业评估前备份 site-packages 原文件、断硬链写入候选，评估后自动恢复——杜绝异步队列下"测到上一个作业残留代码"的静默错误（[ADR-0001](docs/adr/0001-eval-job-deploy-restore.md)）
-- **计时互斥**：worker 持有 `/tmp/k3_bench.lock`，与手工 SSH 基准互不污染（[ADR-0002](docs/adr/0002-shared-timing-mutex.md)）
+- **部署-恢复自包含**：每个作业评估前备份 site-packages 原文件、断硬链写入候选，评估后自动恢复——杜绝异步队列下"测到上一个作业残留代码"的静默错误（[ADR-0001](docs/adr/0001-eval-job-deploy-restore.md)）。
+  **同一部署路径的作业跨车道/跨 worker 互斥**（`Store.path_lock`，deploy→run→restore 全程持锁）：
+  多车道下两个作业写同一 `flag_gems/ops/<op>.py` 会错配候选，服务端强制串行化（ADR-0014）
+- **计时互斥**：worker 持有分区计时锁（`timing_lock_path`：单 worker = `/tmp/k3_bench.lock`，
+  多 worker = `/tmp/k3_bench.lock.<index>`），与手工 SSH 基准互不污染
+  （[ADR-0002](docs/adr/0002-shared-timing-mutex.md)）。**多 worker 部署下，手工基准与任何
+  抢锁的回退路径必须同时持有全部分区锁**（`flock <lock>.0 flock <lock>.1 …`）
 - **kope-mem 兼容**：响应自带 `kope_mem.speedup / pass_rate`，可直接喂给 K3BenchmarkPort
 
 设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；术语：[CONTEXT.md](CONTEXT.md)。
@@ -16,9 +24,13 @@
 ## 部署（板上一次性）
 
 ```bash
-# 本地推送（Windows 工作区）
-k3scp evald.py warmd.py Home-SpacemitK3:~/autoke/evald/
-k3scp evaldctl.sh Home-SpacemitK3:~/autoke/evald/
+# 本地推送（Windows 工作区）——bin/k3ssh / bin/k3scp 已废弃，一律走 pssh.py
+# （--put 按第一个冒号切分，Windows 盘符路径会被切碎 → 先 cd 到文件目录再传相对名）
+cd riscv-flagos-kernel-eval-server
+python ../bin/pssh.py Home-SpacemitK3 --put "evald.py:/home/c4y/autoke/evald/evald.py"
+python ../bin/pssh.py Home-SpacemitK3 --put "warmd.py:/home/c4y/autoke/evald/warmd.py"
+python ../bin/pssh.py Home-SpacemitK3 --put "evaldctl.sh:/home/c4y/autoke/evald/evaldctl.sh"
+python ../bin/pssh.py Home-SpacemitK3 --put "../bin/ev.py:/home/c4y/autoke/evald/ev.py"   # 直连客户端板上副本：探活/金丝雀；--judge 需仓库侧
 
 # 板上
 mkdir -p ~/autoke/evald && cd ~/autoke/evald
@@ -26,7 +38,9 @@ cp config.example.json config.json   # 或 scp 一份已生成的
 python3 evald.py --gen-token         # 把输出填进 config.json 的 token
 python3 evald.py --selftest --config config.json
 bash evaldctl.sh start               # setsid+nohup 守护（无交互终端依赖，适合 @reboot）
-crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl.sh start
+# K3（A100 测量簇）必须用 start-ai：execve 前写 /proc/set_ai_thread 注册，整服务绑 cpu8-15；
+# 用普通 start 会落 X100 → 计时作业 PSR<8（infra 失败）。@reboot 也要写 start-ai。
+crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl.sh start-ai
 ```
 
 > **更名注记（2026-09-09）**：本仓库与 K1-230 板上 `/home/c4y/autoke/evald/evaldctl` 已更名为 `evaldctl.sh`（230 的 c4y crontab `@reboot` 行已同步为 `evaldctl.sh start`）。K3（Home-SpacemitK3）与 233/241/243 板上现存副本**仍叫旧名 `evaldctl`**；同步新名时须同时修改各板 crontab `@reboot` 引用。
@@ -131,6 +145,19 @@ config.json 新增顶层 `evaluators` 节，把三个评估器做成独立开关
 
 - `/healthz` 与 `/metrics`：车道计数新增 `lane="func"` 序列（`evald_queued` / `evald_running`）。
 - 启动横幅打印启用的评估器与各车道 worker 数。
+
+### 队列容量指标（调度器算「空位」用）
+
+外部调度器（如 eval-proxy）可只抓 `/metrics` 完成存活 + 占用 + 容量三件事，无需再读 `/healthz`：
+
+| 指标 | 类型 | 语义 |
+|---|---|---|
+| `evald_up` | gauge | 恒 1（进程活着才答）→ 存活判定 |
+| `evald_queued{lane}` / `evald_running{lane}` | gauge | 每车道排队/运行数 → 占用 |
+| `evald_queue_max` | gauge | **全局队列容量**（= `cfg.queue_max`，跨车道总和上限；达此值 submit 返回 429），恒输出 |
+| `evald_lane_queue_max{lane}` | gauge | 车道级容量覆盖（= `perf.<lane>.max_queue`）；**只对真配了上限的车道输出**，未配的车道不出序列（调度端不要把缺失误读为 0 容量，应回退到 `evald_queue_max` 或自己的缺省值） |
+
+占用建议取 `max(后端 queued+running, 调度器自身对该板在飞数)`，空位 = 容量 - 占用。
 
 ## 资源调度字段 `perf`（可选）
 
