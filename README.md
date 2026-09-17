@@ -43,8 +43,6 @@ bash evaldctl.sh start               # setsid+nohup 守护（无交互终端依�
 crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl.sh start-ai
 ```
 
-> **更名注记（2026-09-09）**：本仓库与 K1-230 板上 `/home/c4y/autoke/evald/evaldctl` 已更名为 `evaldctl.sh`（230 的 c4y crontab `@reboot` 行已同步为 `evaldctl.sh start`）。K3（Home-SpacemitK3）与 233/241/243 板上现存副本**仍叫旧名 `evaldctl`**；同步新名时须同时修改各板 crontab `@reboot` 引用。
-
 ## API
 
 端口 8788；除 `/healthz` 外都需请求头 `X-K3-Token`。
