@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>监控改造目标架构（蓝图）</title>
+<style>
+  /* 设计令牌沿用 architecture.html / dashboard.html 的暗色体系 */
+  :root {
+    color-scheme: dark;
+    --bg: #070910;
+    --card: #0d1119;
+    --card2: #111725;
+    --fg: #e9ecf5;
+    --dim: #98a2b8;
+    --dim2: #7b8699;
+    --line: rgba(255,255,255,.10);
+    --line-soft: rgba(255,255,255,.06);
+    --k3: #2dd6d1;
+    --k1: #6ba4ff;
+    --px: #b072ff;
+    --ok: #3ecf6a;
+    --warn: #ffb524;
+    --bad: #ff6a5e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 14px/1.65 var(--sans); padding: 0 24px 72px; }
+  a { color: var(--k1); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: .92em; }
+  code { background: rgba(255,255,255,.055); padding: 1px 5px; border-radius: 4px; }
+  code.nb { white-space: nowrap; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header.top { padding: 40px 0 22px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: .2px; }
+  h1 .sub { color: var(--dim); font-weight: 400; font-size: 15px; }
+  .lede { color: var(--dim); margin: 0 0 16px; max-width: 82ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: 12px/1 var(--mono); color: var(--dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; background: var(--card);
+  }
+  .chip b { color: var(--fg); font-weight: 600; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  nav.toc a { font-size: 13px; color: var(--dim); }
+  nav.toc a:hover { color: var(--k3); }
+
+  section { padding: 34px 0 4px; }
+  h2 { font-size: 18px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; }
+  h2 .n { font: 600 12px/1 var(--mono); color: var(--k3); border: 1px solid rgba(45,214,209,.35);
+          border-radius: 5px; padding: 4px 7px; }
+  h3 { font-size: 14px; margin: 24px 0 8px; color: var(--dim); font-weight: 600; }
+  p.note { color: var(--dim); margin: 0 0 14px; max-width: 96ch; }
+
+  .fig { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; overflow-x: auto; }
+  .fig svg { display: block; width: 100%; height: auto; min-width: 980px; }
+  .figcap { color: var(--dim2); font-size: 12px; margin: 10px 2px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12px; border-bottom-color: var(--line); }
+  td.mono, th.mono { font-family: var(--mono); font-size: 12px; }
+  tbody tr:hover { background: rgba(255,255,255,.022); }
+
+  .grid { display: grid; gap: 12px; margin-top: 10px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 13.5px; }
+  .card p { margin: 0; color: var(--dim); font-size: 12.5px; }
+  .card .why { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-soft); font-size: 12px; }
+
+  .tag { display: inline-block; font: 600 10.5px/1 var(--mono); padding: 3px 7px; border-radius: 4px;
+         border: 1px solid var(--line); color: var(--dim); margin-right: 6px; white-space: nowrap; }
+  .t-ok   { color: var(--ok);   border-color: rgba(62,207,106,.4);  background: rgba(62,207,106,.09); }
+  .t-warn { color: var(--warn); border-color: rgba(255,181,36,.4);  background: rgba(255,181,36,.08); }
+  .t-bad  { color: var(--bad);  border-color: rgba(255,106,94,.4);  background: rgba(255,106,94,.09); }
+  .t-info { color: var(--k3);   border-color: rgba(45,214,209,.35); background: rgba(45,214,209,.08); }
+  .t-px   { color: var(--px);   border-color: rgba(176,114,255,.4); background: rgba(176,114,255,.09); }
+
+  .flow { list-style: none; margin: 12px 0 0; padding: 0; }
+  .flow li { position: relative; padding: 0 0 14px 34px; border-left: 1px solid var(--line); margin-left: 11px; }
+  .flow li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .flow li::before { content: attr(data-i); position: absolute; left: -12px; top: 0; width: 23px; height: 23px;
+    border-radius: 50%; background: var(--card2); border: 1px solid var(--line);
+    font: 600 11px/23px var(--mono); text-align: center; color: var(--k3); }
+  .flow b { display: block; font-size: 13.5px; }
+  .flow span { color: var(--dim); font-size: 12.5px; }
+
+  footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--dim2); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>监控改造目标架构 <span class="sub">— VictoriaMetrics × Categraf × Nightingale</span></h1>
+  <p class="lede">
+    本页是监控技术栈改造的<b>目标架构蓝图（未实施）</b>：时序记录迁 <b>VictoriaMetrics</b>，
+    板端采集迁 <b>Categraf</b>，可视化大盘与告警迁 <b>Nightingale（夜莺）</b>。
+    三大硬约束贯穿全图：<b>evald 零改动</b>（字节冻结 7 件一个字节不动）、
+    <b>数据方向反转可回退</b>（拉模式并行双跑后再切推送）、<b>既有 PromQL 资产复用</b>
+    （指标名与 <code>job</code> 标签语义保持）。实施计划与验证门见
+    <a href="spec.md">spec.md</a>；现状架构见 <a href="architecture.html">architecture.html</a> §06。
+  </p>
+  <div class="chips">
+    <span class="chip"><b>状态</b> 蓝图 · 待审批</span>
+    <span class="chip"><b>spec</b> docs/spec.md（2026-09-20）</span>
+    <span class="chip"><b>VictoriaMetrics</b> 单机 :8428 · retention 90d</span>
+    <span class="chip"><b>Nightingale</b> v9 单二进制 · WSL2 · :17000 · 内置 SQLite</span>
+    <span class="chip"><b>Categraf</b> 板端 riscv64 自建 · 30s</span>
+    <span class="chip"><b>evald</b> :8788 / :8791 零改动</span>
+    <span class="chip"><b>更新</b> 2026-09-20</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#shift">01 现状 → 目标</a>
+  <a href="#topo">02 目标拓扑</a>
+  <a href="#contract">03 指标流与标签契约</a>
+  <a href="#categraf">04 采集面 · Categraf</a>
+  <a href="#vm">05 存储与查询面 · VictoriaMetrics</a>
+  <a href="#n9e">06 可视化与告警面 · Nightingale</a>
+  <a href="#path">07 迁移路径</a>
+  <a href="#risk">08 风险与未决</a>
+</nav>
+
+<!-- ============================================ 01 现状→目标 -->
+<section id="shift">
+  <h2><span class="n">01</span>现状 → 目标</h2>
+  <p class="note">
+    现状（<a href="architecture.html">architecture.html</a> §06 ＋ <code>monitor/README.md</code>）：
+    板上 node_exporter（:9100 用户态）与 evald 双实例（:8788/:8791 原生 /metrics）由
+    Windows Docker 里的 <b>Prometheus</b>（容器 <code>k1-prom</code> :9090）每 30s <b>拉取</b>；
+    可视化＝零依赖单文件 <code>dashboard.html</code>（file:// 直开，浏览器直查 Prometheus）；
+    <b>告警全部由面板前端计算</b>——浏览器不开着就没有告警，无通知渠道、无屏蔽窗口、无历史。
+    目标架构把「采集 / 存储 / 可视化 / 告警」四层各自换成专用组件，数据方向由<b>拉改为推</b>。
+  </p>
+  <table>
+    <thead><tr><th style="width:120px">层</th><th style="width:250px">现状</th><th style="width:300px">目标</th><th>变化要点</th></tr></thead>
+    <tbody>
+      <tr><td>主机指标采集</td>
+          <td class="mono">node_exporter :9100（~/ne，crontab 兜底）</td>
+          <td class="mono">Categraf input.node_exporter</td>
+          <td>node_* 指标名 100% 兼容（插件内嵌官方 node_exporter 核心逻辑）；由「被抓」变「自采自推」</td></tr>
+      <tr><td>业务指标采集</td>
+          <td class="mono">Prometheus 直抓 evald /metrics ×2</td>
+          <td class="mono">Categraf input.prometheus 抓 localhost:8788/8791</td>
+          <td>evald 零改动；指标 100% 保真透传，URL 即 <code>instance</code> 标签</td></tr>
+      <tr><td>时序存储</td>
+          <td class="mono">Prometheus k1-prom :9090 · 15d</td>
+          <td class="mono">VictoriaMetrics 单机 :8428 · 90d</td>
+          <td>API 同构（/api/v1/query 系）；容量对本规模近零压力</td></tr>
+      <tr><td>监控枢纽形态</td>
+          <td class="mono">k1-prom 单容器（零状态件）</td>
+          <td class="mono">VM 容器 ＋ n9e 单二进制（WSL2）</td>
+          <td>n9e 轻量模式内置 SQLite＋miniredis，免外部 MySQL/Redis——状态件只净增一个 n9e.db</td></tr>
+      <tr><td>可视化</td>
+          <td class="mono">dashboard.html（前端渲染）</td>
+          <td class="mono">Nightingale 大盘（四层重建）</td>
+          <td>dashboard.html 过渡期以 <code>?prom=:8428</code> 只读保留（P2–P5），P6 归档</td></tr>
+      <tr><td>告警</td>
+          <td class="mono">面板前端算（开着浏览器才有）</td>
+          <td class="mono">n9e 告警引擎（9 族规则）</td>
+          <td><b>能力升格</b>：服务端常驻判定、通知媒介、恢复通知、屏蔽窗口（计时敏感天窗）</td></tr>
+      <tr><td>机器失联判定</td>
+          <td class="mono">面板读 up 序列</td>
+          <td class="mono">n9e 心跳（Targets 在线态）＋ absent() 规则兜底</td>
+          <td>v6 起无 target_up 指标，失联告警以心跳超时为准</td></tr>
+      <tr><td>权限 / 值班</td>
+          <td class="mono">无</td>
+          <td class="mono">n9e 用户 / 业务组 / 屏蔽规则</td>
+          <td>新能力，不属迁移</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================ 02 目标拓扑 -->
+<section id="topo">
+  <h2><span class="n">02</span>目标拓扑</h2>
+  <p class="note">
+    板端只新增 <b>Categraf 一个进程</b>（X100 用户域，与现 node_exporter 同侧，不触碰 A100 计时簇）；
+    Windows 侧监控枢纽＝VictoriaMetrics（容器）＋ Nightingale（WSL2 单二进制，与 k1-prom 同机），
+    n9e 轻量模式内置 SQLite＋miniredis、零外部 MySQL/Redis。
+    数据方向反转是最大变化：<b>板端推、枢纽收</b>——因此 P0 必须先验证 K3 → 枢纽 :17000 的网络可达
+    （现状只有 Windows → 板的拉取方向；n9e 落 WSL2，还需 mirrored／portproxy 放通）。
+  </p>
+  <div class="fig">
+    <svg viewBox="0 0 1160 672" role="img" aria-label="监控目标架构拓扑图">
+      <defs>
+        <marker id="ar"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#7b8699"/></marker>
+        <marker id="art" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2dd6d1"/></marker>
+        <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6ba4ff"/></marker>
+        <marker id="arp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#b072ff"/></marker>
+      </defs>
+      <style>
+        .panel { fill: #0d1119; }
+        .box   { fill: #111725; }
+        .ttl   { fill: #e9ecf5; font: 600 12.5px var(--mono); }
+        .ttl2  { fill: #e9ecf5; font: 600 11px var(--mono); }
+        .tx    { fill: #98a2b8; font: 10px var(--mono); }
+        .txd   { fill: #7b8699; font: 9.5px var(--mono); }
+        .teal  { fill: #2dd6d1; }
+        .blue  { fill: #6ba4ff; }
+        .purple{ fill: #b072ff; }
+        .green { fill: #3ecf6a; }
+        .aw    { stroke: #7b8699; stroke-width: 1.3; fill: none; }
+        .awt   { stroke: #2dd6d1; stroke-width: 1.5; fill: none; }
+        .awb   { stroke: #6ba4ff; stroke-width: 1.5; fill: none; }
+        .dash  { stroke-dasharray: 4 4; }
+        .fade  { opacity: .62; }
+      </style>
+
+      <!-- ══ 左：K3 板 ══ -->
+      <rect x="18" y="34" width="436" height="526" rx="12" class="panel" stroke="rgba(45,214,209,.35)"/>
+      <text x="34" y="60" class="ttl teal">K3 评估板 · 10.18.60.100</text>
+      <text x="34" y="76" class="txd">SpacemiT K3 · Bianbu Linux（riscv64）· 板端唯一新增进程 = Categraf</text>
+
+      <!-- evald :8788 -->
+      <rect x="38" y="100" width="180" height="92" rx="8" class="box" stroke="rgba(255,255,255,.10)"/>
+      <text x="50" y="120" class="ttl2">evald :8788</text>
+      <text x="50" y="137" class="tx">纯计时 · A100 簇 cpu8-15</text>
+      <text x="50" y="152" class="tx">原生 /metrics（0.0.4）</text>
+      <text x="50" y="173" class="tx green">字节冻结 · 零改动</text>
+
+      <!-- evald :8791 -->
+      <rect x="38" y="220" width="180" height="100" rx="8" class="box" stroke="rgba(255,255,255,.10)"/>
+      <text x="50" y="240" class="ttl2">evald :8791 · K3-ACC</text>
+      <text x="50" y="257" class="tx">acc cpu0-5×6 / func 6-7×2</text>
+      <text x="50" y="272" class="tx">原生 /metrics · evald-acc 单元</text>
+      <text x="50" y="293" class="tx green">字节冻结 · 零改动</text>
+
+      <!-- node_exporter 退役 -->
+      <rect x="38" y="340" width="180" height="48" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="50" y="360" class="txd">node_exporter :9100（~/ne）</text>
+      <text x="50" y="376" class="txd">P3 接管 · P6 停用（留回滚）</text>
+
+      <!-- Categraf -->
+      <rect x="248" y="100" width="186" height="396" rx="10" fill="#0e1720" stroke="rgba(45,214,209,.55)"/>
+      <text x="260" y="122" class="ttl teal">Categraf（自建 riscv64）</text>
+      <text x="260" y="137" class="txd">X100 用户域 · interval 30s</text>
+
+      <rect x="260" y="150" width="162" height="88" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
+      <text x="270" y="168" class="ttl2">input.node_exporter</text>
+      <text x="270" y="184" class="tx">node_* 100% 兼容</text>
+      <text x="270" y="198" class="tx">hwmon 温度/风扇 · 文件系统</text>
+      <text x="270" y="212" class="txd">与原生 cpu/mem 套件二选一</text>
+
+      <rect x="260" y="248" width="162" height="96" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
+      <text x="270" y="266" class="ttl2">input.prometheus</text>
+      <text x="270" y="282" class="tx">抓 127.0.0.1:8788/metrics</text>
+      <text x="270" y="296" class="tx">抓 127.0.0.1:8791/metrics</text>
+      <text x="270" y="310" class="tx">url_label_key=instance</text>
+      <text x="270" y="326" class="txd">指标 100% 保真透传</text>
+
+      <rect x="260" y="354" width="162" height="56" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
+      <text x="270" y="372" class="ttl2">exec · up 兼容层</text>
+      <text x="270" y="388" class="tx">补 up{job=boards/evald} 序列</text>
+      <text x="270" y="401" class="txd">保 dashboard.html 过渡可用</text>
+
+      <rect x="260" y="420" width="162" height="62" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
+      <text x="270" y="438" class="ttl2">agent 核心</text>
+      <text x="270" y="454" class="tx">[[writers]] remote write ×1</text>
+      <text x="270" y="468" class="tx">[heartbeat] 10s → Targets</text>
+
+      <text x="34" y="540" class="txd">板端改动合计：+ Categraf 一个进程；evald 不动一行；node_exporter P6 停用</text>
+
+      <!-- 板内抓取箭头 -->
+      <path d="M260,282 L220,150" class="aw" marker-end="url(#ar)"/>
+      <path d="M260,300 L220,268" class="aw" marker-end="url(#ar)"/>
+      <text x="240" y="212" class="txd" text-anchor="middle">抓取 /metrics 30s</text>
+
+      <!-- ══ 右：Windows 监控枢纽 ══ -->
+      <rect x="580" y="34" width="562" height="526" rx="12" class="panel" stroke="rgba(107,164,255,.35)"/>
+      <text x="596" y="60" class="ttl blue">Windows Docker 主机 · 监控枢纽</text>
+      <text x="596" y="76" class="txd">与现 k1-prom 同机 · n9e 落 WSL2 单二进制 · 数据方向反转：板端推、枢纽收</text>
+
+      <!-- 浏览器 -->
+      <rect x="596" y="100" width="140" height="76" rx="9" class="box" stroke="rgba(176,114,255,.5)"/>
+      <text x="608" y="122" class="ttl2 purple">用户浏览器</text>
+      <text x="608" y="138" class="tx">n9e Web UI</text>
+      <text x="608" y="152" class="tx">大盘 · 告警事件</text>
+
+      <!-- WSL2 容器（n9e 单二进制宿主） -->
+      <rect x="748" y="88" width="384" height="300" rx="10" fill="none" stroke="rgba(107,164,255,.30)" stroke-dasharray="5 4"/>
+      <text x="1122" y="104" class="txd blue" text-anchor="end">WSL2 · systemd 常驻（linux-amd64 tarball · 解压即启）</text>
+
+      <!-- n9e -->
+      <rect x="760" y="112" width="360" height="190" rx="10" class="box" stroke="rgba(107,164,255,.55)"/>
+      <text x="774" y="134" class="ttl blue">Nightingale（n9e v9 单二进制）· :17000</text>
+      <text x="774" y="152" class="tx">大盘 · 告警引擎 · 屏蔽规则 · 值班</text>
+      <text x="774" y="167" class="tx">数据源代理写（pushgw）· Targets 心跳</text>
+      <rect x="774" y="182" width="160" height="44" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
+      <text x="784" y="200" class="ttl2">大盘（四层重建）</text>
+      <text x="784" y="215" class="txd">P5 验收见 spec §9</text>
+      <rect x="946" y="182" width="160" height="44" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
+      <text x="956" y="200" class="ttl2">告警规则（9 族）</text>
+      <text x="956" y="215" class="txd">通知 · 恢复 · 屏蔽天窗</text>
+      <text x="774" y="246" class="txd">默认查询源 = VictoriaMetrics（写入代理目标同为 VM）</text>
+      <text x="774" y="262" class="txd">通知媒介 20+：钉钉/飞书/企微/邮件/短信/webhook</text>
+      <text x="774" y="278" class="txd">鉴权：用户/业务组；writers basic_auth（P1 验证）</text>
+      <text x="774" y="296" class="tx">元数据 = SQLite 单文件 · 缓存 = 内置 miniredis</text>
+
+      <!-- mysql/redis 不引入：n9e 单二进制内置 SQLite＋miniredis -->
+
+      <!-- VictoriaMetrics -->
+      <rect x="760" y="400" width="360" height="120" rx="10" class="box" stroke="rgba(176,114,255,.55)"/>
+      <text x="774" y="422" class="ttl purple">VictoriaMetrics 单机 · :8428</text>
+      <text x="774" y="440" class="tx">-storageDataPath=vmdata（docker 卷）</text>
+      <text x="774" y="455" class="tx">-retentionPeriod=90d（现状 15d）</text>
+      <text x="774" y="470" class="tx">PromQL /api/v1/query(_range) 全兼容</text>
+      <text x="774" y="485" class="tx">Remote write /api/v1/write</text>
+      <text x="774" y="510" class="txd">容量：~1.6K 序列 · 30s 步长 ≈ &lt;10MB/天 · 90d &lt; 1GB</text>
+      <text x="774" y="536" class="txd">n9e(WSL2) ↔ VM(Win Docker)：mirrored localhost 或宿主 IP（P0/P1 验证）</text>
+
+      <!-- 浏览器 → n9e -->
+      <path d="M736,140 L758,152" class="aw" marker-end="url(#arp)"/>
+      <text x="747" y="130" class="txd" text-anchor="middle">:17000</text>
+
+      <!-- n9e ⇄ VM（跨 WSL2 → Windows Docker 边界） -->
+      <path d="M830,304 L830,396" class="awb" marker-end="url(#arb)"/>
+      <text x="838" y="360" class="txd">写入代理</text>
+      <path d="M1092,304 L1092,396" class="awb dash" marker-start="url(#arb)" marker-end="url(#arb)"/>
+      <text x="1084" y="360" class="txd" text-anchor="end">PromQL 查询</text>
+
+      <!-- dashboard.html 过渡 -->
+      <rect x="596" y="380" width="140" height="110" rx="9" class="box fade" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4"/>
+      <text x="608" y="402" class="ttl2">dashboard.html</text>
+      <text x="608" y="419" class="txd">过渡期只读 P2–P5</text>
+      <text x="608" y="434" class="txd">?prom=http://</text>
+      <text x="608" y="448" class="txd">127.0.0.1:8428</text>
+      <text x="608" y="469" class="txd">→ VM :8428 同构 API</text>
+      <text x="608" y="482" class="txd">（P2 验 CORS 后定）</text>
+      <path d="M736,435 L758,440" class="aw dash fade" marker-end="url(#ar)"/>
+
+      <!-- ══ 板 → 枢纽：推送 ══ -->
+      <path d="M434,440 L526,440 L526,230 L758,230" class="awt" marker-end="url(#art)"/>
+      <text x="468" y="418" class="tx teal" text-anchor="middle">remote write</text>
+      <text x="468" y="431" class="txd" text-anchor="middle">/prometheus/v1/write</text>
+      <path d="M434,478 L552,478 L552,265 L758,265" class="aw dash" stroke="#7b8699" marker-end="url(#ar)"/>
+      <text x="493" y="498" class="txd" text-anchor="middle">心跳 /v1/n9e/heartbeat · 10s</text>
+
+      <!-- ══ 底部：过渡与退役 ══ -->
+      <rect x="18"  y="584" width="360" height="64" rx="8" class="box fade" stroke="rgba(255,181,36,.35)" stroke-dasharray="4 4"/>
+      <text x="32"  y="606" class="ttl2" fill="#ffb524">P2 并行期 · VM 直抓对账</text>
+      <text x="32"  y="622" class="txd">-promscrape.config 复用 monitor/prometheus.yml 语义</text>
+      <text x="32"  y="636" class="txd">k1-prom 与 VM 双跑 ≥7d，指标对账后 P3 切推送</text>
+      <path d="M198,582 L198,564" class="aw dash" marker-end="url(#ar)"/>
+
+      <rect x="398" y="584" width="360" height="64" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="412" y="606" class="ttl2">k1-prom（Prometheus :9090）</text>
+      <text x="412" y="622" class="txd" text-decoration="line-through">P6 退役封存</text>
+      <text x="412" y="636" class="txd">容器停用 · 数据卷封存 30d 后清</text>
+
+      <rect x="778" y="584" width="364" height="64" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="792" y="606" class="ttl2">板上 node_exporter（~/ne）</text>
+      <text x="792" y="622" class="txd" text-decoration="line-through">P6 停用</text>
+      <text x="792" y="636" class="txd">文件保留＝回滚路径（crontab @reboot 注释掉）</text>
+    </svg>
+    <p class="figcap">
+      实线＝常态数据流；虚线＝心跳 / 查询 / 过渡期路径；灰虚框＝退役项（P6）。<br>
+      颜色：青＝板端新增（Categraf）· 蓝＝Nightingale 枢纽 · 紫＝VictoriaMetrics / 用户侧 · 绿＝零改动资产。
+      端口：<b>:8788/:8791</b> evald 原生 metrics（冻结）· <b>:17000</b> n9e·WSL2（mirrored／portproxy 放通，P0 验证方向）
+      · <b>:8428</b> VM（本机 + dashboard 过渡读）。
+    </p>
+  </div>
+</section>
+
+<!-- ============================================ 03 指标流与标签契约 -->
+<section id="contract">
+  <h2><span class="n">03</span>指标流与标签契约</h2>
+  <p class="note">
+    三条指标流汇入 VM：<b>主机流</b>（node_*，Categraf 自采）、<b>业务流</b>（evald_*，Categraf 抓取透传）、
+    <b>兼容流</b>（up 序列，exec 补齐）。标签契约的第一目标＝<b>既有 dashboard.html 查询与告警 PromQL
+    原样可用</b>——它的选择器是 <code class="nb">{job="boards"}</code> / <code class="nb">{job="evald"}</code>，
+    并从 <code>up</code> 序列读 <code>clusters</code>/<code>workers</code> 静态标签（dashboard.html:1280-1293）。
+  </p>
+  <table>
+    <thead><tr><th style="width:110px">指标流</th><th style="width:230px">来源 → 命名</th><th style="width:280px">关键标签</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>主机流</td>
+          <td class="mono">input.node_exporter → node_*</td>
+          <td class="mono">ident（K3 主机名）＋ global.labels 注入</td>
+          <td>指标名与现 node_exporter 100% 兼容（<code>node_cpu_seconds_total</code>、<code>node_hwmon_fan_rpm/pwm/fault</code>、<code>node_hwmon_temp_celsius</code> 等面板在用序列全部保留）</td></tr>
+      <tr><td>业务流</td>
+          <td class="mono">input.prometheus → evald_*</td>
+          <td class="mono">instance=127.0.0.1:8788 / :8791</td>
+          <td>插件对目标 /metrics 的指标与标签「100% 保真透传」，不重命名；board/role 区分靠 instance（URL）或实例级 labels（P3 验证，见 R4）</td></tr>
+      <tr><td>兼容流</td>
+          <td class="mono">exec 脚本 → up{job=…}</td>
+          <td class="mono">job=boards / job=evald ＋ clusters/workers/board</td>
+          <td>推送链路无抓取器生成的 <code>up</code>；面板在线判定与 clusters 标签读取依赖它（每 30s 发 1，缺 3m 判离线）</td></tr>
+    </tbody>
+  </table>
+  <h3>标签映射（prometheus.yml 静态标签 → Categraf）</h3>
+  <table>
+    <thead><tr><th style="width:150px">现状标签（monitor/prometheus.yml）</th><th style="width:290px">目标注入点</th><th>值（不变）</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">board / role / cores / accent</td>
+          <td class="mono">input.prometheus 实例级 labels（若插件不支持 → 见 R4 兜底）</td>
+          <td class="mono">K3 / K3-ACC · 纯计时·A100 簇 / acc 0-5·func 6-7 · 8-15 / 0-7</td></tr>
+      <tr><td class="mono">clusters / workers / fleet</td>
+          <td class="mono">[global.labels]（主机级，随所有序列上送）</td>
+          <td class="mono">X100:0-7,A100:8-15 · acc:0-5,func:6-7 · k3</td></tr>
+      <tr><td class="mono">job=boards / job=evald</td>
+          <td class="mono">global.labels（boards）＋ up 兼容流 / 实例 labels（evald）</td>
+          <td>dashboard.html 与告警 PromQL 的选择器锚点，<b>必须保持</b></td></tr>
+      <tr><td class="mono">—（新增）ident</td>
+          <td class="mono">Categraf 自动（= 板主机名）</td>
+          <td>n9e Targets 身份键；心跳在线态挂靠它</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================ 04 采集面 -->
+<section id="categraf">
+  <h2><span class="n">04</span>采集面 · Categraf</h2>
+  <div class="grid g3">
+    <div class="card">
+      <h4>位置与形态</h4>
+      <p>K3 板 X100 用户域（cpu0-7），systemd 常驻（<code>kategraf.service</code>，CPUAffinity 钉用户域核），
+      与现 node_exporter 同侧；<b>不触碰 A100 计时簇 cpu8-15</b>。interval=30s 与现状抓取节奏一致
+      （计时敏感扰动已获用户确认的口径不变）。</p>
+    </div>
+    <div class="card">
+      <h4>插件选择：node_exporter 输入 <span class="tag t-info">决策</span></h4>
+      <p>板端用 <code>input.node_exporter</code>（内嵌官方采集逻辑，node_* 100% 兼容）而非 Categraf 原生
+      cpu/mem/disk 套件——保住既有查询/告警资产与 hwmon 温度风扇覆盖。官方明确<b>两者二选一</b>，同机混开＝重复采集。
+      Windows 监控主机自监控可用原生套件（n9e 内置主机大盘即插即用）。</p>
+    </div>
+    <div class="card">
+      <h4>evald 抓取：prometheus 输入</h4>
+      <p>两个 instance 分别抓 <code class="nb">127.0.0.1:8788</code> / <code class="nb">:8791</code> 的 /metrics，
+      免 token（原生 exposition 本就免 token）。evald <b>零改动</b>——这是本方案对字节冻结不变式的根本尊重。</p>
+    </div>
+    <div class="card">
+      <h4>riscv64 交付 <span class="tag t-warn">最大风险</span></h4>
+      <p>Categraf 官方发布物只有 linux/amd64、linux/arm64、windows——<b>无 riscv64</b>。
+      路径：Go 交叉编译（<code class="nb">GOOS=linux GOARCH=riscv64 CGO_ENABLED=0</code>），
+      用 build tags 裁掉 CGO 依赖插件（oracle 等）。P3 先做编译＋上板 spike，不过门则维持 VM 直抓（P2 形态长期化）。</p>
+      <p class="why"><b>Why：</b>这是全案唯一可能推翻既定拓扑的点，故列为 P3 硬门禁而非假设。</p>
+    </div>
+    <div class="card">
+      <h4>上报与心跳</h4>
+      <p><code>[[writers]]</code> 单写址 <code class="nb">http://&lt;win-host&gt;:17000/prometheus/v1/write</code>
+      （支持 basic_auth/timeout 等）；<code>[heartbeat]</code> 10s 报 <code class="nb">/v1/n9e/heartbeat</code>
+      → n9e「监控对象」在线态与机器元数据。心跳断≠数据断：告警以数据序列 absent 兜底。</p>
+    </div>
+    <div class="card">
+      <h4>回退</h4>
+      <p><code>systemctl stop categraf</code> 即回到 VM 直抓形态（P2 长期化）；板上 node_exporter 文件与
+      crontab 保留到 P6 才注释，任何时刻可恢复原拉模式（恢复 k1-prom 也只是 docker start）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ 05 存储与查询面 -->
+<section id="vm">
+  <h2><span class="n">05</span>存储与查询面 · VictoriaMetrics</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h4>单机版选型</h4>
+      <p>本规模（1 板 + 2 evald 实例，~1.6K 序列 @30s）用单二进制单机版绰绰有余；
+      vmagent/vmalert/vmcluster 全部不引入（拉模式由 categraf 承担、告警由 n9e 承担）。
+      官方 quickstart 的 n9e 组合数据面（VM＋n9e＋categraf）与本蓝图一致；其 mysql＋redis
+      部分<b>不采纳</b>——n9e 单二进制轻量模式不需要它们。</p>
+    </div>
+    <div class="card">
+      <h4>关键参数</h4>
+      <p><code class="nb">-storageDataPath=/vmdata</code>（docker 卷）；<code class="nb">-retentionPeriod=90d</code>
+      （现状 Prometheus 缺省 15d，升到 90d 仍 &lt;1GB）；镜像 tag 在 P1 拉取时固定为当周 stable，不追 latest。
+      端口绑 <code class="nb">0.0.0.0:8428</code>（供 n9e/WSL2 数据源访问——k1-prom 的 127.0.0.1 绑定不可复用）。</p>
+    </div>
+    <div class="card">
+      <h4>API 同构＝过渡桥</h4>
+      <p>VM 原生服务 <code class="nb">/api/v1/query</code>、<code class="nb">/api/v1/query_range</code> 等
+      Prometheus 查询 API——dashboard.html 只用这两个端点（dashboard.html:921 的抓取面），
+      <code class="nb">?prom=http://127.0.0.1:8428</code> 理论上零改动可用；file:// null origin 的 CORS
+      放行在 P2 实测（R3）。</p>
+    </div>
+    <div class="card">
+      <h4>P2 并行直抓</h4>
+      <p>VM 自带抓取器：<code class="nb">-promscrape.config</code> 直接吃 Prometheus 语义的配置
+      （宽容解析）。把 <code>monitor/prometheus.yml</code> <b>复制</b>为 monitor-next 内的新文件挂给 VM
+      （原文件冻结不动），k1-prom 与 VM 双跑对账 ≥7 天——这一步让「存储替换」与「采集替换」解耦，各自可独立回退。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ 06 可视化与告警面 -->
+<section id="n9e">
+  <h2><span class="n">06</span>可视化与告警面 · Nightingale</h2>
+  <p class="note">
+    n9e 是枢纽里唯一的「人界面」：大盘、告警规则、屏蔽、值班、用户权限全在 Web UI；
+    对数据面它只做两件事——<b>代理写</b>（categraf → n9e :17000 → VM）与<b>查询</b>（PromQL → VM）。
+    <b>部署形态＝单二进制</b>：官方 linux-amd64 tarball（无 Windows 原生包）落 WSL2 systemd 常驻，
+    轻量模式内置 SQLite＋miniredis，解压即启、零外部 MySQL/Redis。
+    v6 起 n9e 不再生成 target_up 指标，机器失联以<b>心跳超时</b>判定（Targets 页在线态），
+    PromQL 层以 absent() 兜底。
+  </p>
+  <div class="grid g2">
+    <div class="card">
+      <h4>为什么单二进制</h4>
+      <p>现栈（k1-prom＋dashboard.html）零状态件，四容器对单板监控是重步；轻量模式只净增一个进程＋
+      一个 n9e.db，运维重量与现栈同量级。官方二进制部署文档自带 systemd 示例；
+      升级路径＝etc 配置改外接 MySQL/Redis（多实例 HA 同路），部署形态不变。</p>
+    </div>
+    <div class="card">
+      <h4>代价（已接受）</h4>
+      <p>miniredis 内存态：重启丢登录态（重登）与心跳态（分钟级重建）；SQLite 单文件：
+      灾备＝文件备份＋规则/大盘 JSON 导出入仓。官方将轻量模式定位为测试/体验，生产建议外接
+      MySQL/Redis——单用户单板场景接受，扩容路径清晰。AI 助手功能需真 Redis Streams（不用，不受影响）。</p>
+    </div>
+  </div>
+  <h3>大盘：四层映射（dashboard.html → n9e）</h3>
+  <table>
+    <thead><tr><th style="width:170px">现状层</th><th style="width:280px">n9e 落位</th><th>迁移要点</th></tr></thead>
+    <tbody>
+      <tr><td>KPI 指挥台（6 格）</td><td class="mono">大盘首行 6 图＋变量（board）</td>
+          <td>实例在线 x/2 用 <code>evald_up</code> 存在性；吞吐/队列/成功率/温度 PromQL 原样搬（标签选择器不变）</td></tr>
+      <tr><td>告警收敛</td><td class="mono">活跃告警页（能力升格）</td>
+          <td>前端算→服务端常驻；新增恢复通知/历史/屏蔽窗口</td></tr>
+      <tr><td>evald 作业线</td><td class="mono">车道拓扑条＋双实例卡＋漏斗图</td>
+          <td>桑基图 n9e 无原生等价物 → <b>堆叠柱/表格</b>表达 func→acc→perf→完赛（数据源 <code>evald_jobs_completed_total{lane,state}</code> 不变）</td></tr>
+      <tr><td>主机资源</td><td class="mono">每核堆叠柱＋温度/内存/swap/盘/风扇</td>
+          <td>node_* 序列名不变；核段命名（workers 标签）继续由标签驱动</td></tr>
+    </tbody>
+  </table>
+  <h3>告警：9 族规则映射（详见 spec §8 的 PromQL 草案）</h3>
+  <table>
+    <thead><tr><th>族（monitor/README 口径）</th><th style="width:120px">级别</th><th>判定口径（迁后）</th></tr></thead>
+    <tbody>
+      <tr><td>主机失联</td><td>P1/P2</td><td class="mono">心跳超时（Targets 离线）＋ absent(node_uname_info) 兜底</td></tr>
+      <tr><td>evald 实例离线</td><td>P1/P2</td><td class="mono">absent(evald_up{instance=~".*8788|8791"}) 持续 3m；K3-ACC 附 MemoryMax 排障提示</td></tr>
+      <tr><td>温度 ≥70 / ≥85</td><td>warn / crit</td><td class="mono">max(node_hwmon_temp_celsius)</td></tr>
+      <tr><td>簇均核占用 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">rate(node_cpu_seconds_total{cpu=~"8-15 段"}) 按 X100/A100 两规则</td></tr>
+      <tr><td>swap ≥60 / ≥80</td><td>warn / crit</td><td class="mono">node_memory_Swap*(Total-Free)/Total</td></tr>
+      <tr><td>内存 / 硬盘 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">node_memory_MemAvailable / node_filesystem_avail（tmpfs 排除）</td></tr>
+      <tr><td>风扇 fault</td><td>crit</td><td class="mono">max(node_hwmon_fan_fault) ≥ 1</td></tr>
+      <tr><td>队列 ≥20 / ≥50</td><td>warn / crit</td><td class="mono">sum by (board) (evald_queued)</td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:8px">
+    屏蔽规则（mute）用于<b>计时敏感天窗</b>与板端维护窗口——这是现状完全没有的能力：今天做手工基准时
+    只能靠人盯着面板忽略告警。
+  </p>
+</section>
+
+<!-- ============================================ 07 迁移路径 -->
+<section id="path">
+  <h2><span class="n">07</span>迁移路径（P0–P6）</h2>
+  <p class="note">
+    每阶段独立可回退、有硬验证门；板端动作集中在 P3 一次完成，其余阶段全部发生在 Windows 侧。
+    详细动作清单、验证门与回退手段见 <a href="spec.md">spec.md §7</a>。
+  </p>
+  <ol class="flow">
+    <li data-i="P0"><b>前置确认（零改动）</b>
+      <span>K3 → 枢纽 :17000 端到端可达（先定 WSL2 网络模式：mirrored 优先、portproxy 兜底）· 防火墙放行 · WSL2 就绪（systemd）· Docker 资源余量 · 冻结物 md5 复核</span></li>
+    <li data-i="P1"><b>枢纽骨架（纯 Windows 侧）</b>
+      <span>WSL2 装 n9e 官方 tarball（解压即启：SQLite＋miniredis 内置，零外部状态件）＋ systemd＋任务计划自启链 · VM 容器改绑 0.0.0.0:8428 · n9e 配 VM 为默认数据源＋写入代理 · 建用户/业务组 · 门禁：板→:17000 端到端、UI 可查 VM 样本、重启自启</span></li>
+    <li data-i="P2"><b>存储并行（板零改动）</b>
+      <span>VM 以 -promscrape.config 直抓三目标（复制 prometheus.yml 语义）· k1-prom 与 VM 双跑 ≥7d · dashboard.html ?prom=:8428 只读并行 · 门禁：指标对账＋CORS 实测</span></li>
+    <li data-i="P3"><b>Categraf 上板（唯一板端阶段）</b>
+      <span>riscv64 交叉编译 spike → systemd 部署 → node_* / hwmon / evald_* / 标签注入 / up 兼容流逐项对账 · 门禁：与 P2 数据并排一致、扰动 vmstat 对比无恶化 · 回退：stop categraf 即回 P2</span></li>
+    <li data-i="P4"><b>告警上线（能力新增）</b>
+      <span>9 族规则录入 n9e ＋ 通知媒介 ＋ 计时天窗屏蔽 · 门禁：停 evald-acc 演练离线告警、手动 PromQL 回放验证阈值族</span></li>
+    <li data-i="P5"><b>大盘重建</b>
+      <span>四层大盘在 n9e 逐层落地（漏斗→堆叠柱）· 门禁：与 dashboard.html 并排对数一致后才谈退役</span></li>
+    <li data-i="P6"><b>退役收尾（逐项独立回退）</b>
+      <span>VM 直抓任务撤 · k1-prom 容器封存（卷留 30d）· 板上 node_exporter 停用（crontab 注释、文件保留）· dashboard.html 归档只读 · monitor-next/README 记录接替关系</span></li>
+  </ol>
+</section>
+
+<!-- ============================================ 08 风险与未决 -->
+<section id="risk">
+  <h2><span class="n">08</span>风险与未决</h2>
+  <table>
+    <thead><tr><th style="width:52px">编号</th><th style="width:270px">风险</th><th>处置 / 兜底</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">R1</td><td>Categraf 无官方 riscv64 发布物</td>
+          <td><span class="tag t-warn">P3 硬门禁</span>Go 交叉编译＋build tags 裁剪；不过门则 VM 直抓（P2 形态）长期化，categraf 仅 Windows 侧自监控——目标架构退一档但可用</td></tr>
+      <tr><td class="mono">R2</td><td>板 → 枢纽推送方向（现状只有反向拉取）；终点是 WSL2 服务，另叠加 n9e(WSL2)→VM(Win Docker) 跨界访问</td>
+          <td><span class="tag t-warn">P0 前置</span>WSL2 mirrored networking 优先（Win11 22H2+，本机 build 26200 满足），netsh portproxy＋任务计划兜底（WSL IP 动态，脚本自适应）；n9e 绑 0.0.0.0:17000；VM 绑 0.0.0.0:8428；防火墙窄放行</td></tr>
+      <tr><td class="mono">R3</td><td>VM 对 file:// null origin 的 CORS 行为未实测</td>
+          <td><span class="tag t-info">P2 验证</span>不放行则 dashboard.html 过渡期退化（本地静态服务器或 9090 反代），不阻塞主线</td></tr>
+      <tr><td class="mono">R4</td><td>input.prometheus 实例级 labels 文档未记载；up 序列推送链天然缺失</td>
+          <td><span class="tag t-warn">P3 验证</span>labels 不支持 → board 级区分退回 instance（端口可解析）＋ n9e 写入侧处理；up → exec 兼容流补齐（或 VM 极简 up-only 抓取任务）</td></tr>
+      <tr><td class="mono">R5</td><td>hwmon 风扇/温度指标名 parity（fan_rpm/pwm/fault）</td>
+          <td><span class="tag t-info">P3 对账</span>input.node_exporter 声称 100% 兼容，仍以上板 diff 面板在用序列为准</td></tr>
+      <tr><td class="mono">R6</td><td>n9e 引入状态件（SQLite 单文件＋miniredis 内存态）与 WSL2 运维链（开机不自启）</td>
+          <td>n9e.db 周备（计划任务拷文件）＋规则/大盘 JSON 导出入仓＝灾备正本；重启丢登录态（重登）与心跳态（分钟级重建）；扩容路径＝etc 配置改外接 MySQL/Redis，部署形态不变；任务计划 <code>wsl -d …</code> 拉起 systemd</td></tr>
+      <tr><td class="mono">R7</td><td>:17000（n9e/WSL2）与 :8428（VM 写口）双双暴露 LAN</td>
+          <td>防火墙按源窄放行（板 IP＋本网段）· categraf writers basic_auth（n9e 侧强制与否 P1 验证）· n9e UI 自带用户体系（首登改默认口令）</td></tr>
+      <tr><td class="mono">R8</td><td>计时簇扰动</td>
+          <td>Categraf 钉 X100 用户域（CPUAffinity）· interval 30s 不变 · P3 vmstat 前后对比；A100 簇零接触</td></tr>
+      <tr><td class="mono">R9</td><td>桑基漏斗、5s 即时刷新等面板特性 n9e 无原生等价</td>
+          <td>漏斗→堆叠柱；即时值节奏接受 n9e 刷新粒度（30s 档）；dashboard.html 归档前保留 2 周重叠期</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  本页为 <code>docs/architecture-dev.html</code>（自包含、零外部依赖，<code>file://</code> 直开）——
+  <b>目标架构蓝图，非现状</b>。实施计划／验证门／回退见 <a href="spec.md">docs/spec.md</a>；
+  现状契约见 <a href="architecture.html">docs/architecture.html</a> §06 与 <code>monitor/README.md</code>。
+  调研依据（2026-09-20）：
+  <a href="https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/">VM 单机版文档</a> ·
+  <a href="https://github.com/ccfos/nightingale">nightingale v9.1.1</a>（单二进制轻量模式：
+  <a href="https://n9e.github.io/docs/install/binary/">官方二进制部署文档</a>）·
+  <a href="https://github.com/flashcatcloud/categraf">categraf v0.5.x</a>
+  （<a href="https://flashcat.cloud/docs/content/flashcat-monitor/nightingale-v6/agent/categraf/">配置文档</a>）。
+  字节冻结 7 件（evald.py / warmd.py / evaldctl.sh / config.example.json / dashboard.html / monitor/*）
+  在本蓝图全部零改动。
+</footer>
+
+</div>
+</body>
+</html>
