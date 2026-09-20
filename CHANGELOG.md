@@ -69,10 +69,19 @@ HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `vers
   支持 `EV_WORKSPACE` 覆盖（缺省仍取仓的父目录），解析不到工作区时**具名报错**而非
   `FileNotFoundError`；`recover_inflight.py` 的 `OUT` 由 CWD 相对改为工作区根相对（该文件
   此前就因 CWD 相对路径出过问题）。`clients/archive/**` 未改（冻结历史）。
+- **文档对账（活文档）**：README 的 `perf` 车道锁语义由"`max_concurrency>1` 仍被单锁串行化"
+  更正为按 worker 分区（原文停留在 ADR-0014 之前，与同页 §计时互斥 自相矛盾）；ADR-0002 文末
+  补修订注记并反链 0014；新增 [docs/adr/README.md](docs/adr/README.md) 索引（标出 0005-0013
+  未入本仓、ADR-0012 悬空、0004 与工作区撞号、编号 0011 两处皆缺）；`CONTEXT.md` 修正
+  `EvalJob`→`Job`（以代码实体名为准）与计时互斥口径，并补 计时车道／字节冻结／战役工作区
+  三条术语；`pyproject.toml` 增 `[project.optional-dependencies] ops = ["paramiko>=3"]`
+  （pssh 的真实依赖此前只在注释里）。
 - 验证：全量 `py_compile` 绿；`rg` 确认活文档/代码无 `bin/`／`shims` 残留引用（`clients/archive`、
   ADR、设计稿与 CHANGELOG 历史条目除外）；7 件冻结物 md5 与上表逐一相符（本次未碰其字节）。
 - **遗留（不在本次范围）**：`ops/precompile_candidate.sh` 的传输层仍为已废弃的 k3ssh，待隔离；
-  `clients/archive/**` 的 `ROOT = REPO_DIR.parent` 未接 `EV_WORKSPACE`。
+  `clients/archive/**` 的 `ROOT = REPO_DIR.parent` 未接 `EV_WORKSPACE`；`monitor/README.md:55`
+  的 docker 挂载路径仍指向收拢前已空的目录——该文件在冻结清单内，改动前需先把"monitor/ 是
+  Windows 侧文档、不属板端部署单元"这一例外写进冻结清单，故本次未改。
 
 ## 2026-09-15 — W0 基建天窗 ＋ `778defa`
 

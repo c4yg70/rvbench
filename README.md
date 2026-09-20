@@ -252,7 +252,7 @@ config.json 新增顶层 `evaluators` 节，把三个评估器做成独立开关
 - **优先级**：`perf` 字段 > `evaluators.<n>` > 旧扁平键（`correctness_workers/cpus/omp_threads`）> 硬缺省。归并后下游（`lane_resources` / `Worker` / `Store` / `validate_request`）只读归并结果。
 - **车道映射**：`perf`→`timing`、`acc`→`correctness`、`func`→`func`。
 - **分核**：归并出的 `cpus` 仍按既有机制在各 worker 间均分（`lane_resources(cfg, lane, index, total)`，`total>1` 时每 worker 独占一段核；核数不足以切分时回落整段共享）。
-- **timing（perf）车道**：默认不钉核、不注 OMP（与旧版逐字节一致）。仅当显式给 `perf.perf.cpu_ids` / `omp_threads` 时才 opt-in 钉核/注 OMP；`K3_LANE` 始终不注入 timing。`max_concurrency>1` 时多 worker 仍被 `/tmp/k3_bench.lock` 串行化（计时互斥不变量），并发只影响 pickup 顺序。
+- **timing（perf）车道**：默认不钉核、不注 OMP（与旧版逐字节一致）。仅当显式给 `perf.perf.cpu_ids` / `omp_threads` 时才 opt-in 钉核/注 OMP；`K3_LANE` 始终不注入 timing。`max_concurrency>1` 时计时锁**按 worker 分区**（`timing_lock_path` = `/tmp/k3_bench.lock.<index>`），各车道独立计时、互不排队（ADR-0014）；同一部署路径的作业另由 `Store.path_lock` 串行化。
 - **校验**：未知顶层键、未知子字段键、非法 `cpu_ids`、`cores` 与 `cpu_ids` 数目不一致、`cores` 超核池、`max_concurrency/max_queue/omp_threads < 1`、非法 `executor`、`timeout_min` 越界——一律启动即 `SystemExit`。
 
 ### 与 `evaluators` 的分工

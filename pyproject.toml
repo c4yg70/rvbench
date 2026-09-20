@@ -7,6 +7,10 @@ description = "SpacemiT K3 (RISC-V) kernel evaluation server (evald) + companion
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+# ops/pssh.py（部署通道）与经它派生的 precompile 走 paramiko；板端脚本另需板上的 torch/triton/flag_gems
+ops = ["paramiko>=3"]
+
 [tool.ruff]
 line-length = 100
 extend-exclude = ["clients/archive", "tools/trace_fixtures"]

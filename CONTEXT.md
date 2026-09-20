@@ -4,9 +4,10 @@
 
 ## Language
 
-**评估作业 (EvalJob)**:
+**评估作业 (Job)**:
 一次提交给评估服务器的原子评估请求：候选文件包 + 评估参数 + 部署语义。
-_Avoid_: task、benchmark request
+代码实体为 `evald.py` 的 `class Job`。
+_Avoid_: task、benchmark request、EvalJob
 
 **候选文件包 (Candidate Files)**:
 随作业提交的代码文件集合（相对 flag_gems 包的路径 + 文件内容），服务器按路径白名单校验后才部署。
@@ -20,7 +21,9 @@ _Avoid_: 覆盖即留、last-writer-wins
 `restore: false` 的评估作业：评估完成后候选代码保留在 site-packages，用于固化最优版本。
 
 **计时互斥 (Timing Mutex)**:
-一切计时执行必须独占 `/tmp/k3_bench.lock` 的不变量；评估服务器 worker 与手工 SSH 基准共用这把锁。
+一切计时执行必须独占计时锁的不变量；评估服务器 worker 与手工 SSH 基准共用同一族锁文件。
+单 worker 用 `/tmp/k3_bench.lock`；多计时车道按 worker 分区为 `/tmp/k3_bench.lock.<index>`
+（ADR-0014）——此时手工基准与任何抢锁的回退路径必须**同时持有全部分区锁**。
 
 **作业号 (Job ID)**:
 评估作业的 UUIDv7 标识，时间有序，贯穿异步跟踪与历史记录；历史查询以其为游标。
@@ -33,3 +36,15 @@ bench_op.py 的单算子快速计时（5~30s），单行 JSON 输出 torch_ms/ge
 
 **全量验收 (Full Acceptance)**:
 pytest benchmark 全量跑分（约 2 分钟/算子），算子优化的验收口径；不进评估队列。
+
+**计时车道 (Lane)**:
+作业按用途分列的调度单位：`timing`（计时，持分区计时锁）/ `correctness`（正确性，多 worker、
+不持计时锁）/ `func`。feature flag 名 `perf`/`acc`/`func` 分别映射到三者。
+
+**字节冻结 (Byte-Freeze)**:
+`evald.py`、`warmd.py`、`evaldctl.sh`、`config.example.json`、`dashboard.html`、`monitor/*`
+与板端部署**逐字节一致**的部署不变量（md5 记录于 CHANGELOG）；改这些文件须过板上 selftest 门禁。
+
+**战役工作区 (Campaign Workspace)**:
+存放 `runs/`、`results/` 与实验文档的工作区根。本仓是其代码正本但已独立于它——客户端用
+`EV_WORKSPACE` 指向它，不用目录相对关系推导。
