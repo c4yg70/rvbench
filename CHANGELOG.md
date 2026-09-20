@@ -65,11 +65,14 @@ HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `vers
   | `monitor/README.md` | `6a58bd3909da40c8491ee5e544592035` | 同左 |
   | `monitor/prometheus.yml` | `778614b51f311a53b40feeeb481283c5` | 同左 |
 
+- **客户端工作区根改为显式**：`clients/{ev,eval_pipeline,op_status,recover_inflight}.py` 的 `ROOT`
+  支持 `EV_WORKSPACE` 覆盖（缺省仍取仓的父目录），解析不到工作区时**具名报错**而非
+  `FileNotFoundError`；`recover_inflight.py` 的 `OUT` 由 CWD 相对改为工作区根相对（该文件
+  此前就因 CWD 相对路径出过问题）。`clients/archive/**` 未改（冻结历史）。
 - 验证：全量 `py_compile` 绿；`rg` 确认活文档/代码无 `bin/`／`shims` 残留引用（`clients/archive`、
   ADR、设计稿与 CHANGELOG 历史条目除外）；7 件冻结物 md5 与上表逐一相符（本次未碰其字节）。
-- **遗留（不在本次范围）**：`clients/*` 与 `clients/archive/*` 的 `ROOT = REPO_DIR.parent` 现指向
-  检出目录的父目录，而战役工作区（`runs/`、`results/`）在仓外的实验工作区——路径契约待定
-  （env 覆盖 or 显式配置）。`ops/precompile_candidate.sh` 的传输层仍为已废弃的 k3ssh，待隔离。
+- **遗留（不在本次范围）**：`ops/precompile_candidate.sh` 的传输层仍为已废弃的 k3ssh，待隔离；
+  `clients/archive/**` 的 `ROOT = REPO_DIR.parent` 未接 `EV_WORKSPACE`。
 
 ## 2026-09-15 — W0 基建天窗 ＋ `778defa`
 

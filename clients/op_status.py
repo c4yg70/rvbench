@@ -6,10 +6,18 @@ like instead of waiting. Usage:
   kope-mem/.venv/Scripts/python.exe clients/op_status.py div exp2   # specific ops
 """
 import json
+import os
 import sys
 from pathlib import Path
 
-RUN = Path(__file__).resolve().parents[2] / "runs" / "E1" / "KOPE"   # parents[2]=工作区根（原 bin/ 位置为 parents[1]）
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+SELF_DIR = Path(__file__).resolve().parent
+REPO_DIR = SELF_DIR.parent
+ROOT = REPO_DIR.parent            # 战役工作区根（含 runs/）
+if os.environ.get("EV_WORKSPACE"):   # 仓已独立于工作区，无法从仓位置推导 → 显式覆盖
+    ROOT = Path(os.environ["EV_WORKSPACE"]).expanduser().resolve()
+RUN = ROOT / "runs" / "E1" / "KOPE"
 ORDER = "0123456789"
 
 
@@ -19,6 +27,9 @@ def rnum(stem: str) -> int:
 
 
 def main() -> None:
+    if not RUN.is_dir():
+        raise SystemExit(f"[op_status] 找不到 {RUN}；"
+                         f"用 EV_WORKSPACE=<含 runs/ 与 results/ 的工作区根> 指定")
     want = set(sys.argv[1:])
     rows = []
     for d in sorted(RUN.iterdir()):

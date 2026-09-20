@@ -39,6 +39,11 @@
 | [tools/](tools/) | 本地校验：`trace_check.py` ＋ `trace_fixtures/`（T3 harness-trace 落盘校验） | — |
 | [docs/](docs/) | ADR、总体设计、优化设计稿、接力链设计、收拢 spec | — |
 
+**运行前置（Windows 侧客户端）**：本仓已独立于战役工作区，`clients/*` 用环境变量
+`EV_WORKSPACE=<战役工作区根>`（应含 `runs/`、`results/`）定位战役状态；未设时回退为仓的
+父目录，解析不到即以具名错误退出（不静默跑错目录）。例：
+`EV_WORKSPACE=<工作区根> python clients/op_status.py`。
+
 **部署不变式**：`evald.py`/`warmd.py`/`evaldctl.sh`/`config.example.json`/`dashboard.html`/
 `monitor/*` 与板上部署保持**逐字节一致**（md5 见 CHANGELOG），改动它们须走板上 selftest 门禁。
 

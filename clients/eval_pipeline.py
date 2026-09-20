@@ -35,9 +35,13 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 SELF_DIR = Path(__file__).resolve().parent
-REPO_DIR = SELF_DIR.parent        # = riscv-flagos-kernel-eval-server/
-ROOT = REPO_DIR.parent            # 工作区根：runs/ results/ 语义不变
+REPO_DIR = SELF_DIR.parent        # = 仓库根
+ROOT = REPO_DIR.parent            # 战役工作区根：runs/ results/ 语义
+if os.environ.get("EV_WORKSPACE"):   # 仓已独立于工作区，无法从仓位置推导 → 显式覆盖
+    ROOT = Path(os.environ["EV_WORKSPACE"]).expanduser().resolve()
 BASE = "http://10.18.60.100:8788"
 TOKEN = json.load(open(REPO_DIR / "config.json"))["token"]
 
@@ -45,6 +49,10 @@ RE_SHAPE_OK = re.compile(r"^[0-9]{1,10}(,[0-9]{1,10}){0,5}$")
 # 2026-09-10 起正本在 results/e1-ops/（runs/E1/ 旧路径留副本兜底，见
 # results/infra/infra-20260910-repartition.md 的归拢）
 _MANIFEST_PATH = ROOT / "results" / "e1-ops" / "baseline_manifest.json"
+if not _MANIFEST_PATH.is_file():
+    raise SystemExit(f"[eval_pipeline] 找不到 baseline_manifest：{_MANIFEST_PATH}\n"
+                     f"  （工作区根默认取仓的父目录 {ROOT}；"
+                     f"用 EV_WORKSPACE=<含 runs/ 与 results/ 的工作区根> 指定）")
 _MANIFEST_RAW = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
 MANIFEST = {it["op"]: it for it in _MANIFEST_RAW["jobs"]}
 

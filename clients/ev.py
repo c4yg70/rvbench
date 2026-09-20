@@ -61,8 +61,10 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 SELF_DIR = Path(__file__).resolve().parent
-REPO_DIR = SELF_DIR.parent        # = riscv-flagos-kernel-eval-server/（板上部署时 = ~/autoke）
-ROOT = REPO_DIR.parent            # 工作区根：candidate 相对路径、runs/E1 读数语义不变
+REPO_DIR = SELF_DIR.parent        # = 仓库根（板上部署时 = ~/autoke）
+ROOT = REPO_DIR.parent            # 战役工作区根：candidate 相对路径、runs/E1 读数语义
+if os.environ.get("EV_WORKSPACE"):   # 仓已独立于工作区，无法从仓位置推导 → 显式覆盖
+    ROOT = Path(os.environ["EV_WORKSPACE"]).expanduser().resolve()
 
 BASE = "http://10.18.60.100:8788"
 DEFAULT_CORR_BASE = "http://10.18.60.100:8791"
@@ -203,7 +205,8 @@ def build_body(a: argparse.Namespace) -> tuple[dict, dict]:
         if not cp.is_absolute():
             cp = ROOT / cp
         if not cp.exists():
-            die(f"候选文件不存在（防计时空跑，见排坑清单）：{a.candidate}")
+            die(f"候选文件不存在（防计时空跑，见排坑清单）：{a.candidate}"
+                f"（相对路径按工作区根 {ROOT} 解析；根不对时设 EV_WORKSPACE）")
         dep = a.deploy_path or f"flag_gems/ops/{a.op}.py"
         body["files"] = [{"path": dep, "content": cp.read_text(encoding="utf-8")}]
         meta["sha256"] = hashlib.sha256(cp.read_bytes()).hexdigest()
