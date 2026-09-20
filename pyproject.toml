@@ -1,0 +1,12 @@
+[project]
+# 纯元数据声明：本仓库不构建/不安装任何包（ADR-0003：stdlib-only、单文件直部署）。
+# 服务端跑板上系统 python3.14；客户端纯 stdlib（pssh.py 依赖 paramiko，由隔离 venv 提供）。
+name = "evald-server"
+version = "1.0.0"
+description = "SpacemiT K3 (RISC-V) kernel evaluation server (evald) + companion clients/board scripts"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["clients/archive", "tools/trace_fixtures"]

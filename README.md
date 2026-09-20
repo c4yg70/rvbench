@@ -7,7 +7,7 @@
 - **异步队列·多车道**：timing 车道（默认）缺省单 worker 串行（计时纯净），可用
   `perf.perf.max_concurrency>1` 开**多计时车道**（配 `cpu_ids` 按 worker 均分核段、`omp_threads`
   限线程）——K3 生产为 2 车道 × 4 核（8-11 / 12-15），实测 2.0× 吞吐且 gems_ms CV 从 119% 降到
-  3.2%（[ADR-0014](../../docs/adr/0014-dual-timing-lanes-a100.md)）；correctness 车道
+  3.2%（[ADR-0014](docs/adr/0014-dual-timing-lanes-a100.md)）；correctness 车道
   3 worker 并行（`correctness_workers`，0=关闭）——不持计时锁、强制 warmup=0/rep=1、taskset
   到车道核（handoff §3-L2）。队列按 lane 分列，上限 64 两车道共享，超时杀进程
 - **部署-恢复自包含**：每个作业评估前备份 site-packages 原文件、断硬链写入候选，评估后自动恢复——杜绝异步队列下"测到上一个作业残留代码"的静默错误（[ADR-0001](docs/adr/0001-eval-job-deploy-restore.md)）。
@@ -19,7 +19,28 @@
   抢锁的回退路径必须同时持有全部分区锁**（`flock <lock>.0 flock <lock>.1 …`）
 - **kope-mem 兼容**：响应自带 `kope_mem.speedup / pass_rate`，可直接喂给 K3BenchmarkPort
 
-设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；术语：[CONTEXT.md](CONTEXT.md)。
+设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；接力链设计：
+[docs/relay-chain-design.md](docs/relay-chain-design.md)；术语：[CONTEXT.md](CONTEXT.md)；
+变更史：[CHANGELOG.md](CHANGELOG.md)。
+
+## 仓库结构（2026-09-20 收拢，spec-20260920）
+
+本仓库是 evald **服务端与全部配套代码的单一正本**。工作区（父目录）`bin/` 下的同名入口
+均为兼容垫片（母本在 [shims/](shims/)），旧命令行 `python bin/ev.py …` 等逐字不变。
+
+| 分区 | 内容 | 板上对应 |
+|---|---|---|
+| 根目录 | `evald.py` / `warmd.py` / `evaldctl.sh` / `config*.json` / `dashboard.html` / `monitor/` —— 服务端部署单元与监控 | `~/autoke/evald/`（push 清单见下） |
+| [clients/](clients/) | Windows 侧 evald 客户端与战役驱动：`ev.py`（交互单评）、`eval_pipeline.py`（批量管线，judge/registry 正本）、`op_status.py`、`recover_inflight.py` | `ev.py` 另有板上副本 `~/autoke/evald/ev.py` |
+| [clients/archive/](clients/archive/) | 历史一次性基线工具（run_recall / run_baseline_group / run_verify43_rerun / run_gemm_panel ＋ baseline 数据文件），路径常量已随迁修指 | — |
+| [board/](board/) | 板端配套脚本（evald 文件白名单契约的一部分）：`bench_op.py`（计时三层分发）、`bench_gemm.py`、`torch_reference.py`、`fallback_refs.py`（数值判定正本） | `~/autoke/scripts/` |
+| [ops/](ops/) | 部署与运维：`pssh.py`（SSH 通道）、`evald_selftest_local.py`、`precompile.py` + `precompile_candidate.sh`（⚠ 传输仍为已废弃的 k3ssh，复用前须迁 pssh） | — |
+| [tools/](tools/) | 本地校验：`trace_check.py` ＋ `trace_fixtures/`（T3 harness-trace 落盘校验） | — |
+| [shims/](shims/) | bin/ 兼容垫片母本（13 py + 1 sh），部署方式见其 README | — |
+| [docs/](docs/) | ADR、总体设计、优化设计稿、接力链设计、收拢 spec | — |
+
+**部署不变式**：`evald.py`/`warmd.py`/`evaldctl.sh`/`config.example.json`/`dashboard.html`/
+`monitor/*` 与板上部署保持**逐字节一致**（md5 见 CHANGELOG），改动它们须走板上 selftest 门禁。
 
 ## 部署（板上一次性）
 
@@ -27,10 +48,10 @@
 # 本地推送（Windows 工作区）——bin/k3ssh / bin/k3scp 已废弃，一律走 pssh.py
 # （--put 按第一个冒号切分，Windows 盘符路径会被切碎 → 先 cd 到文件目录再传相对名）
 cd riscv-flagos-kernel-eval-server
-python ../bin/pssh.py Home-SpacemitK3 --put "evald.py:/home/c4y/autoke/evald/evald.py"
-python ../bin/pssh.py Home-SpacemitK3 --put "warmd.py:/home/c4y/autoke/evald/warmd.py"
-python ../bin/pssh.py Home-SpacemitK3 --put "evaldctl.sh:/home/c4y/autoke/evald/evaldctl.sh"
-python ../bin/pssh.py Home-SpacemitK3 --put "../bin/ev.py:/home/c4y/autoke/evald/ev.py"   # 直连客户端板上副本：探活/金丝雀；--judge 需仓库侧
+python ops/pssh.py Home-SpacemitK3 --put "evald.py:/home/c4y/autoke/evald/evald.py"
+python ops/pssh.py Home-SpacemitK3 --put "warmd.py:/home/c4y/autoke/evald/warmd.py"
+python ops/pssh.py Home-SpacemitK3 --put "evaldctl.sh:/home/c4y/autoke/evald/evaldctl.sh"
+python ops/pssh.py Home-SpacemitK3 --put "clients/ev.py:/home/c4y/autoke/evald/ev.py"   # 直连客户端板上副本：探活/金丝雀；--judge 需仓库侧
 
 # 板上
 mkdir -p ~/autoke/evald && cd ~/autoke/evald
@@ -42,6 +63,16 @@ bash evaldctl.sh start               # setsid+nohup 守护（无交互终端依�
 # 用普通 start 会落 X100 → 计时作业 PSR<8（infra 失败）。@reboot 也要写 start-ai。
 crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash evaldctl.sh start-ai
 ```
+
+## 板恢复后回归门（2026-09-20 收拢的欠账）
+
+本次收拢为纯本地静态整理（板不可达期间），板恢复后须补：
+
+1. 板上 `md5sum` evald.py / warmd.py 对仓库（应仍逐字节一致——本次未改它们）。
+2. 金丝雀：板上 `ev.py run --op add --shape 64,512,512` ＋ Windows 侧 `python bin/ev.py status`（验垫片＋token 链）。
+3. `evald.py --selftest`（板上最小 config 口径，234 PASS 基线）。
+4. 重推 `clients/ev.py` → 板上 `~/autoke/evald/ev.py`（板侧现为收拢前旧副本）。
+5. `eval_pipeline` 以一个 dry 工单跑半轮，确认 ROOT/registry 落点无漂移。
 
 ## API
 
@@ -227,4 +258,5 @@ curl -s -X DELETE "$BASE/jobs/<job_id>" -H "$H"
 - **M1** ✅ evald.py + 子进程执行器 + 部署-恢复 + 队列/超时/429
 - **M2** ✅ runbook 配方 + crontab 自启
 - **M3** ✅ WarmForkExecutor（warmd 预热守护 + fork 子进程全新加载；实测同作业 20.2s→15.1s，A/B 交叉验证正确性一致）
-- **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）；进一步压缩子进程 flag_gems 导入（~6.8s，弥散性开销）
+- **2026-09-20** ✅ 配套代码收拢（clients/board/ops/tools/shims 分区，spec-20260920；见 CHANGELOG）
+- **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）；进一步压缩子进程 flag_gems 导入（~6.8s，弥散性开销）；uv 打包 + cnb CI（`.qoder` c36 规格，须先过板上 selftest 门禁）

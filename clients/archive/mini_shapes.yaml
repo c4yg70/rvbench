@@ -1,0 +1,36 @@
+# 冒烟专用最小 shape：筛选"算子主体能否在 K3 编译运行"，不做性能评估
+# 匹配规则：op_name 条目 > 类名条目（MRO 顺序）> DEFAULT_SHAPES（含 1G 元素，不可用）
+Benchmark:
+  shapes: [[16, 16]]
+GenericBenchmark:
+  shapes: [[16, 16]]
+GenericBenchmarkFilterShapes:
+  shapes: [[16, 16]]
+GenericBenchmarkExcluse1D:
+  shapes: [[16, 16]]
+GenericBenchmarkExcluse3D:
+  shapes: [[16, 16]]
+GenericBenchmark4DOnly:
+  shapes: [[1, 4, 8, 8]]
+GenericBenchmark2DOnly:
+  shapes: [[16, 16]]
+UnaryPointwiseBenchmark:
+  shapes: [[16, 16]]
+UnaryPointwiseOutBenchmark:
+  shapes: [[16, 16]]
+BinaryPointwiseBenchmark:
+  shapes: [[16, 16]]
+ScalarBinaryPointwiseBenchmark:
+  shapes: [[16, 16]]
+UnaryReductionBenchmark:
+  shapes: [[16, 16]]
+TexGluBenchmark:
+  shapes: [[16, 16]]
+TexGluForwardBenchmark:
+  shapes: [[16, 16]]
+TexGluBackwardBenchmark:
+  shapes: [[16, 16]]
+MarginRankingLossBenchmark:
+  shapes: [[16, 16]]
+BlasBenchmark:
+  shapes: [[16, 16, 16]]

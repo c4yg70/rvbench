@@ -1,0 +1,58 @@
+# CHANGELOG — riscv-flagos-kernel-eval-server (evald)
+
+版本痕迹的单一查阅点（此前散在 README/docstring/注释里）。
+HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `version=0.0.4` 是文本格式版本号，与本文件的项目版本无关。
+
+## 2026-09-20 — 配套代码收拢（spec-20260920）
+
+**仓库成为 evald 服务端＋全部配套代码的单一正本**；工作区 `bin/` 同名入口改为兼容垫片
+（母本 `shims/`，旧命令行逐字不变）。详见 [docs/spec-20260920-reorg.md](docs/spec-20260920-reorg.md)。
+
+- 新分区：`clients/`（ev.py、eval_pipeline.py、op_status.py、recover_inflight.py）、
+  `clients/archive/`（run_recall 等 4 个历史基线工具＋baseline 数据文件）、
+  `board/`（bench_op/bench_gemm/torch_reference/fallback_refs）、
+  `ops/`（pssh/evald_selftest_local/precompile*）、`tools/`（trace_check＋fixtures）、
+  `shims/`（14 个 bin/ 垫片母本）。
+- 路径适配（常量级，非逻辑改动）：ev.py / eval_pipeline.py 引入 `SELF_DIR/REPO_DIR/ROOT`；
+  op_status.py `parents[2]`；recover_inflight.py / archive×4 token 改读 `REPO_DIR/config.json`；
+  evald_selftest_local.py 的 evald.py 默认定位；precompile_candidate.sh 的 `cd ../..`。
+- `bin/k3ssh`、`bin/k3scp` 删除（2026-09-09 起废弃）；6 份 `eval_pipeline.py.bak-*`
+  移出 bin/（工作区 `tmp/archive-20260920/`）；`ops/precompile_candidate.sh` 传输层仍为
+  k3ssh——**已标注⚠，复用前须迁 pssh**。
+- 新增 `pyproject.toml`（纯元数据，零运行时依赖，不建包——ADR-0003 不变）。
+- ADR-0014（双计时车道）自工作区 `docs/adr/` 双宿主一份入仓，修掉 README 死链。
+- **冻结字节清单（本次零改动，md5 前后一致）**：
+  `evald.py` `2966864b31e956524707b089a43af8e0`、`warmd.py` `3cf28f96daeecbcd4371f4d9e725dbfb`、
+  `evaldctl.sh` `8c0b9e8d078a6d1c52e75f0e1ff08eee`、`config.example.json` `328b2e351210c0269039e9f9aac8e1f7`、
+  `dashboard.html` `da364ef19201cb2f1ba58ad560e4daef`、`monitor/README.md` `6a58bd3909da40c8491ee5e544592035`、
+  `monitor/prometheus.yml` `778614b51f311a53b40feeeb481283c5`。
+  ⚠ md5 校验**对工作副本**（＝板端部署字节）：`evald.py` 与 `dashboard.html` 的工作副本/板端为
+  **CRLF** 行尾，git 索引按 `.gitattributes`（eol=lf）存 LF——`git show HEAD:evald.py` 的 md5
+  是 LF 形态（`324baede…`/`96266bd2…`），**不是**漂移；上板 push 一律用工作副本。
+- 验证口径：板不可达期间仅静态（AST 全量、垫片转发目标存在性、md5 前后比对）；
+  **板恢复后回归门**见 README「板恢复后回归门」节（含重推 `clients/ev.py` 上板）。
+
+## 2026-09-15 — W0 基建天窗 ＋ `778defa`
+
+多计时车道（A100 分核 8-11/12-15）＋ path_lock 部署互斥 ＋ 0911 加固 ＋ dashboard/monitor 入库。
+板上 evald.py/warmd.py 与本提交逐字节一致（md5 见上）。W0 八项竣工记录：
+工作区 `results/infra/infra-20260915-w0-hardening.md`。
+
+## 2026-09-11 — 加固上板（P0/P1/P2）
+
+依据 0910/0911 两夜事故：恢复后回读 sha 校验（L631）、槽位投毒加固（L801）、
+`path_lock_dir` 双实例共用、`require_verified_base`、`warmd_output_selfcheck`（仅 8788）。
+提案/报告/验收单：工作区 `results/infra/evald-{improvement-proposal-20260911,hardening-report,acceptance-checklist}.md`。
+
+## 2026-09-09 ~ 09-10 — feature flags ＋ 8791 旁路 ＋ ev.py 直连通道
+
+- perf/acc/func 三评估器 feature flags（`evaluators` 节＋`perf` 资源覆盖层）。
+- K3 双实例定型：8788 纯计时（A100 8-15）/ 8791 acc+func 旁路（X100 0-7，
+  systemd 瞬态单元 `evald-acc.service`，`CPUAffinity=0-7`）。
+- `ev.py` 一次性直连客户端上线（交互单评免工单免常驻驱动；板上副本 `~/autoke/evald/ev.py`）。
+
+## 2026-09-07 — 设计定稿（grilling）
+
+`docs/eval-server-design.md`：HTTP 队列服务取代 ssh+flock；ADR-0001（部署-恢复）、
+ADR-0002（共享计时互斥）、ADR-0003（stdlib-only）、ADR-0004（WarmFork 不变量预热）。
+首个可用版 M1 起（仓库首提交 `2534f35`）。
