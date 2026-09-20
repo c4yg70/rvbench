@@ -76,6 +76,10 @@ HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `vers
   `EvalJob`→`Job`（以代码实体名为准）与计时互斥口径，并补 计时车道／字节冻结／战役工作区
   三条术语；`pyproject.toml` 增 `[project.optional-dependencies] ops = ["paramiko>=3"]`
   （pssh 的真实依赖此前只在注释里）。
+- **新增 [docs/architecture.html](docs/architecture.html)**：自包含架构总览（部署拓扑／作业生命周期
+  与持锁区间／车道与并发／不变量与门禁／分区与板端契约／可观测性／本次审计发现），内联 CSS+SVG、
+  零外部依赖、`file://` 直开；内容以代码事实为准（含 `run_job` 的锁顺序：path_lock 先于计时锁、
+  计时锁覆盖部署到恢复整段）。
 - 验证：全量 `py_compile` 绿；`rg` 确认活文档/代码无 `bin/`／`shims` 残留引用（`clients/archive`、
   ADR、设计稿与 CHANGELOG 历史条目除外）；7 件冻结物 md5 与上表逐一相符（本次未碰其字节）。
 - **遗留（不在本次范围）**：`ops/precompile_candidate.sh` 的传输层仍为已废弃的 k3ssh，待隔离；

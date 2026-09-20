@@ -19,8 +19,9 @@
   抢锁的回退路径必须同时持有全部分区锁**（`flock <lock>.0 flock <lock>.1 …`）
 - **kope-mem 兼容**：响应自带 `kope_mem.speedup / pass_rate`，可直接喂给 K3BenchmarkPort
 
-设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；接力链设计：
-[docs/relay-chain-design.md](docs/relay-chain-design.md)；术语：[CONTEXT.md](CONTEXT.md)；
+设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；
+**架构总览（自包含 HTML，含拓扑/生命周期/车道/不变量/审计发现）**：[docs/architecture.html](docs/architecture.html)；
+接力链设计：[docs/relay-chain-design.md](docs/relay-chain-design.md)；术语：[CONTEXT.md](CONTEXT.md)；
 变更史：[CHANGELOG.md](CHANGELOG.md)。
 
 ## 仓库结构（2026-09-20 收拢，spec-20260920）
@@ -37,7 +38,7 @@
 | [board/](board/) | 板端配套脚本（evald 文件白名单契约的一部分）：`bench_op.py`（计时三层分发）、`bench_gemm.py`、`torch_reference.py`、`fallback_refs.py`（数值判定正本） | `~/autoke/scripts/` |
 | [ops/](ops/) | 部署与运维：`pssh.py`（SSH 通道）、`evald_selftest_local.py`、`precompile.py` + `precompile_candidate.sh`（⚠ 传输仍为已废弃的 k3ssh，复用前须迁 pssh） | — |
 | [tools/](tools/) | 本地校验：`trace_check.py` ＋ `trace_fixtures/`（T3 harness-trace 落盘校验） | — |
-| [docs/](docs/) | ADR、总体设计、优化设计稿、接力链设计、收拢 spec | — |
+| [docs/](docs/) | ADR（索引在 [docs/adr/](docs/adr/)）、总体设计、优化设计稿、接力链设计、收拢 spec、[architecture.html](docs/architecture.html)（架构总览） | — |
 
 **运行前置（Windows 侧客户端）**：本仓已独立于战役工作区，`clients/*` 用环境变量
 `EV_WORKSPACE=<战役工作区根>`（应含 `runs/`、`results/`）定位战役状态；未设时回退为仓的
