@@ -28,9 +28,9 @@ v1.1（2026-09-09，runs/PILOT 端到端演练缺陷 D2/D3/D4 协调者裁决回
     （禁止裸 mem/ 等非规范形）；runs/<task>/<condition>/ 前缀检查（E_CROSS_ROOT）不变。
 
 用法：
-  python bin/trace_check.py --dir results/conditions/full/add       # 单目录（或其子树）
-  python bin/trace_check.py --root runs/              # 递归汇总
-  python bin/trace_check.py --root runs/ --json       # 机器可读 JSON（stdout）
+  python tools/trace_check.py --dir results/conditions/full/add       # 单目录（或其子树）
+  python tools/trace_check.py --root runs/              # 递归汇总
+  python tools/trace_check.py --root runs/ --json       # 机器可读 JSON（stdout）
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ TASKS = frozenset({"E1", "E3", "E9", "E10_PASS2", "E4", "E7", "PILOT"})
 
 # 必填字段：(字段名, 期望种类 "str" | "list")
 # 模板原生字段照 template；标注 [扩展] 的是编排层新增字段（模板不动，
-# 语义见 bin/trace_check.README.md）。
+# 语义见 tools/trace_check.README.md）。
 REQUIRED_FIELDS = [
     ("schema_version", "str"),        # 必须 == kelso.harness-trace/1.0
     ("run_id", "str"),                # 模板：run 标识

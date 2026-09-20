@@ -32,6 +32,45 @@ HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `vers
 - 验证口径：板不可达期间仅静态（AST 全量、垫片转发目标存在性、md5 前后比对）；
   **板恢复后回归门**见 README「板恢复后回归门」节（含重推 `clients/ev.py` 上板）。
 
+## 2026-09-20（二次整理）— bin/ 垫片退场 ＋ 收拢遗留死引用清理
+
+承同日收拢（上文）：检出目录已改名 `rvbench-kernel` 并移出工作区，既不在工作区内、
+也不再是 `bin/` 的兄弟目录 → 垫片的解析前提与"仓外工作区"假设一并作废。按**bin/ 入口作废**处置。
+
+- **垫片退场**：删除 `shims/`（12 py + 1 sh 母本 ＋ README）；工作区 `bin/` 下同名副本不再
+  维护。入口一律走仓内：`python clients/ev.py …`。spec §7／§14-D1 的垫片决策随之作废。
+- **死引用清理**（收拢时的依赖扫描未覆盖到的一批）：
+  - `clients/recover_inflight.py` FIX_NOTE 源：`bin/run_recall.py` → `clients/archive/run_recall.py`
+    （沿用旧路径必 `IndexError`）。
+  - `clients/eval_pipeline.py`：`PSSH = ROOT/"bin"/"pssh.py"` → `REPO_DIR/"ops"/"pssh.py"`。
+  - 用法/路径文本改指新分区：`clients/ev.py`、`clients/op_status.py`、
+    `ops/{pssh,precompile,evald_selftest_local}.py`、`tools/trace_check.py` ＋其 README、
+    `board/{bench_op,fallback_refs}.py` ＋`fallback_refs.README.md`、`docs/relay-chain-design.md`；
+    `baseline_shapes.yaml` 改指实际位置 `clients/archive/`（板上部署名 `~/autoke/scripts/baseline_shapes.yaml`
+    不变）。**未改**：`clients/archive/**`、`docs/adr/**`、`docs/evald-优化设计-20260909.md`、
+    `ops/precompile_candidate.sh`（待隔离）、`evald.py` 内注释（冻结文件）。
+- **仓库卫生**：`.gitignore` 补 `evald.pid`／`evald.env`／`*.tmp`；删除 `__pycache__/`
+  （含 spec §117 点名要删的孤儿 `_static_check.pyc`）。
+- **冻结物 md5 双形态登记 ＋ 禁令（补强上文口径）**：冻结物只认**工作副本**（＝板端字节）；
+  对冻结物**禁止** `git checkout -- <file>`／`git restore`——`.gitattributes`（`eol=lf`）会把
+  CRLF 工作副本换成 LF，md5 立刻漂移，且 fresh clone 无法自证冻结。
+
+  | 冻结文件 | 工作副本（板端字节） | git 索引 blob |
+  |---|---|---|
+  | `evald.py` | `2966864b31e956524707b089a43af8e0`（CRLF） | `324baedeb2c1c475e8bd8ececd82e641`（LF） |
+  | `dashboard.html` | `da364ef19201cb2f1ba58ad560e4daef`（CRLF） | `96266bd265cef9aa8834362dc46bf5da`（LF） |
+  | `warmd.py` | `3cf28f96daeecbcd4371f4d9e725dbfb` | 同左 |
+  | `evaldctl.sh` | `8c0b9e8d078a6d1c52e75f0e1ff08eee` | 同左 |
+  | `config.example.json` | `328b2e351210c0269039e9f9aac8e1f7` | 同左 |
+  | `monitor/README.md` | `6a58bd3909da40c8491ee5e544592035` | 同左 |
+  | `monitor/prometheus.yml` | `778614b51f311a53b40feeeb481283c5` | 同左 |
+
+- 验证：全量 `py_compile` 绿；`rg` 确认活文档/代码无 `bin/`／`shims` 残留引用（`clients/archive`、
+  ADR、设计稿与 CHANGELOG 历史条目除外）；7 件冻结物 md5 与上表逐一相符（本次未碰其字节）。
+- **遗留（不在本次范围）**：`clients/*` 与 `clients/archive/*` 的 `ROOT = REPO_DIR.parent` 现指向
+  检出目录的父目录，而战役工作区（`runs/`、`results/`）在仓外的实验工作区——路径契约待定
+  （env 覆盖 or 显式配置）。`ops/precompile_candidate.sh` 的传输层仍为已废弃的 k3ssh，待隔离。
+
 ## 2026-09-15 — W0 基建天窗 ＋ `778defa`
 
 多计时车道（A100 分核 8-11/12-15）＋ path_lock 部署互斥 ＋ 0911 加固 ＋ dashboard/monitor 入库。

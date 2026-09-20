@@ -25,8 +25,9 @@
 
 ## 仓库结构（2026-09-20 收拢，spec-20260920）
 
-本仓库是 evald **服务端与全部配套代码的单一正本**。工作区（父目录）`bin/` 下的同名入口
-均为兼容垫片（母本在 [shims/](shims/)），旧命令行 `python bin/ev.py …` 等逐字不变。
+本仓库是 evald **服务端与全部配套代码的单一正本**，所有入口都在仓内直接运行
+（如 `python clients/ev.py status`）。工作区 `bin/` 下的旧同名入口与兼容垫片已于
+2026-09-20 二次整理中退役——仓库不依赖任何仓外目录名，也不假定检出目录叫什么。
 
 | 分区 | 内容 | 板上对应 |
 |---|---|---|
@@ -36,7 +37,6 @@
 | [board/](board/) | 板端配套脚本（evald 文件白名单契约的一部分）：`bench_op.py`（计时三层分发）、`bench_gemm.py`、`torch_reference.py`、`fallback_refs.py`（数值判定正本） | `~/autoke/scripts/` |
 | [ops/](ops/) | 部署与运维：`pssh.py`（SSH 通道）、`evald_selftest_local.py`、`precompile.py` + `precompile_candidate.sh`（⚠ 传输仍为已废弃的 k3ssh，复用前须迁 pssh） | — |
 | [tools/](tools/) | 本地校验：`trace_check.py` ＋ `trace_fixtures/`（T3 harness-trace 落盘校验） | — |
-| [shims/](shims/) | bin/ 兼容垫片母本（13 py + 1 sh），部署方式见其 README | — |
 | [docs/](docs/) | ADR、总体设计、优化设计稿、接力链设计、收拢 spec | — |
 
 **部署不变式**：`evald.py`/`warmd.py`/`evaldctl.sh`/`config.example.json`/`dashboard.html`/
@@ -45,9 +45,9 @@
 ## 部署（板上一次性）
 
 ```bash
-# 本地推送（Windows 工作区）——bin/k3ssh / bin/k3scp 已废弃，一律走 pssh.py
-# （--put 按第一个冒号切分，Windows 盘符路径会被切碎 → 先 cd 到文件目录再传相对名）
-cd riscv-flagos-kernel-eval-server
+# 本地推送（在仓库根执行）——k3ssh / k3scp 已废弃，一律走 pssh.py
+# （--put 按第一个冒号切分，Windows 盘符路径会被切碎 → 先 cd 到文件所在目录再传相对名）
+cd <仓库根>
 python ops/pssh.py Home-SpacemitK3 --put "evald.py:/home/c4y/autoke/evald/evald.py"
 python ops/pssh.py Home-SpacemitK3 --put "warmd.py:/home/c4y/autoke/evald/warmd.py"
 python ops/pssh.py Home-SpacemitK3 --put "evaldctl.sh:/home/c4y/autoke/evald/evaldctl.sh"
@@ -66,10 +66,38 @@ crontab -e                           # @reboot cd /home/c4y/autoke/evald && bash
 
 ## 板恢复后回归门（2026-09-20 收拢的欠账）
 
-本次收拢为纯本地静态整理（板不可达期间），板恢复后须补：
+本次收拢为纯本地静态整理（板不可达期间），板恢复后按序补：
+
+**0. 先验：安装树未被污染（未过此门前的任何跑分都不可信）**
+
+服务重启路径只把被打断的作业标 `failed`（`Store._sweep_stale`），**不会**恢复
+site-packages。SIGTERM 落在 deploy→restore 之间时，候选代码会留在安装树里——正是
+ADR-0001 要消灭的"测到上一个作业残留代码"。板恢复后先做：
+
+```bash
+cd <板上 data_dir>          # config.json 的 data_dir
+
+# a) 列出"部署过但未恢复"的条目：manifest 存在、条目缺 restored_sha256（单行 JSON，逐条判）
+python3 - <<'PY'
+import json, glob
+for mp in sorted(glob.glob("jobs/*/manifest.json")):
+    for e in json.load(open(mp)):
+        if "restored_sha256" not in e:
+            print(mp, "existed=%s" % e["existed"], e["path"])
+PY
+
+# b) 命中即说明该槽位可能仍是候选代码：比对 abs 当前 sha256 与 orig_sha256 是否相符
+#    需还原时用同作业备份 jobs/<job_id>/backup/<相对路径> 手工拷回
+# c) 清 deploy 中途被打断留下的暂存文件（<白名单路径>.<job_id>.tmp）
+```
+
+口径：`jobs/<job_id>/manifest.json` 每条含 `path/abs/backup/existed/orig_sha256/
+deployed_sha256/restored_sha256`；`restored_sha256` 由 `restore_files` 恢复后回写，
+**缺该键 = 该条目未恢复**。（根治＝让 `_sweep_stale` 启动时按 manifest 补 restore，
+属 `evald.py` 改动，须走本门禁。）
 
 1. 板上 `md5sum` evald.py / warmd.py 对仓库（应仍逐字节一致——本次未改它们）。
-2. 金丝雀：板上 `ev.py run --op add --shape 64,512,512` ＋ Windows 侧 `python bin/ev.py status`（验垫片＋token 链）。
+2. 金丝雀：板上 `ev.py run --op add --shape 64,512,512` ＋ Windows 侧 `python clients/ev.py status`（验 token 链）。
 3. `evald.py --selftest`（板上最小 config 口径，234 PASS 基线）。
 4. 重推 `clients/ev.py` → 板上 `~/autoke/evald/ev.py`（板侧现为收拢前旧副本）。
 5. `eval_pipeline` 以一个 dry 工单跑半轮，确认 ROOT/registry 落点无漂移。
@@ -258,5 +286,6 @@ curl -s -X DELETE "$BASE/jobs/<job_id>" -H "$H"
 - **M1** ✅ evald.py + 子进程执行器 + 部署-恢复 + 队列/超时/429
 - **M2** ✅ runbook 配方 + crontab 自启
 - **M3** ✅ WarmForkExecutor（warmd 预热守护 + fork 子进程全新加载；实测同作业 20.2s→15.1s，A/B 交叉验证正确性一致）
-- **2026-09-20** ✅ 配套代码收拢（clients/board/ops/tools/shims 分区，spec-20260920；见 CHANGELOG）
+- **2026-09-20** ✅ 配套代码收拢（clients/board/ops/tools 分区，spec-20260920；见 CHANGELOG）
+- **2026-09-20（二次）** ✅ bin/ 垫片退场＋遗留 bin/ 死引用清理＋冻结物双 md5 登记（见 CHANGELOG）
 - **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）；进一步压缩子进程 flag_gems 导入（~6.8s，弥散性开销）；uv 打包 + cnb CI（`.qoder` c36 规格，须先过板上 selftest 门禁）

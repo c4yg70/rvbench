@@ -15,9 +15,9 @@
 ## 用法
 
 ```bash
-python bin/trace_check.py --dir results/conditions/full/add   # 单目录：目录内直接含 trace.jsonl，或递归其子树
-python bin/trace_check.py --root runs/          # 从 runs 根递归收集并按 task/condition 汇总
-python bin/trace_check.py --root runs/ --json   # stdout 输出机器可读 JSON（人读摘要转 stderr）
+python tools/trace_check.py --dir results/conditions/full/add   # 单目录：目录内直接含 trace.jsonl，或递归其子树
+python tools/trace_check.py --root runs/          # 从 runs 根递归收集并按 task/condition 汇总
+python tools/trace_check.py --root runs/ --json   # stdout 输出机器可读 JSON（人读摘要转 stderr）
 ```
 
 `--dir` / `--root` 二选一（必填）。`--json` 的 JSON 结构：
@@ -100,12 +100,12 @@ Windows 反斜杠路径会先归一化为 `/` 再比对；前缀比对大小写�
 
 ## Fixtures 自测
 
-`bin/trace_fixtures/good/E1/G/add/trace.jsonl`：3 行合法候选
+`tools/trace_fixtures/good/E1/G/add/trace.jsonl`：3 行合法候选
 （accepted_correctness_and_faster / rejected_slower / repaired）。
-`bin/trace_fixtures/bad/E4/R_ONLY/relu/trace.jsonl`：2 行违规
+`tools/trace_fixtures/bad/E4/R_ONLY/relu/trace.jsonl`：2 行违规
 （非法 hash、null 理由、枚举外结果态、kope-mem 与 mem/ 引用、空注入证据、跨条件路径、重复 job_id）。
 
 ```bash
-python bin/trace_check.py --dir bin/trace_fixtures/good   # 必须 PASS，exit 0
-python bin/trace_check.py --dir bin/trace_fixtures/bad    # 必须 FAIL，exit 1
+python tools/trace_check.py --dir tools/trace_fixtures/good   # 必须 PASS，exit 0
+python tools/trace_check.py --dir tools/trace_fixtures/bad    # 必须 FAIL，exit 1
 ```

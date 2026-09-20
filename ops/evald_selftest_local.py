@@ -9,7 +9,7 @@ msvcrt.locking 实现（Windows 文件锁按句柄互斥，同进程第二个 fd
 照旧例：无 os.fork 时 selftest 自行跳过 [6]/[7]。
 
 用法（工作区根）::
-  python bin/evald_selftest_local.py [evald.py 路径]
+  python ops/evald_selftest_local.py [evald.py 路径]
 """
 
 import importlib.util

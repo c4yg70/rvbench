@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """收掉被打断的在飞作业：对 evald 上 queued/running 的本任务作业轮询到终态，
 追加进 results/panel/baseline_recall.jsonl（attempt 从命令行给，默认 1）。
-用法: python bin/recover_inflight.py [attempt]
+用法: python clients/recover_inflight.py [attempt]
 """
 
 import json
@@ -27,7 +27,7 @@ def req(method, path, body=None, timeout_s=90):
 
 def main():
     attempt = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    src = open('bin/run_recall.py', encoding='utf-8').read()
+    src = open(REPO_DIR / "clients" / "archive" / "run_recall.py", encoding='utf-8').read()
     fix_note = dict(re.findall(r'"([\w]+)": "([^"]+)"', src.split('FIX_NOTE = {')[1].split('\n}')[0]))
     js = req("GET", "/jobs?limit=3000")
     jobs = js if isinstance(js, list) else js.get("jobs", js.get("items", []))

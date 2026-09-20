@@ -1,6 +1,6 @@
 # func→acc→perf 自动接力设计（eval_pipeline v2.1，2026-09-10）
 
-> 实现正本：`bin/eval_pipeline.py`（relay 章节 + main() 两处挂点）。
+> 实现正本：`clients/eval_pipeline.py`（relay 章节 + main() 两处挂点）。
 > 状态：**已实现、默认全关**，未激活（上板/激活等用户通知天窗期后另行进行）。
 > 依据：实验环境.md §3/§4（口径红线、计时口径）、并发评测经验.md §3（ADR-0012/0014）、AGENTS.md 铁律。
 
@@ -43,7 +43,7 @@
 |---|---|---|
 | `chain_func_acc` | `false` | func 票终态 func_pass → 为同一 (cond/op/stem/shape/dtype/candidate_path) 合成 acc 票（kind=correctness），走 corr_base() 车道 |
 | `relay_acc_perf` | `false` | correctness 票 done 且 correct==true（即 judge 同簇粗计时 >5% 快于现任）→ 合成计时票投 BASE；**同时控制挂起队列冲刷**（关=冻结队列） |
-| `relay_mem_gate_mb` | `3072` | relay 投计时票前经 `python bin/pssh.py Home-SpacemitK3 'grep MemAvailable /proc/meminfo'` 只读检查，低于阈值本 tick 挂起、下 tick 重试并记 flags；SSH 异常 fail-closed（挂起），连续 3 次失败降级放行并注记 flags（探测恢复成功自动收回降级）。只约束 relay 计时票，不约束 chain 的 acc 票 |
+| `relay_mem_gate_mb` | `3072` | relay 投计时票前经 `python ops/pssh.py Home-SpacemitK3 'grep MemAvailable /proc/meminfo'` 只读检查，低于阈值本 tick 挂起、下 tick 重试并记 flags；SSH 异常 fail-closed（挂起），连续 3 次失败降级放行并注记 flags（探测恢复成功自动收回降级）。只约束 relay 计时票，不约束 chain 的 acc 票 |
 | `relay_max_per_run` | `10` | 本次驱动运行 relay 自动投计时票上限；新触发超限→注记 flags 停投（不排队）；挂起队列超限→保留队列待下次运行 |
 
 读取姿势与 `correctness_paused` 相同（`load_json(CONFIG_FILE, ...)` 每 tick 重读）：
@@ -63,8 +63,8 @@
 
 ## 4. 内存闸细节
 
-- 探测：`bin/pssh.py`（paramiko），一 tick 至多一次（`CYCLE_S=20` 内缓存复用，多条挂起票共享）。
-- 解释器：默认当前解释器，可 env `KOPE_PSSH_PYTHON` 覆盖（同 `bin/precompile.py`）。
+- 探测：`ops/pssh.py`（paramiko），一 tick 至多一次（`CYCLE_S=20` 内缓存复用，多条挂起票共享）。
+- 解释器：默认当前解释器，可 env `KOPE_PSSH_PYTHON` 覆盖（同 `ops/precompile.py`）。
   驱动 venv 若缺 paramiko → 探测按失败计 → fail-closed 挂起 → 3 个 tick（~60s）后自动降级放行，接力不卡死。
 - 失败计数仅进程内（重启清零）；`MemAvailable` 低于阈值属正常挂起，不计入失败连击。
 
@@ -75,7 +75,7 @@
 
 1. **波次边界**：确认当前无在飞优化批次依赖（或在当前批次收尾后）。停旧驱动
    （写 `runs/E1/HALT` 让其优雅退出 exit 2，或直接结束进程）；确保同一时刻只有一个驱动实例（state 文件单实例）。
-2. **部署代码**：确认驱动从本仓库 `bin/eval_pipeline.py` 启动（新代码已在本仓库）。
+2. **部署代码**：确认驱动从本仓库 `clients/eval_pipeline.py` 启动（新代码已在本仓库）。
 3. **开开关**：编辑 `runs/E1/.pipeline-config.json`：
    ```json
    {
@@ -95,7 +95,7 @@
 
 - **软回滚（首选）**：`.pipeline-config.json` 把 `chain_func_acc` / `relay_acc_perf` 置 false
   （逐 tick 生效，无需重启）。挂起队列原样保留，去重表保留——**之后重新打开不会重复投递**。
-- **硬回滚**：恢复旧版 `bin/eval_pipeline.py` 并重启驱动（波次边界）。两个状态文件
+- **硬回滚**：恢复旧版 `clients/eval_pipeline.py` 并重启驱动（波次边界）。两个状态文件
   （`.relay-timed.json`、state 的 `relay_pending` 键）可保留不清理，旧代码不读它们，无副作用。
 - 已投出的接力票就是普通工单，走既有 finalize/判定路径，无需特殊清理。
 

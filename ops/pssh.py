@@ -6,11 +6,11 @@ Git Bash 自带 ssh 读 ed25519 私钥报 `error in libcrypto: unsupported`。�
 故改走 paramiko（隔离 venv: C:/Users/c4y/.workbuddy/binaries/python/envs/default）。
 
 用法：
-    python bin/pssh.py <alias|host> "<cmd>" [--timeout 120] [--no-config]
-    python bin/pssh.py SpacemitK1-241 "uptime"
-    python bin/pssh.py Home-SpacemitK3 "nproc" --timeout 30
+    python ops/pssh.py <alias|host> "<cmd>" [--timeout 120] [--no-config]
+    python ops/pssh.py SpacemitK1-241 "uptime"
+    python ops/pssh.py Home-SpacemitK3 "nproc" --timeout 30
 
-主机别名/用户/密钥从 ~/.ssh/config 解析（与 bin/k3ssh 同一份配置）。
+主机别名/用户/密钥从 ~/.ssh/config 解析（与已废弃的 k3ssh 同一份配置）。
 输出：先 stdout，再 stderr（带 [stderr] 前缀），末行 `EXIT=<rc>`。
 """
 import argparse

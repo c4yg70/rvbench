@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """X100 预编译（ADR-0012 / t4-runbook §8.2）—— pssh 通道 python 版。
 
-取代 `bin/precompile_candidate.sh`：那份脚本用已废弃的 `bin/k3ssh`/`bin/k3scp`
+取代 `ops/precompile_candidate.sh`：那份脚本用已废弃的 `bin/k3ssh`/`bin/k3scp`
 （Windows ssh.exe 与 Git Bash ssh 双双失效，见 AGENTS.md），且是 bash，pwsh 下
-跑不了。本版一律走 `bin/pssh.py`（paramiko；上传用 `--put`，走 SFTP）。
+跑不了。本版一律走 `ops/pssh.py`（paramiko；上传用 `--put`，走 SFTP）。
 
 与 sh 版两处有意差异（吞吐提升计划 A1）：
 1. **默认不启用 bench_op 回退**——回退路径 `flock /tmp/k3_bench.lock` 会与
@@ -18,7 +18,7 @@ A100、不碰计时锁）临时 python 进程 import 候选 → 按 bench_op 直
 
 用法::
 
-    python bin/precompile.py <候选文件> <op> <shape[,shape...]> <dtype> \
+    python ops/precompile.py <候选文件> <op> <shape[,shape...]> <dtype> \
         [--board Home-SpacemitK3] [--timeout 300] [--fallback] [--keep]
 
 输出契约（与 sh 版逐字兼容）：`PRECOMPILE_OK ...` / `PRECOMPILE_FAIL ...` /
@@ -65,7 +65,7 @@ class BoardUnreachable(RuntimeError):
 # 每次随本脚本重新上传，防版本漂移（与 sh 版同一策略）。多 shape 变体：
 # import 只付一次，逐 shape 独立成败（单 shape 崩不牵连其余）。
 DRIVER_SRC = r'''#!/usr/bin/env python
-"""X100 预编译驱动（板上运行，由 bin/precompile.py 生成并上传）。
+"""X100 预编译驱动（板上运行，由 ops/precompile.py 生成并上传）。
 
 argv: <candidate.py> <op> <dtype> <shapes-json>
 独立进程 import 候选模块（顶层模块，非部署）→ 按 bench_op 直调层顺序解析入口 →
@@ -271,7 +271,7 @@ def _pssh_python() -> str:
 
 
 def _run_pssh(args: list[str], timeout_s: int, cwd: str | None = None) -> tuple[int, str]:
-    """调 bin/pssh.py，返回 (rc, 合并输出)。板不可达抛 BoardUnreachable。
+    """调 ops/pssh.py，返回 (rc, 合并输出)。板不可达抛 BoardUnreachable。
 
     cwd 用于上传：pssh 的 `--put LOCAL:REMOTE` 按第一个冒号切分，Windows 盘符
     路径（c:\\...）会被切碎，故上传一律在临时目录内以**相对文件名**传。

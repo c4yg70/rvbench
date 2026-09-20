@@ -353,7 +353,7 @@ def _framework_bench(op, dtype_str, warmup, rep):
 
 
 def _fallback_ref_check(op, dtype_str):
-    """框架兜底层参照挂点（AA 伪代码：bin/fallback_refs.README.md §3 / plan §3）。
+    """框架兜底层参照挂点（AA 伪代码：board/fallback_refs.README.md §3 / plan §3）。
 
     计时成功返回后调用，与计时解耦：build_inputs -> gems 侧重放 -> compare，
     返回需并入输出 JSON 的附加字段（correct/max_abs_err/correct_mode，异常时 note）。

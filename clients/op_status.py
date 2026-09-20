@@ -2,8 +2,8 @@
 """One-shot status for optimizer groups: per op, last judged round / pending
 ticket / in-flight (ticket without raw). Non-blocking; poll as often as you
 like instead of waiting. Usage:
-  kope-mem/.venv/Scripts/python.exe bin/op_status.py            # all KOPE ops
-  kope-mem/.venv/Scripts/python.exe bin/op_status.py div exp2   # specific ops
+  kope-mem/.venv/Scripts/python.exe clients/op_status.py            # all KOPE ops
+  kope-mem/.venv/Scripts/python.exe clients/op_status.py div exp2   # specific ops
 """
 import json
 import sys

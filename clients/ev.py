@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """ev — 一次性直连 evald 客户端（agent 交互通道，2026-09-10）。
 
-目标：agent 不依赖常驻工单驱动（bin/eval_pipeline.py）也能安全用 evald。
+目标：agent 不依赖常驻工单驱动（clients/eval_pipeline.py）也能安全用 evald。
 本工具**无状态、单进程跑完即退**：提交 → 长轮询 → （--judge 机械判定+落盘）→ stdout JSON。
 无本地状态文件 → 不存在双实例互踩；同路径并发由服务端 Store.path_lock 串行化；
 队列过载由服务端 429 + 内置退避消化；作业记录在板上 spool 跨重启存活，
 中断后用 `get <job_id>` 续接，永不丢作业。
 
 双部署形态（同一份代码）：
-- Windows 仓库（正本 `bin/ev.py`）：全功能。`--judge` 惰性 import eval_pipeline，
+- Windows 仓库（正本 `clients/ev.py`）：全功能。`--judge` 惰性 import eval_pipeline，
   复用其 judge()/registry/落盘契约（ADR-0012 同簇比较、§11 >5% ratchet、
   stochastic/suspended 语义一致），registry 与管线共享 runs/E1/.incumbent-registry.json
   （原子写；并发判定的最坏情形 = 一次改进被晚写者覆盖，raw.json 恒有全量记录可审计）。
@@ -358,7 +358,7 @@ def cmd_run(a: argparse.Namespace) -> int:
         job = None
     if job is None:  # 预算耗尽仍未终态：job 在板上 spool，永不丢
         print(json.dumps({"job_id": jid, "state": "inflight",
-                          "resumable": f"python bin/ev.py get {jid} --wait 60",
+                          "resumable": f"python clients/ev.py get {jid} --wait 60",
                           "base": base}, ensure_ascii=False))
         return 5
     out = dict(job)

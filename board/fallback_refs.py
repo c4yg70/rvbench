@@ -2,7 +2,7 @@
 """框架兜底层 torch 参照注册表（43 op）—— bench_op 扩展的数值判定正本。
 
 规格依据：results/panel/fallback-reference-plan.md（A 直构 37 / B 组构 2 / C 不可构 4）。
-本文件只被 bench_op 挂点 import，严禁在本文件内改 bin/bench_op.py（挂点另行接入）。
+本文件只被 bench_op 挂点 import，严禁在本文件内改 board/bench_op.py（挂点另行接入）。
 
 依赖与扩展约定：
 - 数值合同：运行期读 ``results/panel/numeric-contract.csv``（相对本文件 ../results/panel/，
@@ -17,9 +17,9 @@
   （板上已证可调用才保留直调）。
 
 CLI：
-  python bin/fallback_refs.py --list           # 打印注册表与 mode 分布
-  python bin/fallback_refs.py --selftest       # 不依赖 torch 的结构自测
-  python bin/fallback_refs.py --selftest-torch # 依赖 torch 的构建/比对自测（无 torch 则 SKIP）
+  python board/fallback_refs.py --list           # 打印注册表与 mode 分布
+  python board/fallback_refs.py --selftest       # 不依赖 torch 的结构自测
+  python board/fallback_refs.py --selftest-torch # 依赖 torch 的构建/比对自测（无 torch 则 SKIP）
 """
 
 import argparse
@@ -1185,7 +1185,7 @@ def _cmd_selftest_torch() -> int:
         import torch.nn.functional as F
     except ImportError:
         print("SKIP: 本机无 torch —— 本地 python 与 kope-mem/.venv 均未安装；"
-              "请上板跑或用带 torch 的 venv：python bin/fallback_refs.py --selftest-torch")
+              "请上板跑或用带 torch 的 venv：python board/fallback_refs.py --selftest-torch")
         return 0
     # 注册表 lambda 以模块级名解析 torch/flag_gems（bench_op 挂点注入同款）；
     # CLI 直跑时模块是 __main__，必须自注入，否则 NameError（2026-09-08 板上实证）

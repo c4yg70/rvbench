@@ -1,12 +1,12 @@
 # fallback_refs —— 框架兜底层 torch 参照注册表（43 op）
 
 规格依据：`results/panel/fallback-reference-plan.md`（A 直构 37 / B 组构 2 / C 不可构 4）；
-容差正本：`results/panel/numeric-contract.csv`；shape 口径：`bin/baseline_shapes.yaml`（主口径
-`[64,512,512]`，16.7M 元素档）。
+容差正本：`results/panel/numeric-contract.csv`；shape 口径：`clients/archive/baseline_shapes.yaml`
+（主口径 `[64,512,512]`，16.7M 元素档；板上部署为 `~/autoke/scripts/baseline_shapes.yaml`）。
 
-- `bin/fallback_refs.py` **只做参照与判定，不含任何计时逻辑**；`bin/bench_op.py` 的挂点在
+- `board/fallback_refs.py` **只做参照与判定，不含任何计时逻辑**；`board/bench_op.py` 的挂点在
   B 侧完成后另行接入（挂点伪代码见 §3，可直接抄）。
-- 依赖声明（运行期）：读 `../results/panel/numeric-contract.csv`（相对 bin/ 即 repo 根）；
+- 依赖声明（运行期）：读工作区根 `results/panel/numeric-contract.csv`；
   CSV 缺席（板上路径白名单场景）自动回退内嵌 `_CONTRACT_FALLBACK`（2026-09-08 从该 CSV
   编译，`--selftest` 会校验两者逐值一致）。CSV 变更无需重生成代码。
 - **fp16 扩展：只改 CONTRACT，不动注册表**——注册表 43 条的 ref_fn/input_builder 与 dtype
@@ -89,7 +89,7 @@ fallback_refs.compare(op, inputs, gems_out)
 `get_latency`，故不在 `_rec` 里抓输出）。JSON 行按 plan §3.4 扩展。
 
 ```python
-# ---- bin/bench_op.py 框架兜底层挂点伪代码（main() 内 _framework_bench 成功后） ----
+# ---- board/bench_op.py 框架兜底层挂点伪代码（main() 内 _framework_bench 成功后） ----
 import fallback_refs                                   # 与 bench_op 同目录
 lat_t, lat_g = _framework_bench(args.op, args.dtype, args.warmup, args.rep)
 correct = max_err = cmode = None
@@ -130,9 +130,9 @@ print(json.dumps({
 ## 5. CLI 自测
 
 ```bash
-python bin/fallback_refs.py --list            # 注册表全表 + mode 分布
-python bin/fallback_refs.py --selftest        # 无 torch：43 条齐全、mode 37/2/2/1/1、CONTRACT 编译/CSV 逐值一致
-python bin/fallback_refs.py --selftest-torch  # 有 torch：43 条 builder+ref 全执行、compare 自洽/失配/NaN/统计管线
+python board/fallback_refs.py --list            # 注册表全表 + mode 分布
+python board/fallback_refs.py --selftest        # 无 torch：43 条齐全、mode 37/2/2/1/1、CONTRACT 编译/CSV 逐值一致
+python board/fallback_refs.py --selftest-torch  # 有 torch：43 条 builder+ref 全执行、compare 自洽/失配/NaN/统计管线
 ```
 
 ## 6. 已知 TODO / 风险

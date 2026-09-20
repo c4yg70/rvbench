@@ -599,7 +599,7 @@ def finalize_ticket(entry: dict, job: dict, state: dict, registry: dict) -> None
 # 同簇 >5% 结论），绝不写入任何 result/报告/入库路径；计时正本只在 BASE（A100，
 # warmup=5/rep=5）产出。依据 ADR-0012 / 实验环境.md §3、§4.1。
 
-PSSH = ROOT / "bin" / "pssh.py"     # 内存闸只读探测通道（paramiko，见 实验环境.md §0）
+PSSH = REPO_DIR / "ops" / "pssh.py"     # 内存闸只读探测通道（paramiko，见 实验环境.md §0）
 MEM_GATE_HOST = "Home-SpacemitK3"
 _RELAY_RUNTIME = {  # 仅本进程生命周期，不落盘（重启即重新计预算/探测节拍）
     "perf_submitted": 0,    # 本次运行已自动投出的 relay 计时票数
@@ -618,12 +618,12 @@ def _relay_flag(cond: str, op: str, outcome: str, note: str) -> None:
 
 
 def _pssh_python() -> str:
-    """跑 pssh.py 的解释器（同 bin/precompile.py：env 可覆盖，默认当前解释器）。"""
+    """跑 pssh.py 的解释器（同 ops/precompile.py：env 可覆盖，默认当前解释器）。"""
     return os.environ.get("KOPE_PSSH_PYTHON") or sys.executable
 
 
 def mem_available_mb() -> int | None:
-    """经 bin/pssh.py 只读查 K3 板 MemAvailable（kB→MB）；任何异常返回 None。
+    """经 ops/pssh.py 只读查 K3 板 MemAvailable（kB→MB）；任何异常返回 None。
 
     None = 探测失败，由 _mem_gate_ok 按 fail-closed 处理（本 tick 挂起）。
     """
