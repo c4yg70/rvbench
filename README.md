@@ -21,6 +21,8 @@
 
 设计规格：[docs/eval-server-design.md](docs/eval-server-design.md)；
 **架构总览（自包含 HTML，含拓扑/生命周期/车道/不变量/审计发现）**：[docs/architecture.html](docs/architecture.html)；
+监控改造规格（待审批，双板拓扑）：[docs/specs/2026-09-20-监控栈改造.md](docs/specs/2026-09-20-监控栈改造.md)
+＋目标蓝图 [docs/architecture-dev.html](docs/architecture-dev.html)；
 接力链设计：[docs/relay-chain-design.md](docs/relay-chain-design.md)；术语：[CONTEXT.md](CONTEXT.md)；
 变更史：[CHANGELOG.md](CHANGELOG.md)。
 
@@ -38,7 +40,7 @@
 | [board/](board/) | 板端配套脚本（evald 文件白名单契约的一部分）：`bench_op.py`（计时三层分发）、`bench_gemm.py`、`torch_reference.py`、`fallback_refs.py`（数值判定正本） | `~/autoke/scripts/` |
 | [ops/](ops/) | 部署与运维：`pssh.py`（SSH 通道）、`evald_selftest_local.py`、`precompile.py` + `precompile_candidate.sh`（⚠ 传输仍为已废弃的 k3ssh，复用前须迁 pssh） | — |
 | [tools/](tools/) | 本地校验：`trace_check.py` ＋ `trace_fixtures/`（T3 harness-trace 落盘校验） | — |
-| [docs/](docs/) | ADR（索引在 [docs/adr/](docs/adr/)）、总体设计、优化设计稿、接力链设计、收拢 spec、[architecture.html](docs/architecture.html)（架构总览） | — |
+| [docs/](docs/) | ADR（索引在 [docs/adr/](docs/adr/)）、总体设计、优化设计稿、接力链设计、收拢 spec、[specs/](docs/specs/)（待审批规格：监控栈改造）、[architecture.html](docs/architecture.html)（现状总览）、[architecture-dev.html](docs/architecture-dev.html)（目标蓝图·双板监控） | — |
 
 **运行前置（Windows 侧客户端）**：本仓已独立于战役工作区，`clients/*` 用环境变量
 `EV_WORKSPACE=<战役工作区根>`（应含 `runs/`、`results/`）定位战役状态；未设时回退为仓的
@@ -294,4 +296,5 @@ curl -s -X DELETE "$BASE/jobs/<job_id>" -H "$H"
 - **M3** ✅ WarmForkExecutor（warmd 预热守护 + fork 子进程全新加载；实测同作业 20.2s→15.1s，A/B 交叉验证正确性一致）
 - **2026-09-20** ✅ 配套代码收拢（clients/board/ops/tools 分区，spec-20260920；见 CHANGELOG）
 - **2026-09-20（二次）** ✅ bin/ 垫片退场＋遗留 bin/ 死引用清理＋冻结物双 md5 登记（见 CHANGELOG）
+- **2026-09-20（三次）** 📋 监控改造 spec 改址重写为双板拓扑（`docs/specs/2026-09-20-监控栈改造.md`，待审批）
 - **backlog**：预编译缓存包上传（qemu-riscv64 交叉编译路径，依据见设计文档 Backlog 节）；进一步压缩子进程 flag_gems 导入（~6.8s，弥散性开销）；uv 打包 + cnb CI（`.qoder` c36 规格，须先过板上 selftest 门禁）

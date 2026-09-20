@@ -102,20 +102,24 @@
 <header class="top">
   <h1>监控改造目标架构 <span class="sub">— VictoriaMetrics × Categraf × Nightingale</span></h1>
   <p class="lede">
-    本页是监控技术栈改造的<b>目标架构蓝图（未实施）</b>：时序记录迁 <b>VictoriaMetrics</b>，
-    板端采集迁 <b>Categraf</b>，可视化大盘与告警迁 <b>Nightingale（夜莺）</b>。
+    本页是监控技术栈改造的<b>目标架构蓝图（未实施）</b>：拓扑前提是<b>两块 K3 板</b>——一块专责
+    perf 计时测试，另一块承担 acc、func 与监控/面板组件；时序记录迁 <b>VictoriaMetrics</b>，
+    板端采集迁 <b>Categraf</b>，可视化大盘与告警迁 <b>Nightingale（夜莺）</b>，枢纽整体落在板侧。
     三大硬约束贯穿全图：<b>evald 零改动</b>（字节冻结 7 件一个字节不动）、
     <b>数据方向反转可回退</b>（拉模式并行双跑后再切推送）、<b>既有 PromQL 资产复用</b>
     （指标名与 <code>job</code> 标签语义保持）。实施计划与验证门见
-    <a href="spec.md">spec.md</a>；现状架构见 <a href="architecture.html">architecture.html</a> §06。
+    <a href="specs/2026-09-20-监控栈改造.md">specs/2026-09-20-监控栈改造.md</a>；
+    现状架构见 <a href="architecture.html">architecture.html</a> §06。
   </p>
   <div class="chips">
     <span class="chip"><b>状态</b> 蓝图 · 待审批</span>
-    <span class="chip"><b>spec</b> docs/spec.md（2026-09-20）</span>
-    <span class="chip"><b>VictoriaMetrics</b> 单机 :8428 · retention 90d</span>
-    <span class="chip"><b>Nightingale</b> v9 单二进制 · WSL2 · :17000 · 内置 SQLite</span>
+    <span class="chip"><b>spec</b> docs/specs/2026-09-20-监控栈改造.md</span>
+    <span class="chip"><b>拓扑</b> 双板：计时板 ／ acc+func 与监控枢纽板</span>
+    <span class="chip"><b>VictoriaMetrics</b> 单机 :8428 · retention 90d · riscv64 自建</span>
+    <span class="chip"><b>Nightingale</b> v9 单二进制 · :17000 · 内置 SQLite · riscv64 自建</span>
     <span class="chip"><b>Categraf</b> 板端 riscv64 自建 · 30s</span>
     <span class="chip"><b>evald</b> :8788 / :8791 零改动</span>
+    <span class="chip"><b>板清单</b> boards.json 驱动 · 加板只改清单</span>
     <span class="chip"><b>更新</b> 2026-09-20</span>
   </div>
 </header>
@@ -136,15 +140,20 @@
   <h2><span class="n">01</span>现状 → 目标</h2>
   <p class="note">
     现状（<a href="architecture.html">architecture.html</a> §06 ＋ <code>monitor/README.md</code>）：
-    板上 node_exporter（:9100 用户态）与 evald 双实例（:8788/:8791 原生 /metrics）由
-    Windows Docker 里的 <b>Prometheus</b>（容器 <code>k1-prom</code> :9090）每 30s <b>拉取</b>；
+    板上 node_exporter（:9100 用户态）与 evald 双实例（:8788/:8791 原生 /metrics）由开发机上的
+    <b>Prometheus</b>（容器 <code>k1-prom</code> :9090，绑 127.0.0.1）每 30s <b>拉取</b>；
     可视化＝零依赖单文件 <code>dashboard.html</code>（file:// 直开，浏览器直查 Prometheus）；
     <b>告警全部由面板前端计算</b>——浏览器不开着就没有告警，无通知渠道、无屏蔽窗口、无历史。
-    目标架构把「采集 / 存储 / 可视化 / 告警」四层各自换成专用组件，数据方向由<b>拉改为推</b>。
+    目标架构把「采集 / 存储 / 可视化 / 告警」四层各自换成专用组件，数据方向由<b>拉改为推</b>，
+    枢纽从开发机迁到板侧（第二块 K3 板），<b>观测链路不再依赖任何开发机/容器宿主</b>。
   </p>
   <table>
     <thead><tr><th style="width:120px">层</th><th style="width:250px">现状</th><th style="width:300px">目标</th><th>变化要点</th></tr></thead>
     <tbody>
+      <tr><td>拓扑前提 <span class="tag t-info">新</span></td>
+          <td class="mono">单板 10.18.60.100 承载双 evald 实例</td>
+          <td class="mono">双板：计时板 ＋ acc/func 与枢纽板（板清单声明，可扩展）</td>
+          <td><b>计时隔离由「核簇隔离」升级为「板级隔离」</b>：计时板不承载任何枢纽组件，A100 簇零监控进程</td></tr>
       <tr><td>主机指标采集</td>
           <td class="mono">node_exporter :9100（~/ne，crontab 兜底）</td>
           <td class="mono">Categraf input.node_exporter</td>
@@ -158,9 +167,9 @@
           <td class="mono">VictoriaMetrics 单机 :8428 · 90d</td>
           <td>API 同构（/api/v1/query 系）；容量对本规模近零压力</td></tr>
       <tr><td>监控枢纽形态</td>
-          <td class="mono">k1-prom 单容器（零状态件）</td>
-          <td class="mono">VM 容器 ＋ n9e 单二进制（WSL2）</td>
-          <td>n9e 轻量模式内置 SQLite＋miniredis，免外部 MySQL/Redis——状态件只净增一个 n9e.db</td></tr>
+          <td class="mono">k1-prom 单容器（零状态件，跑在开发机）</td>
+          <td class="mono">板 A：VM 单二进制 ＋ n9e 单二进制（均 riscv64 自建）</td>
+          <td>枢纽落板侧，无容器宿主/WSL2/端口转发；n9e 轻量模式内置 SQLite＋miniredis，免外部 MySQL/Redis——状态件只净增一个 n9e.db</td></tr>
       <tr><td>可视化</td>
           <td class="mono">dashboard.html（前端渲染）</td>
           <td class="mono">Nightingale 大盘（四层重建）</td>
@@ -185,14 +194,16 @@
 <section id="topo">
   <h2><span class="n">02</span>目标拓扑</h2>
   <p class="note">
-    板端只新增 <b>Categraf 一个进程</b>（X100 用户域，与现 node_exporter 同侧，不触碰 A100 计时簇）；
-    Windows 侧监控枢纽＝VictoriaMetrics（容器）＋ Nightingale（WSL2 单二进制，与 k1-prom 同机），
-    n9e 轻量模式内置 SQLite＋miniredis、零外部 MySQL/Redis。
-    数据方向反转是最大变化：<b>板端推、枢纽收</b>——因此 P0 必须先验证 K3 → 枢纽 :17000 的网络可达
-    （现状只有 Windows → 板的拉取方向；n9e 落 WSL2，还需 mirrored／portproxy 放通）。
+    两块 K3 板按角色分工（物理映射由板清单声明，推荐＝计时正本留现板、新板承接 acc/func ＋ 枢纽）：
+    <b>板 P 计时板</b>只跑计时与一个钉在 X100 用户域的 Categraf（A100 cpu8-15 零监控进程）；
+    <b>板 A</b> 承担 acc/func，并把 VictoriaMetrics ＋ Nightingale 一起装在本板、钉在 A100 簇
+    （该板计时已迁出，A100 空闲），X100 cpu0-7 完整留给 acc/func 车道。
+    数据方向反转是最大变化：<b>板端推、板 A 收</b>——P0 必须验证板 P → 板 A :17000 的可达性
+    （现状只有开发机 → 板的拉取方向）。枢纽是板上的 systemd 服务，n9e 轻量模式内置
+    SQLite＋miniredis、零外部 MySQL/Redis，<b>全案无 WSL2、无端口转发、无容器宿主依赖</b>。
   </p>
   <div class="fig">
-    <svg viewBox="0 0 1160 672" role="img" aria-label="监控目标架构拓扑图">
+    <svg viewBox="0 0 1160 712" role="img" aria-label="监控目标架构拓扑图（双板）">
       <defs>
         <marker id="ar"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#7b8699"/></marker>
@@ -221,34 +232,27 @@
         .fade  { opacity: .62; }
       </style>
 
-      <!-- ══ 左：K3 板 ══ -->
-      <rect x="18" y="34" width="436" height="526" rx="12" class="panel" stroke="rgba(45,214,209,.35)"/>
-      <text x="34" y="60" class="ttl teal">K3 评估板 · 10.18.60.100</text>
-      <text x="34" y="76" class="txd">SpacemiT K3 · Bianbu Linux（riscv64）· 板端唯一新增进程 = Categraf</text>
+      <!-- ══ 左：板 P · 计时板 ══ -->
+      <rect x="18" y="34" width="436" height="470" rx="12" class="panel" stroke="rgba(45,214,209,.35)"/>
+      <text x="34" y="60" class="ttl teal">板 P · 计时板（riscv64）</text>
+      <text x="34" y="76" class="txd">板级隔离：A100 cpu8-15 零监控进程 · 计时正本零迁移（单元/字节/锁分区不变）</text>
 
       <!-- evald :8788 -->
-      <rect x="38" y="100" width="180" height="92" rx="8" class="box" stroke="rgba(255,255,255,.10)"/>
-      <text x="50" y="120" class="ttl2">evald :8788</text>
+      <rect x="38" y="100" width="180" height="88" rx="8" class="box" stroke="rgba(255,255,255,.10)"/>
+      <text x="50" y="120" class="ttl2">evald :8788 · board=K3</text>
       <text x="50" y="137" class="tx">纯计时 · A100 簇 cpu8-15</text>
       <text x="50" y="152" class="tx">原生 /metrics（0.0.4）</text>
       <text x="50" y="173" class="tx green">字节冻结 · 零改动</text>
 
-      <!-- evald :8791 -->
-      <rect x="38" y="220" width="180" height="100" rx="8" class="box" stroke="rgba(255,255,255,.10)"/>
-      <text x="50" y="240" class="ttl2">evald :8791 · K3-ACC</text>
-      <text x="50" y="257" class="tx">acc cpu0-5×6 / func 6-7×2</text>
-      <text x="50" y="272" class="tx">原生 /metrics · evald-acc 单元</text>
-      <text x="50" y="293" class="tx green">字节冻结 · 零改动</text>
-
       <!-- node_exporter 退役 -->
-      <rect x="38" y="340" width="180" height="48" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
-      <text x="50" y="360" class="txd">node_exporter :9100（~/ne）</text>
-      <text x="50" y="376" class="txd">P3 接管 · P6 停用（留回滚）</text>
+      <rect x="38" y="204" width="180" height="52" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="50" y="224" class="txd">node_exporter :9100（~/ne）</text>
+      <text x="50" y="240" class="txd">P3 接管 · P6 停用（留回滚）</text>
 
       <!-- Categraf -->
-      <rect x="248" y="100" width="186" height="396" rx="10" fill="#0e1720" stroke="rgba(45,214,209,.55)"/>
+      <rect x="248" y="100" width="186" height="382" rx="10" fill="#0e1720" stroke="rgba(45,214,209,.55)"/>
       <text x="260" y="122" class="ttl teal">Categraf（自建 riscv64）</text>
-      <text x="260" y="137" class="txd">X100 用户域 · interval 30s</text>
+      <text x="260" y="137" class="txd">钉 X100 用户域 cpu0-7 · interval 30s</text>
 
       <rect x="260" y="150" width="162" height="88" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
       <text x="270" y="168" class="ttl2">input.node_exporter</text>
@@ -258,120 +262,135 @@
 
       <rect x="260" y="248" width="162" height="96" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
       <text x="270" y="266" class="ttl2">input.prometheus</text>
-      <text x="270" y="282" class="tx">抓 127.0.0.1:8788/metrics</text>
-      <text x="270" y="296" class="tx">抓 127.0.0.1:8791/metrics</text>
-      <text x="270" y="310" class="tx">url_label_key=instance</text>
-      <text x="270" y="326" class="txd">指标 100% 保真透传</text>
+      <text x="270" y="282" class="tx">抓 :8788/metrics</text>
+      <text x="270" y="296" class="tx">指标 100% 保真透传</text>
+      <text x="270" y="310" class="tx">board/role/cores 标签</text>
+      <text x="270" y="326" class="txd">实例级 labels（P3 验证，R4）</text>
 
       <rect x="260" y="354" width="162" height="56" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
       <text x="270" y="372" class="ttl2">exec · up 兼容层</text>
-      <text x="270" y="388" class="tx">补 up{job=boards/evald} 序列</text>
-      <text x="270" y="401" class="txd">保 dashboard.html 过渡可用</text>
+      <text x="270" y="388" class="tx">补 up{job=boards/evald}</text>
+      <text x="270" y="401" class="txd">端点不可达则归零/停发</text>
 
       <rect x="260" y="420" width="162" height="62" rx="7" class="box" stroke="rgba(255,255,255,.08)"/>
       <text x="270" y="438" class="ttl2">agent 核心</text>
-      <text x="270" y="454" class="tx">[[writers]] remote write ×1</text>
+      <text x="270" y="454" class="tx">[[writers]] → 板 A :17000</text>
       <text x="270" y="468" class="tx">[heartbeat] 10s → Targets</text>
 
-      <text x="34" y="540" class="txd">板端改动合计：+ Categraf 一个进程；evald 不动一行；node_exporter P6 停用</text>
-
       <!-- 板内抓取箭头 -->
-      <path d="M260,282 L220,150" class="aw" marker-end="url(#ar)"/>
-      <path d="M260,300 L220,268" class="aw" marker-end="url(#ar)"/>
-      <text x="240" y="212" class="txd" text-anchor="middle">抓取 /metrics 30s</text>
+      <path d="M258,296 L222,164" class="aw" marker-end="url(#ar)"/>
+      <text x="240" y="234" class="txd" text-anchor="middle">抓 /metrics 30s</text>
 
-      <!-- ══ 右：Windows 监控枢纽 ══ -->
-      <rect x="580" y="34" width="562" height="526" rx="12" class="panel" stroke="rgba(107,164,255,.35)"/>
-      <text x="596" y="60" class="ttl blue">Windows Docker 主机 · 监控枢纽</text>
-      <text x="596" y="76" class="txd">与现 k1-prom 同机 · n9e 落 WSL2 单二进制 · 数据方向反转：板端推、枢纽收</text>
-
-      <!-- 浏览器 -->
-      <rect x="596" y="100" width="140" height="76" rx="9" class="box" stroke="rgba(176,114,255,.5)"/>
-      <text x="608" y="122" class="ttl2 purple">用户浏览器</text>
-      <text x="608" y="138" class="tx">n9e Web UI</text>
-      <text x="608" y="152" class="tx">大盘 · 告警事件</text>
-
-      <!-- WSL2 容器（n9e 单二进制宿主） -->
-      <rect x="748" y="88" width="384" height="300" rx="10" fill="none" stroke="rgba(107,164,255,.30)" stroke-dasharray="5 4"/>
-      <text x="1122" y="104" class="txd blue" text-anchor="end">WSL2 · systemd 常驻（linux-amd64 tarball · 解压即启）</text>
+      <!-- ══ 右：板 A · acc/func ＋ 监控枢纽 ══ -->
+      <rect x="580" y="34" width="562" height="470" rx="12" class="panel" stroke="rgba(107,164,255,.35)"/>
+      <text x="596" y="60" class="ttl blue">板 A · acc/func ＋ 监控枢纽（riscv64）</text>
+      <text x="596" y="76" class="txd">枢纽钉 A100 cpu8-15（本板计时已迁出）· X100 cpu0-7 完整留给 acc/func 车道</text>
 
       <!-- n9e -->
-      <rect x="760" y="112" width="360" height="190" rx="10" class="box" stroke="rgba(107,164,255,.55)"/>
-      <text x="774" y="134" class="ttl blue">Nightingale（n9e v9 单二进制）· :17000</text>
-      <text x="774" y="152" class="tx">大盘 · 告警引擎 · 屏蔽规则 · 值班</text>
-      <text x="774" y="167" class="tx">数据源代理写（pushgw）· Targets 心跳</text>
-      <rect x="774" y="182" width="160" height="44" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
-      <text x="784" y="200" class="ttl2">大盘（四层重建）</text>
-      <text x="784" y="215" class="txd">P5 验收见 spec §9</text>
-      <rect x="946" y="182" width="160" height="44" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
-      <text x="956" y="200" class="ttl2">告警规则（9 族）</text>
-      <text x="956" y="215" class="txd">通知 · 恢复 · 屏蔽天窗</text>
-      <text x="774" y="246" class="txd">默认查询源 = VictoriaMetrics（写入代理目标同为 VM）</text>
-      <text x="774" y="262" class="txd">通知媒介 20+：钉钉/飞书/企微/邮件/短信/webhook</text>
-      <text x="774" y="278" class="txd">鉴权：用户/业务组；writers basic_auth（P1 验证）</text>
-      <text x="774" y="296" class="tx">元数据 = SQLite 单文件 · 缓存 = 内置 miniredis</text>
-
-      <!-- mysql/redis 不引入：n9e 单二进制内置 SQLite＋miniredis -->
+      <rect x="596" y="106" width="172" height="200" rx="10" class="box" stroke="rgba(107,164,255,.55)"/>
+      <text x="606" y="126" class="ttl blue">Nightingale（n9e v9）</text>
+      <text x="606" y="141" class="tx">:17000 · 单二进制（自建 riscv64）</text>
+      <rect x="606" y="150" width="152" height="40" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
+      <text x="616" y="168" class="ttl2">大盘（四层重建）</text>
+      <text x="616" y="182" class="txd">P5 验收见 spec §9</text>
+      <rect x="606" y="198" width="152" height="40" rx="6" fill="#0e1720" stroke="rgba(255,255,255,.07)"/>
+      <text x="616" y="216" class="ttl2">告警规则（9 族）</text>
+      <text x="616" y="230" class="txd">通知 · 恢复 · 屏蔽天窗</text>
+      <text x="606" y="258" class="txd">元数据 = SQLite 单文件</text>
+      <text x="606" y="273" class="txd">缓存 = 内置 miniredis</text>
+      <text x="606" y="288" class="txd">首登改口令 · writers basic_auth</text>
 
       <!-- VictoriaMetrics -->
-      <rect x="760" y="400" width="360" height="120" rx="10" class="box" stroke="rgba(176,114,255,.55)"/>
-      <text x="774" y="422" class="ttl purple">VictoriaMetrics 单机 · :8428</text>
-      <text x="774" y="440" class="tx">-storageDataPath=vmdata（docker 卷）</text>
-      <text x="774" y="455" class="tx">-retentionPeriod=90d（现状 15d）</text>
-      <text x="774" y="470" class="tx">PromQL /api/v1/query(_range) 全兼容</text>
-      <text x="774" y="485" class="tx">Remote write /api/v1/write</text>
-      <text x="774" y="510" class="txd">容量：~1.6K 序列 · 30s 步长 ≈ &lt;10MB/天 · 90d &lt; 1GB</text>
-      <text x="774" y="536" class="txd">n9e(WSL2) ↔ VM(Win Docker)：mirrored localhost 或宿主 IP（P0/P1 验证）</text>
+      <rect x="596" y="326" width="172" height="140" rx="10" class="box" stroke="rgba(176,114,255,.55)"/>
+      <text x="606" y="346" class="ttl purple">VictoriaMetrics 单机</text>
+      <text x="606" y="361" class="tx">:8428 · retention 90d（现状 15d）</text>
+      <text x="606" y="377" class="tx">-storageDataPath=vmdata</text>
+      <text x="606" y="393" class="tx">PromQL /api/v1/query(_range)</text>
+      <text x="606" y="409" class="tx">remote write /api/v1/write</text>
+      <text x="606" y="428" class="txd">本机卷（无容器宿主）</text>
+      <text x="606" y="444" class="txd">~1.6K 序列 ≈ &lt;10MB/天</text>
 
-      <!-- 浏览器 → n9e -->
-      <path d="M736,140 L758,152" class="aw" marker-end="url(#arp)"/>
-      <text x="747" y="130" class="txd" text-anchor="middle">:17000</text>
+      <!-- 板 A 的 evald -->
+      <rect x="806" y="106" width="330" height="88" rx="9" class="box" stroke="rgba(255,255,255,.10)"/>
+      <text x="818" y="126" class="ttl2">evald :8791 · board=K3-ACC</text>
+      <text x="818" y="143" class="tx">acc cpu0-5×6 / func 6-7×2 · evald-acc 单元</text>
+      <text x="818" y="158" class="tx">原生 /metrics（0.0.4）</text>
+      <text x="818" y="176" class="tx green">字节冻结 · 零改动</text>
 
-      <!-- n9e ⇄ VM（跨 WSL2 → Windows Docker 边界） -->
-      <path d="M830,304 L830,396" class="awb" marker-end="url(#arb)"/>
-      <text x="838" y="360" class="txd">写入代理</text>
-      <path d="M1092,304 L1092,396" class="awb dash" marker-start="url(#arb)" marker-end="url(#arb)"/>
-      <text x="1084" y="360" class="txd" text-anchor="end">PromQL 查询</text>
+      <!-- 板 A 的 Categraf -->
+      <rect x="806" y="210" width="330" height="120" rx="10" fill="#0e1720" stroke="rgba(45,214,209,.45)"/>
+      <text x="818" y="230" class="ttl teal">Categraf（自建 riscv64）</text>
+      <text x="818" y="245" class="txd">钉 A100 cpu8-15 · interval 30s（不占 X100）</text>
+      <text x="818" y="264" class="tx">input.node_exporter · input.prometheus</text>
+      <text x="818" y="279" class="tx">exec up 兼容层（board=K3-ACC）</text>
+      <text x="818" y="298" class="tx">[[writers]] → 本机 n9e :17000</text>
+      <text x="818" y="315" class="txd">同板 localhost，不经 LAN</text>
 
-      <!-- dashboard.html 过渡 -->
-      <rect x="596" y="380" width="140" height="110" rx="9" class="box fade" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4"/>
-      <text x="608" y="402" class="ttl2">dashboard.html</text>
-      <text x="608" y="419" class="txd">过渡期只读 P2–P5</text>
-      <text x="608" y="434" class="txd">?prom=http://</text>
-      <text x="608" y="448" class="txd">127.0.0.1:8428</text>
-      <text x="608" y="469" class="txd">→ VM :8428 同构 API</text>
-      <text x="608" y="482" class="txd">（P2 验 CORS 后定）</text>
-      <path d="M736,435 L758,440" class="aw dash fade" marker-end="url(#ar)"/>
+      <!-- 板 A 内部数据面 -->
+      <rect x="806" y="348" width="330" height="118" rx="9" class="box fade" stroke="rgba(107,164,255,.35)" stroke-dasharray="4 4"/>
+      <text x="818" y="368" class="ttl2">板 A 内部数据面</text>
+      <text x="818" y="385" class="tx">categraf → n9e :17000 → VM :8428</text>
+      <text x="818" y="400" class="tx">心跳 10s → Targets 在线态</text>
+      <text x="818" y="419" class="txd">写入代理（pushgw）＝官方组合形态</text>
+      <text x="818" y="434" class="txd">备选：categraf 直写 VM（默认不用）</text>
+      <text x="818" y="453" class="txd">acc/func 与枢纽异簇共存（US-14 · R3）</text>
 
-      <!-- ══ 板 → 枢纽：推送 ══ -->
-      <path d="M434,440 L526,440 L526,230 L758,230" class="awt" marker-end="url(#art)"/>
-      <text x="468" y="418" class="tx teal" text-anchor="middle">remote write</text>
-      <text x="468" y="431" class="txd" text-anchor="middle">/prometheus/v1/write</text>
-      <path d="M434,478 L552,478 L552,265 L758,265" class="aw dash" stroke="#7b8699" marker-end="url(#ar)"/>
-      <text x="493" y="498" class="txd" text-anchor="middle">心跳 /v1/n9e/heartbeat · 10s</text>
+      <!-- ══ 板 P → 板 A：推送与心跳 ══ -->
+      <path d="M434,150 L594,150" class="awt" marker-end="url(#art)"/>
+      <text x="514" y="140" class="tx teal" text-anchor="middle">remote write（LAN）</text>
+      <text x="514" y="166" class="txd" text-anchor="middle">:17000/prometheus/v1/write</text>
+      <path d="M434,186 L594,186" class="aw dash" stroke="#7b8699" marker-end="url(#ar)"/>
+      <text x="514" y="202" class="txd" text-anchor="middle">心跳 10s（板端推）</text>
 
-      <!-- ══ 底部：过渡与退役 ══ -->
-      <rect x="18"  y="584" width="360" height="64" rx="8" class="box fade" stroke="rgba(255,181,36,.35)" stroke-dasharray="4 4"/>
-      <text x="32"  y="606" class="ttl2" fill="#ffb524">P2 并行期 · VM 直抓对账</text>
-      <text x="32"  y="622" class="txd">-promscrape.config 复用 monitor/prometheus.yml 语义</text>
-      <text x="32"  y="636" class="txd">k1-prom 与 VM 双跑 ≥7d，指标对账后 P3 切推送</text>
-      <path d="M198,582 L198,564" class="aw dash" marker-end="url(#ar)"/>
+      <!-- ══ 板 A 内部：categraf → n9e · 客户端 → n9e · n9e ⇄ VM ══ -->
+      <path d="M804,250 L772,250" class="awb" marker-end="url(#arb)"/>
+      <path d="M790,516 L790,290 L772,290" class="aw dash" stroke="#b072ff" marker-end="url(#arp)"/>
+      <text x="782" y="470" class="txd" text-anchor="middle" fill="#b072ff">:17000</text>
+      <path d="M720,306 L720,322" class="awb" marker-end="url(#arb)"/>
+      <path d="M748,326 L748,310" class="awb dash" marker-end="url(#arb)"/>
+      <text x="596" y="320" class="txd">n9e ⇄ VM（同板）</text>
 
-      <rect x="398" y="584" width="360" height="64" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
-      <text x="412" y="606" class="ttl2">k1-prom（Prometheus :9090）</text>
-      <text x="412" y="622" class="txd" text-decoration="line-through">P6 退役封存</text>
-      <text x="412" y="636" class="txd">容器停用 · 数据卷封存 30d 后清</text>
+      <!-- ══ 底部：板清单 · 自建门禁 · 板外客户端 ══ -->
+      <rect x="18" y="520" width="360" height="88" rx="8" class="box" stroke="rgba(45,214,209,.40)" stroke-dasharray="4 4"/>
+      <text x="32" y="542" class="ttl2 teal">板清单 boards.json（P0 定稿）</text>
+      <text x="32" y="559" class="txd">角色 · 实例 · board/role/cores 标签 · 采集器钉核 · 单元清单</text>
+      <text x="32" y="574" class="txd">加板/换板只改此文件（D2）；与部署清单 manifest 同源</text>
+      <text x="32" y="594" class="txd">两板 clusters/workers 字符串保持一致（D8）</text>
 
-      <rect x="778" y="584" width="364" height="64" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
-      <text x="792" y="606" class="ttl2">板上 node_exporter（~/ne）</text>
-      <text x="792" y="622" class="txd" text-decoration="line-through">P6 停用</text>
-      <text x="792" y="636" class="txd">文件保留＝回滚路径（crontab @reboot 注释掉）</text>
+      <rect x="398" y="520" width="360" height="88" rx="8" class="box" stroke="rgba(255,181,36,.45)" stroke-dasharray="4 4"/>
+      <text x="412" y="542" class="ttl2" fill="#ffb524">riscv64 自建三件（P0 硬门禁 · R1）</text>
+      <text x="412" y="559" class="txd">Categraf · VictoriaMetrics · Nightingale</text>
+      <text x="412" y="574" class="txd">官方发布物无/未见 riscv64 → 优先板上原生构建</text>
+      <text x="412" y="594" class="txd">任一件不过门 → 重开 spec（不降级迁就宿主）</text>
+
+      <rect x="778" y="520" width="364" height="88" rx="8" class="box" stroke="rgba(176,114,255,.45)" stroke-dasharray="4 4"/>
+      <text x="792" y="542" class="ttl2 purple">用户在 LAN 终端（板外）</text>
+      <text x="792" y="559" class="txd">浏览器直连 n9e http://&lt;板 A&gt;:17000</text>
+      <text x="792" y="574" class="txd">过渡期 dashboard.html?prom=http://&lt;板 A&gt;:8428</text>
+      <text x="792" y="594" class="txd">无 WSL2 / 无端口转发 / 无容器宿主（D1）</text>
+
+      <!-- ══ 底部：过渡与退役（P6） ══ -->
+      <rect x="18" y="628" width="360" height="72" rx="8" class="box fade" stroke="rgba(255,181,36,.35)" stroke-dasharray="4 4"/>
+      <text x="32" y="650" class="ttl2" fill="#ffb524">P2 并行期 · VM 直抓对账</text>
+      <text x="32" y="667" class="txd">-promscrape.config 复用 monitor/prometheus.yml 语义</text>
+      <text x="32" y="682" class="txd">与旧链路双跑 ≥7d，指标对账后 P3 切推送</text>
+
+      <rect x="398" y="628" width="360" height="72" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="412" y="650" class="ttl2">开发机 k1-prom（Prometheus :9090）</text>
+      <text x="412" y="667" class="txd" text-decoration="line-through">P6 退役封存</text>
+      <text x="412" y="682" class="txd">容器停用 · 数据卷封存 30d 后清</text>
+
+      <rect x="778" y="628" width="364" height="72" rx="8" class="box fade" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 4"/>
+      <text x="792" y="650" class="ttl2">两板 node_exporter（~/ne）</text>
+      <text x="792" y="667" class="txd" text-decoration="line-through">P6 停用</text>
+      <text x="792" y="682" class="txd">文件与 crontab @reboot 保留＝回滚路径（注释掉）</text>
     </svg>
     <p class="figcap">
-      实线＝常态数据流；虚线＝心跳 / 查询 / 过渡期路径；灰虚框＝退役项（P6）。<br>
-      颜色：青＝板端新增（Categraf）· 蓝＝Nightingale 枢纽 · 紫＝VictoriaMetrics / 用户侧 · 绿＝零改动资产。
-      端口：<b>:8788/:8791</b> evald 原生 metrics（冻结）· <b>:17000</b> n9e·WSL2（mirrored／portproxy 放通，P0 验证方向）
-      · <b>:8428</b> VM（本机 + dashboard 过渡读）。
+      实线＝常态数据流；虚线＝心跳 / 查询 / 过渡期路径；灰虚框＝过渡项或退役项（P6）。
+      颜色：青＝板端采集（Categraf）· 蓝＝Nightingale 枢纽 · 紫＝VictoriaMetrics 与用户侧 · 绿＝零改动资产。<br>
+      跨板方向为本蓝图新增：<b>板 P → 板 A</b>（remote write ＋ 心跳）；枢纽与存储均在板侧，不再依赖开发机。
+      端口：<b>:17000</b> n9e · <b>:8428</b> VM · <b>:9100</b> node_exporter（P6 停用）·
+      <b>:8788/:8791</b> evald 原生 metrics（冻结）。
     </p>
   </div>
 </section>
@@ -390,11 +409,11 @@
     <tbody>
       <tr><td>主机流</td>
           <td class="mono">input.node_exporter → node_*</td>
-          <td class="mono">ident（K3 主机名）＋ global.labels 注入</td>
-          <td>指标名与现 node_exporter 100% 兼容（<code>node_cpu_seconds_total</code>、<code>node_hwmon_fan_rpm/pwm/fault</code>、<code>node_hwmon_temp_celsius</code> 等面板在用序列全部保留）</td></tr>
+          <td class="mono">ident（板主机名，两板不同）＋ global.labels 注入</td>
+          <td>指标名与现 node_exporter 100% 兼容（<code>node_cpu_seconds_total</code>、<code>node_hwmon_fan_rpm/pwm/fault</code>、<code>node_hwmon_temp_celsius</code> 等面板在用序列全部保留）；两板各出一张主机卡（面板按 <code>board</code> 键）</td></tr>
       <tr><td>业务流</td>
           <td class="mono">input.prometheus → evald_*</td>
-          <td class="mono">instance=127.0.0.1:8788 / :8791</td>
+          <td class="mono">instance=&lt;板 IP&gt;:8788 / :8791（板清单声明）</td>
           <td>插件对目标 /metrics 的指标与标签「100% 保真透传」，不重命名；board/role 区分靠 instance（URL）或实例级 labels（P3 验证，见 R4）</td></tr>
       <tr><td>兼容流</td>
           <td class="mono">exec 脚本 → up{job=…}</td>
@@ -408,16 +427,16 @@
     <tbody>
       <tr><td class="mono">board / role / cores / accent</td>
           <td class="mono">input.prometheus 实例级 labels（若插件不支持 → 见 R4 兜底）</td>
-          <td class="mono">K3 / K3-ACC · 纯计时·A100 簇 / acc 0-5·func 6-7 · 8-15 / 0-7</td></tr>
+          <td class="mono">板 P：K3 · 纯计时·A100 簇 · 8-15 · timing<br>板 A：K3-ACC · acc 0-5·func 6-7 · 0-7 · acc</td></tr>
       <tr><td class="mono">clusters / workers / fleet</td>
           <td class="mono">[global.labels]（主机级，随所有序列上送）</td>
-          <td class="mono">X100:0-7,A100:8-15 · acc:0-5,func:6-7 · k3</td></tr>
+          <td class="mono">X100:0-7,A100:8-15 · acc:0-5,func:6-7 · k3 —— <b>两板必须同一串</b>（面板对 up{job="boards"} 取末条命中，D8）</td></tr>
       <tr><td class="mono">job=boards / job=evald</td>
           <td class="mono">global.labels（boards）＋ up 兼容流 / 实例 labels（evald）</td>
           <td>dashboard.html 与告警 PromQL 的选择器锚点，<b>必须保持</b></td></tr>
       <tr><td class="mono">—（新增）ident</td>
           <td class="mono">Categraf 自动（= 板主机名）</td>
-          <td>n9e Targets 身份键；心跳在线态挂靠它</td></tr>
+          <td>n9e Targets 身份键；两板必须不同（心跳在线态挂靠它）</td></tr>
     </tbody>
   </table>
 </section>
@@ -428,15 +447,15 @@
   <div class="grid g3">
     <div class="card">
       <h4>位置与形态</h4>
-      <p>K3 板 X100 用户域（cpu0-7），systemd 常驻（<code>kategraf.service</code>，CPUAffinity 钉用户域核），
-      与现 node_exporter 同侧；<b>不触碰 A100 计时簇 cpu8-15</b>。interval=30s 与现状抓取节奏一致
-      （计时敏感扰动已获用户确认的口径不变）。</p>
+      <p>两板各一个 Categraf，systemd 常驻、<b>按角色钉核</b>：板 P 钉 X100 cpu0-7（与现 node_exporter
+      同侧，A100 计时簇 cpu8-15 零监控进程）；板 A 钉 A100 cpu8-15（该板计时已迁出，监控不得占用
+      X100 的 acc/func 车道）。interval=30s 与现状抓取节奏一致（计时敏感扰动的既有口径不变）。</p>
     </div>
     <div class="card">
       <h4>插件选择：node_exporter 输入 <span class="tag t-info">决策</span></h4>
       <p>板端用 <code>input.node_exporter</code>（内嵌官方采集逻辑，node_* 100% 兼容）而非 Categraf 原生
       cpu/mem/disk 套件——保住既有查询/告警资产与 hwmon 温度风扇覆盖。官方明确<b>两者二选一</b>，同机混开＝重复采集。
-      Windows 监控主机自监控可用原生套件（n9e 内置主机大盘即插即用）。</p>
+      本次无板外被采集对象（开发机只充当浏览器），故原生套件不启用。</p>
     </div>
     <div class="card">
       <h4>evald 抓取：prometheus 输入</h4>
@@ -445,21 +464,25 @@
     </div>
     <div class="card">
       <h4>riscv64 交付 <span class="tag t-warn">最大风险</span></h4>
-      <p>Categraf 官方发布物只有 linux/amd64、linux/arm64、windows——<b>无 riscv64</b>。
-      路径：Go 交叉编译（<code class="nb">GOOS=linux GOARCH=riscv64 CGO_ENABLED=0</code>），
-      用 build tags 裁掉 CGO 依赖插件（oracle 等）。P3 先做编译＋上板 spike，不过门则维持 VM 直抓（P2 形态长期化）。</p>
-      <p class="why"><b>Why：</b>这是全案唯一可能推翻既定拓扑的点，故列为 P3 硬门禁而非假设。</p>
+      <p>自建范围＝<b>三件</b>：Categraf（官方发布物只有 linux/amd64、linux/arm64、windows）、
+      VictoriaMetrics 与 Nightingale（官方发布物为 linux amd64/arm64，<b>riscv64 情况未核实</b>）。
+      <b>优先在板上原生构建</b>（Bianbu 自带 riscv64 工具链，天然规避交叉编译坑），
+      交叉编译（<code class="nb">GOOS=linux GOARCH=riscv64 CGO_ENABLED=0</code> ＋ build tags 裁掉
+      CGO 依赖插件）作备选。三件未就位不进入 P1。</p>
+      <p class="why"><b>Why：</b>riscv64 自建是唯一可能推翻本拓扑的点（R1），故前移为 <b>P0 硬门禁</b>；
+      任一件不过门 → 重开 spec，<b>不</b>改投开发机/容器宿主或端口转发式折中。</p>
     </div>
     <div class="card">
       <h4>上报与心跳</h4>
-      <p><code>[[writers]]</code> 单写址 <code class="nb">http://&lt;win-host&gt;:17000/prometheus/v1/write</code>
+      <p><code>[[writers]]</code> 写址 <code class="nb">http://&lt;板 A&gt;:17000/prometheus/v1/write</code>
       （支持 basic_auth/timeout 等）；<code>[heartbeat]</code> 10s 报 <code class="nb">/v1/n9e/heartbeat</code>
-      → n9e「监控对象」在线态与机器元数据。心跳断≠数据断：告警以数据序列 absent 兜底。</p>
+      → n9e「监控对象」在线态与机器元数据。板 A 上的 categraf 走本机 localhost，板 P 走 LAN。
+      心跳断≠数据断：告警以数据序列 absent 兜底。</p>
     </div>
     <div class="card">
       <h4>回退</h4>
-      <p><code>systemctl stop categraf</code> 即回到 VM 直抓形态（P2 长期化）；板上 node_exporter 文件与
-      crontab 保留到 P6 才注释，任何时刻可恢复原拉模式（恢复 k1-prom 也只是 docker start）。</p>
+      <p>两板 <code>systemctl stop categraf</code> 即回到 VM 直抓形态（P2 长期化）；板上 node_exporter
+      文件与 crontab 保留到 P6 才注释，任何时刻可恢复原拉模式（恢复 k1-prom 也只是 docker start）。</p>
     </div>
   </div>
 </section>
@@ -470,29 +493,31 @@
   <div class="grid g2">
     <div class="card">
       <h4>单机版选型</h4>
-      <p>本规模（1 板 + 2 evald 实例，~1.6K 序列 @30s）用单二进制单机版绰绰有余；
+      <p>本规模（2 板 + 2 evald 实例，~1.6K 序列 @30s）用单二进制单机版绰绰有余；
       vmagent/vmalert/vmcluster 全部不引入（拉模式由 categraf 承担、告警由 n9e 承担）。
       官方 quickstart 的 n9e 组合数据面（VM＋n9e＋categraf）与本蓝图一致；其 mysql＋redis
       部分<b>不采纳</b>——n9e 单二进制轻量模式不需要它们。</p>
     </div>
     <div class="card">
       <h4>关键参数</h4>
-      <p><code class="nb">-storageDataPath=/vmdata</code>（docker 卷）；<code class="nb">-retentionPeriod=90d</code>
-      （现状 Prometheus 缺省 15d，升到 90d 仍 &lt;1GB）；镜像 tag 在 P1 拉取时固定为当周 stable，不追 latest。
-      端口绑 <code class="nb">0.0.0.0:8428</code>（供 n9e/WSL2 数据源访问——k1-prom 的 127.0.0.1 绑定不可复用）。</p>
+      <p><code class="nb">-storageDataPath=&lt;本机目录&gt;/vmdata</code>（板 A 本地盘，无容器卷）；
+      <code class="nb">-retentionPeriod=90d</code>（现状 Prometheus 缺省 15d，升到 90d 仍 &lt;1GB）；
+      版本与产物 md5 在 P0 自建后锁定。端口绑 <code class="nb">0.0.0.0:8428</code>——消费方是板 P
+      的写入与 LAN 浏览器，非同机，故不能只绑 127.0.0.1。</p>
     </div>
     <div class="card">
       <h4>API 同构＝过渡桥</h4>
       <p>VM 原生服务 <code class="nb">/api/v1/query</code>、<code class="nb">/api/v1/query_range</code> 等
       Prometheus 查询 API——dashboard.html 只用这两个端点（dashboard.html:921 的抓取面），
-      <code class="nb">?prom=http://127.0.0.1:8428</code> 理论上零改动可用；file:// null origin 的 CORS
-      放行在 P2 实测（R3）。</p>
+      <code class="nb">?prom=http://&lt;板 A&gt;:8428</code> 理论上零改动可用；file:// null origin 的 CORS
+      放行在 P2 实测（R3b）。</p>
     </div>
     <div class="card">
       <h4>P2 并行直抓</h4>
       <p>VM 自带抓取器：<code class="nb">-promscrape.config</code> 直接吃 Prometheus 语义的配置
       （宽容解析）。把 <code>monitor/prometheus.yml</code> <b>复制</b>为 monitor-next 内的新文件挂给 VM
-      （原文件冻结不动），k1-prom 与 VM 双跑对账 ≥7 天——这一步让「存储替换」与「采集替换」解耦，各自可独立回退。</p>
+      （原文件冻结不动），直抓两板三目标（:9100/:8788/:8791），与旧链路双跑对账 ≥7 天——这一步让
+      「存储替换」与「采集替换」解耦，各自可独立回退。</p>
     </div>
   </div>
 </section>
@@ -503,7 +528,7 @@
   <p class="note">
     n9e 是枢纽里唯一的「人界面」：大盘、告警规则、屏蔽、值班、用户权限全在 Web UI；
     对数据面它只做两件事——<b>代理写</b>（categraf → n9e :17000 → VM）与<b>查询</b>（PromQL → VM）。
-    <b>部署形态＝单二进制</b>：官方 linux-amd64 tarball（无 Windows 原生包）落 WSL2 systemd 常驻，
+    <b>部署形态＝单二进制、落板 A 的 systemd</b>（riscv64 自建；官方发布物为 linux amd64/arm64），
     轻量模式内置 SQLite＋miniredis，解压即启、零外部 MySQL/Redis。
     v6 起 n9e 不再生成 target_up 指标，机器失联以<b>心跳超时</b>判定（Targets 页在线态），
     PromQL 层以 absent() 兜底。
@@ -511,15 +536,17 @@
   <div class="grid g2">
     <div class="card">
       <h4>为什么单二进制</h4>
-      <p>现栈（k1-prom＋dashboard.html）零状态件，四容器对单板监控是重步；轻量模式只净增一个进程＋
-      一个 n9e.db，运维重量与现栈同量级。官方二进制部署文档自带 systemd 示例；
-      升级路径＝etc 配置改外接 MySQL/Redis（多实例 HA 同路），部署形态不变。</p>
+      <p>官方 compose 五件套（VM＋n9e＋MySQL＋Redis＋categraf）对两板小场景是重步；轻量模式只净增
+      一个进程＋一个 n9e.db，运维重量与现栈同量级，且与板上既有 systemd 体系一致（自启、日志、回退
+      都用 <code class="nb">systemctl</code>）。升级路径＝etc 配置改外接 MySQL/Redis（多实例 HA 同路），
+      部署形态不变。</p>
     </div>
     <div class="card">
       <h4>代价（已接受）</h4>
       <p>miniredis 内存态：重启丢登录态（重登）与心跳态（分钟级重建）；SQLite 单文件：
       灾备＝文件备份＋规则/大盘 JSON 导出入仓。官方将轻量模式定位为测试/体验，生产建议外接
-      MySQL/Redis——单用户单板场景接受，扩容路径清晰。AI 助手功能需真 Redis Streams（不用，不受影响）。</p>
+      MySQL/Redis——单用户场景接受，扩容路径清晰。AI 助手功能需真 Redis Streams（不用，不受影响）。
+      另需盯两件运行期事项：板 A 的存储/内存余量（R6）与 riscv64 上长跑稳定性（R7）。</p>
     </div>
   </div>
   <h3>大盘：四层映射（dashboard.html → n9e）</h3>
@@ -532,21 +559,21 @@
           <td>前端算→服务端常驻；新增恢复通知/历史/屏蔽窗口</td></tr>
       <tr><td>evald 作业线</td><td class="mono">车道拓扑条＋双实例卡＋漏斗图</td>
           <td>桑基图 n9e 无原生等价物 → <b>堆叠柱/表格</b>表达 func→acc→perf→完赛（数据源 <code>evald_jobs_completed_total{lane,state}</code> 不变）</td></tr>
-      <tr><td>主机资源</td><td class="mono">每核堆叠柱＋温度/内存/swap/盘/风扇</td>
-          <td>node_* 序列名不变；核段命名（workers 标签）继续由标签驱动</td></tr>
+      <tr><td>主机资源</td><td class="mono">逐板每核堆叠柱＋温度/内存/swap/盘/风扇</td>
+          <td>node_* 序列名不变；核段命名（workers 标签）继续由标签驱动；<b>两板各出一张主机卡</b>（面板按 board 键自动合并作业卡与主机卡）</td></tr>
     </tbody>
   </table>
   <h3>告警：9 族规则映射（详见 spec §8 的 PromQL 草案）</h3>
   <table>
     <thead><tr><th>族（monitor/README 口径）</th><th style="width:120px">级别</th><th>判定口径（迁后）</th></tr></thead>
     <tbody>
-      <tr><td>主机失联</td><td>P1/P2</td><td class="mono">心跳超时（Targets 离线）＋ absent(node_uname_info) 兜底</td></tr>
-      <tr><td>evald 实例离线</td><td>P1/P2</td><td class="mono">absent(evald_up{instance=~".*8788|8791"}) 持续 3m；K3-ACC 附 MemoryMax 排障提示</td></tr>
-      <tr><td>温度 ≥70 / ≥85</td><td>warn / crit</td><td class="mono">max(node_hwmon_temp_celsius)</td></tr>
-      <tr><td>簇均核占用 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">rate(node_cpu_seconds_total{cpu=~"8-15 段"}) 按 X100/A100 两规则</td></tr>
-      <tr><td>swap ≥60 / ≥80</td><td>warn / crit</td><td class="mono">node_memory_Swap*(Total-Free)/Total</td></tr>
-      <tr><td>内存 / 硬盘 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">node_memory_MemAvailable / node_filesystem_avail（tmpfs 排除）</td></tr>
-      <tr><td>风扇 fault</td><td>crit</td><td class="mono">max(node_hwmon_fan_fault) ≥ 1</td></tr>
+      <tr><td>主机失联</td><td>Sev1</td><td class="mono">心跳超时（Targets 离线）＋ absent(node_uname_info) 兜底，双口径同族合并</td></tr>
+      <tr><td>evald 实例离线</td><td>Sev1</td><td class="mono">absent(evald_up{job="evald",board="&lt;板&gt;"}) 逐实例生成，持续 3m；acc 实例附 MemoryMax 排障提示</td></tr>
+      <tr><td>温度 ≥70 / ≥85</td><td>warn / crit</td><td class="mono">max by (board) (node_hwmon_temp_celsius)</td></tr>
+      <tr><td>簇均核占用 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">rate(node_cpu_seconds_total{cpu=~"X100/A100 段"}) <b>按板成对生成</b>——两板的同名核簇是两台机器，跨板 avg 会把读数混成一个</td></tr>
+      <tr><td>swap ≥60 / ≥80</td><td>warn / crit</td><td class="mono">node_memory_Swap*(Total-Free)/Total（前置 Total&gt;0）</td></tr>
+      <tr><td>内存 / 硬盘 ≥80 / ≥92</td><td>warn / crit</td><td class="mono">node_memory_MemAvailable / node_filesystem_avail（tmpfs 排除，按 instance＋mountpoint 分组）</td></tr>
+      <tr><td>风扇 fault</td><td>crit</td><td class="mono">max by (board) (node_hwmon_fan_fault) ≥ 1</td></tr>
       <tr><td>队列 ≥20 / ≥50</td><td>warn / crit</td><td class="mono">sum by (board) (evald_queued)</td></tr>
     </tbody>
   </table>
@@ -560,24 +587,24 @@
 <section id="path">
   <h2><span class="n">07</span>迁移路径（P0–P6）</h2>
   <p class="note">
-    每阶段独立可回退、有硬验证门；板端动作集中在 P3 一次完成，其余阶段全部发生在 Windows 侧。
-    详细动作清单、验证门与回退手段见 <a href="spec.md">spec.md §7</a>。
+    每阶段独立可回退、有硬验证门；板端动作集中在 P3 一次完成（两板同一维护窗口）。
+    详细动作清单、验证门与回退手段见 <a href="specs/2026-09-20-监控栈改造.md">spec §6</a>。
   </p>
   <ol class="flow">
-    <li data-i="P0"><b>前置确认（零改动）</b>
-      <span>K3 → 枢纽 :17000 端到端可达（先定 WSL2 网络模式：mirrored 优先、portproxy 兜底）· 防火墙放行 · WSL2 就绪（systemd）· Docker 资源余量 · 冻结物 md5 复核</span></li>
-    <li data-i="P1"><b>枢纽骨架（纯 Windows 侧）</b>
-      <span>WSL2 装 n9e 官方 tarball（解压即启：SQLite＋miniredis 内置，零外部状态件）＋ systemd＋任务计划自启链 · VM 容器改绑 0.0.0.0:8428 · n9e 配 VM 为默认数据源＋写入代理 · 建用户/业务组 · 门禁：板→:17000 端到端、UI 可查 VM 样本、重启自启</span></li>
+    <li data-i="P0"><b>前置与门禁（可先于新板到位）</b>
+      <span>riscv64 自建三件 spike（categraf / VM / n9e，优先板上原生构建）· 板 A 存储内存余量实测 · 板 P → 板 A :17000 可达 · 板清单定稿 · 冻结物 md5 复核 · 物理映射定案</span></li>
+    <li data-i="P1"><b>枢纽骨架（板 A）</b>
+      <span>VM 落位（vmdata · 90d）＋ n9e 落位（内置 SQLite）＋ 两件 systemd enable · 建用户/业务组 · n9e 配 VM 为默认数据源＋写入代理 · LAN 窄放行 · 门禁：板 P→:17000 端到端、UI 可查 VM 样本、重启自启</span></li>
     <li data-i="P2"><b>存储并行（板零改动）</b>
-      <span>VM 以 -promscrape.config 直抓三目标（复制 prometheus.yml 语义）· k1-prom 与 VM 双跑 ≥7d · dashboard.html ?prom=:8428 只读并行 · 门禁：指标对账＋CORS 实测</span></li>
-    <li data-i="P3"><b>Categraf 上板（唯一板端阶段）</b>
-      <span>riscv64 交叉编译 spike → systemd 部署 → node_* / hwmon / evald_* / 标签注入 / up 兼容流逐项对账 · 门禁：与 P2 数据并排一致、扰动 vmstat 对比无恶化 · 回退：stop categraf 即回 P2</span></li>
+      <span>VM 以 -promscrape.config 直抓两板三目标（复制 prometheus.yml 语义）· 与旧链路双跑 ≥7d · dashboard.html ?prom=&lt;板 A&gt;:8428 只读并行 · 门禁：指标对账＋CORS 实测</span></li>
+    <li data-i="P3"><b>Categraf 上板（唯一板端阶段 · 两板）</b>
+      <span>两板部署（钉核：板 P=0-7 / 板 A=8-15）→ node_* / hwmon / evald_* / 标签注入 / up 兼容流逐项对账 · 门禁：与 P2 数据一致、板 P A100 簇零监控进程、两车道漂移 ≤5% · 回退：stop categraf 即回 P2</span></li>
     <li data-i="P4"><b>告警上线（能力新增）</b>
-      <span>9 族规则录入 n9e ＋ 通知媒介 ＋ 计时天窗屏蔽 · 门禁：停 evald-acc 演练离线告警、手动 PromQL 回放验证阈值族</span></li>
+      <span>9 族规则录入 n9e（先仅记录 ≥3d）＋ 通知媒介 ＋ 计时天窗屏蔽 · 门禁：停 evald-acc 演练离线告警与恢复、历史回放验证阈值族、屏蔽窗口静默</span></li>
     <li data-i="P5"><b>大盘重建</b>
       <span>四层大盘在 n9e 逐层落地（漏斗→堆叠柱）· 门禁：与 dashboard.html 并排对数一致后才谈退役</span></li>
     <li data-i="P6"><b>退役收尾（逐项独立回退）</b>
-      <span>VM 直抓任务撤 · k1-prom 容器封存（卷留 30d）· 板上 node_exporter 停用（crontab 注释、文件保留）· dashboard.html 归档只读 · monitor-next/README 记录接替关系</span></li>
+      <span>VM 直抓任务撤 · k1-prom 容器封存（卷留 30d）· 两板 node_exporter 停用（crontab 注释、文件保留）· dashboard.html 归档只读 · monitor-next/README 记录接替关系</span></li>
   </ol>
 </section>
 
@@ -587,31 +614,45 @@
   <table>
     <thead><tr><th style="width:52px">编号</th><th style="width:270px">风险</th><th>处置 / 兜底</th></tr></thead>
     <tbody>
-      <tr><td class="mono">R1</td><td>Categraf 无官方 riscv64 发布物</td>
-          <td><span class="tag t-warn">P3 硬门禁</span>Go 交叉编译＋build tags 裁剪；不过门则 VM 直抓（P2 形态）长期化，categraf 仅 Windows 侧自监控——目标架构退一档但可用</td></tr>
-      <tr><td class="mono">R2</td><td>板 → 枢纽推送方向（现状只有反向拉取）；终点是 WSL2 服务，另叠加 n9e(WSL2)→VM(Win Docker) 跨界访问</td>
-          <td><span class="tag t-warn">P0 前置</span>WSL2 mirrored networking 优先（Win11 22H2+，本机 build 26200 满足），netsh portproxy＋任务计划兜底（WSL IP 动态，脚本自适应）；n9e 绑 0.0.0.0:17000；VM 绑 0.0.0.0:8428；防火墙窄放行</td></tr>
-      <tr><td class="mono">R3</td><td>VM 对 file:// null origin 的 CORS 行为未实测</td>
-          <td><span class="tag t-info">P2 验证</span>不放行则 dashboard.html 过渡期退化（本地静态服务器或 9090 反代），不阻塞主线</td></tr>
+      <tr><td class="mono">R1</td><td><b>riscv64 自建范围扩到三件</b>：Categraf（无官方 riscv64）、VM 与 n9e（riscv64 发布物未核实；n9e 的 SQLite 驱动是否 CGO、前端资产内嵌方式未探明）</td>
+          <td><span class="tag t-warn">P0 硬门禁</span>优先板上原生构建（Bianbu 自带 riscv64 工具链），交叉编译备选；任一件不可行 → 重开 spec（备选：枢纽退为板外一台常驻 Linux 主机，或改用可自建的轻量替代栈）——<b>不</b>采用宿主耦合/端口转发式折中</td></tr>
+      <tr><td class="mono">R2</td><td>板 → 板推送方向从未验证（现状只有开发机 → 板）</td>
+          <td><span class="tag t-warn">P0/P1</span>验证板 P → 板 A <code>:17000</code>；板 A 防火墙按源 IP 窄放行</td></tr>
+      <tr><td class="mono">R3</td><td>枢纽与 acc/func <b>同板异簇</b>，共享内存带宽/缓存/IO</td>
+          <td><span class="tag t-info">P1 建基线 · P3 复测</span>acc/func 吞吐与微基准漂移 ≤5%；超阈 → 枢纽迁板外常驻主机（重开 spec）</td></tr>
+      <tr><td class="mono">R3b</td><td>VM 对 <code>file://</code> null origin 的 CORS 未实测</td>
+          <td><span class="tag t-info">P2 验证</span>不放行则以本地静态服务器/反代承载，或接受旧面板提前退役（P5 提速）</td></tr>
       <tr><td class="mono">R4</td><td>input.prometheus 实例级 labels 文档未记载；up 序列推送链天然缺失</td>
-          <td><span class="tag t-warn">P3 验证</span>labels 不支持 → board 级区分退回 instance（端口可解析）＋ n9e 写入侧处理；up → exec 兼容流补齐（或 VM 极简 up-only 抓取任务）</td></tr>
+          <td><span class="tag t-warn">P3 验证</span>labels 不支持 → board/role 退回 instance（端口可解析）；up → exec 兼容流补齐（或 VM 极简 up-only 抓取任务）</td></tr>
       <tr><td class="mono">R5</td><td>hwmon 风扇/温度指标名 parity（fan_rpm/pwm/fault）</td>
           <td><span class="tag t-info">P3 对账</span>input.node_exporter 声称 100% 兼容，仍以上板 diff 面板在用序列为准</td></tr>
-      <tr><td class="mono">R6</td><td>n9e 引入状态件（SQLite 单文件＋miniredis 内存态）与 WSL2 运维链（开机不自启）</td>
-          <td>n9e.db 周备（计划任务拷文件）＋规则/大盘 JSON 导出入仓＝灾备正本；重启丢登录态（重登）与心跳态（分钟级重建）；扩容路径＝etc 配置改外接 MySQL/Redis，部署形态不变；任务计划 <code>wsl -d …</code> 拉起 systemd</td></tr>
-      <tr><td class="mono">R7</td><td>:17000（n9e/WSL2）与 :8428（VM 写口）双双暴露 LAN</td>
-          <td>防火墙按源窄放行（板 IP＋本网段）· categraf writers basic_auth（n9e 侧强制与否 P1 验证）· n9e UI 自带用户体系（首登改默认口令）</td></tr>
-      <tr><td class="mono">R8</td><td>计时簇扰动</td>
-          <td>Categraf 钉 X100 用户域（CPUAffinity）· interval 30s 不变 · P3 vmstat 前后对比；A100 簇零接触</td></tr>
+      <tr><td class="mono">R6</td><td>板 A 存储/内存余量未知（90d retention ＋ SQLite ＋ n9e 常驻）</td>
+          <td><span class="tag t-info">P0 实测</span>不足则降 retention（如 30d）或外挂存储——降级前先确认面板/告警的查询窗口需求</td></tr>
+      <tr><td class="mono">R7</td><td>riscv64 上 VM/n9e 长跑稳定性与性能（GC、SQLite 写入、内存单调增长）</td>
+          <td><span class="tag t-info">P1 起 7d 采样</span>RSS/磁盘异常 → 重开 spec（同 R1 备选）</td></tr>
+      <tr><td class="mono">R8</td><td>端口暴露面（:17000 / :8428 / :9100 / :8788 / :8791 均 LAN 可见）</td>
+          <td>防火墙按源窄放行 · n9e 首登改默认口令（root/root.2020）· categraf writers basic_auth（P1 验证 n9e 侧鉴权）</td></tr>
       <tr><td class="mono">R9</td><td>桑基漏斗、5s 即时刷新等面板特性 n9e 无原生等价</td>
-          <td>漏斗→堆叠柱；即时值节奏接受 n9e 刷新粒度（30s 档）；dashboard.html 归档前保留 2 周重叠期</td></tr>
+          <td>漏斗→堆叠柱；即时值接受 30s 档；dashboard.html 归档前保留 2 周重叠期</td></tr>
+      <tr><td class="mono">R10</td><td>监控进程钉核与 evald 整簇注册的相互作用（ADR-0012 禁跨簇 taskset、ADR-0014 锁分区）</td>
+          <td>监控进程不 taskset 进 evald 注册簇：板 P 钉 0-7、板 A 钉 8-15，与各自 evald 簇不重叠（US-01 可证）</td></tr>
     </tbody>
   </table>
+  <p class="note" style="margin-top:10px">
+    <b>未决事项</b>（P0–P3 前须由用户拍板，见 spec §11）：
+    <b>U1</b> 通知渠道（钉钉/飞书/企微/邮件/webhook/短信）· <b>U2</b> 部署通道（repo 原生清单式
+    <code>deploy.py</code> vs ansible）· <b>U3</b> n9e 版本策略（固定 v9.x 小版本）·
+    <b>U4</b> 物理映射（推荐：计时正本留现板、新板承接 acc/func ＋ 枢纽）·
+    <b>U5</b> acc/func 实例迁移后的客户端指向（<code>clients/ev.py</code> 的
+    <code>DEFAULT_CORR_BASE</code>、<code>eval_pipeline.py</code> 的 <code>correctness_base</code>，
+    非冻结物）。
+  </p>
 </section>
 
 <footer>
   本页为 <code>docs/architecture-dev.html</code>（自包含、零外部依赖，<code>file://</code> 直开）——
-  <b>目标架构蓝图，非现状</b>。实施计划／验证门／回退见 <a href="spec.md">docs/spec.md</a>；
+  <b>目标架构蓝图，非现状</b>。实施计划／验证门／回退见
+  <a href="specs/2026-09-20-监控栈改造.md">docs/specs/2026-09-20-监控栈改造.md</a>；
   现状契约见 <a href="architecture.html">docs/architecture.html</a> §06 与 <code>monitor/README.md</code>。
   调研依据（2026-09-20）：
   <a href="https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/">VM 单机版文档</a> ·
