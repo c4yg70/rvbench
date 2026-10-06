@@ -110,6 +110,13 @@ deployed_sha256/restored_sha256`；`restored_sha256` 由 `restore_files` 恢复�
 4. 重推 `clients/ev.py` → 板上 `~/autoke/evald/ev.py`（板侧现为收拢前旧副本）。
 5. `eval_pipeline` 以一个 dry 工单跑半轮，确认 ROOT/registry 落点无漂移。
 
+> **2026-10-07 执行完毕（板恢复日）**：0-5 全绿，详见 CHANGELOG 当日条目。两个口径事实：
+> ① selftest 必须用**最小 config**（`ops/evald_selftest_local.py` 的 7 键假根配方）——生产
+> config 会因 perf 钉核/OMP 注入等合法生产行为 fail 掉"缺省语义"断言；且 SSH 会话亲和
+> 0-7，`taskset -c 8-15` 在会话内 EINVAL（计时核只有 evald 服务进程可达），生产 config 的
+> [4] 假 bench 必失败。② warmd.py 在 0915 W0 天窗上板过 W0-2 `pdeathsig` 但未回仓——
+> 本次正本吸收板端字节（md5 重登记），板上 `evaldctl` 与仓 `evaldctl.sh` 的双向分歧仍挂账。
+
 ## API
 
 端口 8788；除 `/healthz` 外都需请求头 `X-K3-Token`。

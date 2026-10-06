@@ -333,7 +333,20 @@ def handle(req):
     _send(resp)
 
 
+def _pdeathsig():
+    # W0-2 (2026-09-15): evald 退出后 warmd 必须随葬——0911 事故根因是历次
+    # 重启累积的孤儿 warmd 各吃满核。PR_SET_PDEATHSIG=SIGTERM。
+    try:
+        import ctypes
+        import signal as _sig
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        libc.prctl(1, _sig.SIGTERM, 0, 0, 0)  # 1 = PR_SET_PDEATHSIG
+    except Exception:
+        pass  # 非 Linux/无 prctl 时静默跳过，不阻塞启动
+
+
 def main():
+    _pdeathsig()
     fake = os.environ.get("WARMD_FAKE") == "1"
     if not fake:
         import torch  # noqa: F401 — 预热（~3.6s）

@@ -42,7 +42,20 @@ REPO_DIR = SELF_DIR.parent        # = 仓库根
 ROOT = REPO_DIR.parent            # 战役工作区根：runs/ results/ 语义
 if os.environ.get("EV_WORKSPACE"):   # 仓已独立于工作区，无法从仓位置推导 → 显式覆盖
     ROOT = Path(os.environ["EV_WORKSPACE"]).expanduser().resolve()
-BASE = "http://10.18.60.100:8788"
+# 评测后端（ADR-0016，B1）：EV_BACKEND 选 BackendProfile；无 backends.py 或未设时
+# 恒为 k3 常量——本文件独立部署语义不变。未布点直接死（配置错误不静默回落 k3）。
+BACKEND = os.environ.get("EV_BACKEND", "k3")
+try:
+    from backends import get as _bp_get
+except Exception:  # noqa: BLE001 — 板上/最小环境无 clients/backends.py
+    _bp_get = None
+if _bp_get is not None:
+    _bp = _bp_get(BACKEND)
+    if not _bp.timing_base:
+        raise SystemExit(f"[eval_pipeline] backend {BACKEND!r} 尚未布点（timing_base 空）")
+    BASE = _bp.timing_base
+else:
+    BASE = "http://10.18.60.100:8788"
 TOKEN = json.load(open(REPO_DIR / "config.json"))["token"]
 
 RE_SHAPE_OK = re.compile(r"^[0-9]{1,10}(,[0-9]{1,10}){0,5}$")
@@ -248,18 +261,27 @@ def load_json(path: Path, default):
 
 
 def corr_base() -> str:
+    if BACKEND != "k3" and _bp_get is not None:
+        # 非 k3：correctness 走 profile（无独立旁路实例时同 timing）；
+        # 工作区 correctness_base 是 k3 双实例的部署细节，不做跨后端回落
+        return _bp_get(BACKEND).corr_base or BASE
     cfg = load_json(CONFIG_FILE, {})
     return cfg.get("correctness_base", BASE)
 
 
 def base_label(base: str) -> str:
-    # 精确映射：ADR-0012 重定基按 host 标签判跨簇；8791（K3 acc 旁路，X100 4-6）
-    # 必须与 8788（K3 计时，A100 8-15）和已消亡的 k1-proxy（X60）区分开
-    if base == BASE:
-        return "k3"
-    if base.rstrip("/").endswith(":8791"):
-        return "k3-acc"
-    return "k1-proxy"
+    # 统一正本在 clients/backends.py（ADR-0016）；无该模块时本地同语义兜底。
+    # 未知 URL 旧版一律记 "k1-proxy"，正本改原样串——与历史 host 值不等必触发
+    # 重定基（宁可重定基不许假可比）；k3/k3-acc 两簇标签逐字不变。
+    try:
+        from backends import base_label as _bl
+        return _bl(base)
+    except Exception:  # noqa: BLE001
+        if base == BASE:
+            return "k3"
+        if base.rstrip("/").endswith(":8791"):
+            return "k3-acc"
+        return "k1-proxy"
 
 
 def adapt_job(job: dict) -> dict:
@@ -481,14 +503,24 @@ def judge(tk: dict, job: dict, registry: dict, cur_base: str,
         # 2026-09-10 U9-② 分键＋隔离改造：astra 各臂独立参照（此前 KOPE/<op> 跨臂
         # 共享导致后到臂被姊妹臂移参照压成 rejected_slower）；E1-KOPE 历史键保留。
         # 0910_5 §3.1 硬门槛：一臂更新不得改变另一臂判定。
-        key = key_override or cond_key(tk.get("cond"), op)
+        # 2026-10-07 ADR-0016：backend 轴入键——k3 保持旧格式（424 既有键零漂移），
+        # 非 k3 一律 b:<backend>/ 前缀，物理杜绝跨后端共用参照。
+        backend = tk.get("backend") or "k3"
+        if backend == "k3":
+            key = key_override or cond_key(tk.get("cond"), op)
+        else:
+            from backends import registry_key
+            key = key_override or registry_key(tk.get("cond"), op, backend)
         reg = registry.get(key)
         host = base_label(cur_base)
         if isinstance(reg, dict) and reg.get("host") == host and reg.get("ref_ms"):
             ref = reg["ref_ms"]
             if g is not None and g < ref * 0.95:
-                registry[key] = {"host": host, "ref_ms": g, "ref_job": job.get("job_id"),
-                                 "ref_stem": f"r{attempt}", "ts": now_local()}
+                entry = {"host": host, "ref_ms": g, "ref_job": job.get("job_id"),
+                         "ref_stem": f"r{attempt}", "ts": now_local()}
+                if backend != "k3":
+                    entry["backend"] = backend   # 溯源（键已带 b: 前缀）
+                registry[key] = entry
                 return ("accepted_correctness_and_faster",
                         f"correct=true max_abs_err={r.get('max_abs_err')}；gems_ms {g} < {host} 参照 {ref}（>5%，§11 切换通过）", registry)
             if g is not None:
@@ -496,8 +528,11 @@ def judge(tk: dict, job: dict, registry: dict, cur_base: str,
                         f"correct=true 但 gems_ms {g} ≥ {host} 参照 {ref}×0.95（§11 不切换）", registry)
             return "needs_verifier_attention", "correct=true 但缺 gems_ms，无法机械比较", registry
         # cold start or cross-cluster cutover: re-baseline, no cross-cluster compare
-        registry[key] = {"host": host, "ref_ms": g, "ref_job": job.get("job_id"),
-                         "ref_stem": f"r{attempt}", "ts": now_local(), "rebaselined": True}
+        entry = {"host": host, "ref_ms": g, "ref_job": job.get("job_id"),
+                 "ref_stem": f"r{attempt}", "ts": now_local(), "rebaselined": True}
+        if backend != "k3":
+            entry["backend"] = backend
+        registry[key] = entry
         why = "跨簇切换重定基（ADR-0012：不与旧簇数字比较）" if isinstance(reg, dict) else "本 op 首个可用参照"
         return ("accepted_correctness",
                 f"correct=true max_abs_err={r.get('max_abs_err')}；{why}，本结果 gems_ms={g} 记为 {host} 新参照", registry)
@@ -526,8 +561,11 @@ def finalize_ticket(entry: dict, job: dict, state: dict, registry: dict) -> None
         log(f"SKIP-DUP {cond}/{op} {stem}: raw already exists (duplicate submit)")
         return
     r, cases = _split_cases(job)
-    # judge 是单结果语义：多 shape 时用主 shape（cases[0]）判定
-    tk_with_cond = dict(tk, cond=entry.get("cond", tk.get("cond")))
+    # judge 是单结果语义：多 shape 时用主 shape（cases[0]）判定；
+    # backend 穿线（ADR-0016）：票自带优先，缺省继承进程级 EV_BACKEND——
+    # 路由（BASE）与 registry 键命名空间必须同后端
+    tk_with_cond = dict(tk, cond=entry.get("cond", tk.get("cond")),
+                        backend=tk.get("backend") or BACKEND)
     job_j = dict(job, result=r) if cases is not None else job
     _key_o = cond_key_from_path(entry.get("ticket_path") or "", cond, op)
     outcome, note, registry = judge(tk_with_cond, job_j, registry,
@@ -536,6 +574,7 @@ def finalize_ticket(entry: dict, job: dict, state: dict, registry: dict) -> None
     raw = {
         "schema": "raw-v1", "writer": "pipeline-v1", "condition": cond,
         "kind": tk.get("kind", "correctness"), "op": op,
+        "backend": tk_with_cond["backend"],
         "shape": tk.get("shape"), "dtype": tk.get("dtype"),
         "attempt": tk.get("attempt"),
         "candidate_sha256": tk.get("candidate_sha256"),
@@ -571,6 +610,19 @@ def finalize_ticket(entry: dict, job: dict, state: dict, registry: dict) -> None
         "judge": "pipeline-v1-mechanical",
     }
     atomic_write(res_dir / f"{stem}.result.json", result)
+    # B2（ADR-0017）：统一结果视图随写；无 result_schema（板上最小部署）显式提示不静默
+    try:
+        from result_schema import to_result_v2
+        atomic_write(res_dir / f"{stem}.result-v2.json", to_result_v2(
+            job_j, backend=BACKEND, host_tag=raw["evald_host"],
+            lane={"correctness": "correctness", "func": "func"}.get(
+                tk.get("kind", "correctness"), "timing"),
+            meta={"condition": cond, "attempt": tk.get("attempt"), "stem": stem,
+                  "kind": tk.get("kind", "correctness"), "outcome": outcome,
+                  "note": note, "candidate_sha256": tk.get("candidate_sha256"),
+                  "candidate_path": tk.get("candidate_path")}))
+    except ImportError:
+        log(f"result-v2 未写（无 result_schema）：{cond}/{op} {stem}")
     if outcome == "unverifiable_retry":
         # W0-4（2026-09-15）：单文件覆盖会丢更早的 retry 事件——改 append-only
         # JSONL 台账留全史；pending_retry.json 保留为"最新状态"快照（兼容旧语义）

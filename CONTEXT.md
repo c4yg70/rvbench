@@ -41,6 +41,17 @@ pytest benchmark 全量跑分（约 2 分钟/算子），算子优化的验收�
 作业按用途分列的调度单位：`timing`（计时，持分区计时锁）/ `correctness`（正确性，多 worker、
 不持计时锁）/ `func`。feature flag 名 `perf`/`acc`/`func` 分别映射到三者。
 
+**评测后端 (Backend Profile)**:
+clients/backends.py 中 BackendProfile 描述的一台/一族评测靶机的客户端侧档案（k3/k1/sg2042/rvv_general）
+——base URL、host 标签与缺省参数；registry 键与结果 schema 的 backend 轴由此承载。
+_Avoid_: backend（三义：flag_gems runtime/backend 目录、k1-proxy healthz 的 backends 数组、本义——
+仓内说「后端」须带 Profile 或写全）、target 混用。
+
+**评测集 (Suite)**:
+suite-v1 JSON 文档定义的一次成批评测的算子清单（op/shape/dtype 条目＋缺省参数＋backend 档案名）；
+clients/suite.py 展开为 ticket 后完全复用 scan/submit/finalize 链路，suite 不进服务端。
+_Avoid_: benchmark set、manifest（manifest 特指 baseline_manifest 基线清单）。
+
 **字节冻结 (Byte-Freeze)**:
 `evald.py`、`warmd.py`、`evaldctl.sh`、`config.example.json`、`dashboard.html`、`monitor/*`
 与板端部署**逐字节一致**的部署不变量（md5 记录于 CHANGELOG）；改这些文件须过板上 selftest 门禁。

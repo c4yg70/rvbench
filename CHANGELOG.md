@@ -3,6 +3,57 @@
 版本痕迹的单一查阅点（此前散在 README/docstring/注释里）。
 HTTP 响应头 `server_version` 现值 `evald/1.0`；`/metrics` exposition `version=0.0.4` 是文本格式版本号，与本文件的项目版本无关。
 
+## 2026-10-07 — K3 板恢复回归门全绿 ＋ 多评测后端三件套落地（B3/B2/B1/A1+A2）
+
+板重新上线（10.18.60.100，HUMAN-K3），「板恢复后回归门」0-5 步全部执行完毕：
+
+- **门 0 安装树未污染**：567 条缺 `restored_sha256` 的 manifest 全为历史中间态——逐路径按
+  「最后条目」判定，无任何路径处于"未恢复且当前=部署值"；34 个文件为战役定稿＋W0 补丁态
+  （`bench_op.py` W0 输入域补丁、`*_best.diff` 定稿等），属预期非污染；`outer.py`
+  existed=False 已按恢复语义回收；无 `.tmp` 暂存残留。
+- **门 1 md5 对账**：`evald.py` 一致（2966864b）；**`warmd.py` 板上比正本多 W0-2
+  `PR_SET_PDEATHSIG`（0915 上板未回仓）→ 正本吸收板端字节**，冻结清单 md5 重登记
+  `023ad2de0fe49f93be9c84c69425bc06`；板上 `evaldctl`（无 `.sh`）与仓 `evaldctl.sh`
+  **双向分歧**（板有 W0-2 孤儿 warmd 清理、仓有 PY 解释器覆盖）——未合并，动它须过板上
+  selftest 门禁；dashboard/monitor 本就是 Windows 侧文档、不在 k3 板部署单元。
+- **门 2 金丝雀**：旧板上 ev.py 与新 Windows ev.py 各跑 add 64,512,512，
+  speedup 0.4909/0.4851/0.4855（三跑一致，可复现）。
+- **门 3 selftest**：**最小 config 口径 ALL PASS**（README 234 基线之后 selftest 又扩了
+  [7b]/[7c]/[15]-[20] 等节）。口径事实：SSH 会话亲和 0-7，带生产 config 跑会在 [4] 假 bench
+  的 `taskset -c 8-15` 处 EINVAL——计时核 8-15 只有 evald 服务进程（`/proc/set_ai_thread`）
+  可达；生产 config 还有 5 项"缺省语义"断言错配（OMP/taskset/output_selfcheck/推导），
+  均非代码回退。
+- **门 4 ev.py 重推上板**（`~/autoke/evald/ev.py`，备份 `.bak-pre-multi-backend-20261007`；
+  同推 backends.py/result_schema.py）金丝雀通过。
+- **门 5 dry 工单半轮**：沙箱工作区（`EV_WORKSPACE` 临时根、`baseline_paused`/relay 全关）
+  3 票全链路（timing×2 → 8788 @k3，correctness×1 → 8791 @k3-acc），ROOT/registry/结果
+  落点无漂移，真实战役工作区零接触（registry mtime 复核不变）。
+
+多后端升级项落地（**全部客户端侧，七件冻结物零改动**；决策清单 2026-09-28 的 B3→B2→B1→A1 定案顺序）：
+
+- **B1+B3 `clients/backends.py`**：`BackendProfile` 四档案（k3 在役、k1/sg2042/rvv_general
+  规划占位）、`registry_key`（k3 保持旧格式——424 个既有键零漂移；非 k3 一律 `b:<backend>/`
+  前缀，物理杜绝跨后端共用参照）、`comparable`（仅同 host 标签可比，failover 纪律）、
+  `base_label` 统一正本（k3/k3-acc 逐字不变；未知 URL 由旧管线侧 "k1-proxy" 兜底改为原样串，
+  与历史 host 值不等必触发重定基——宁可重定基不许假可比）。
+- **B2 `clients/result_schema.py`**：result-v2 统一视图——一切指标允许 None（正确性车道
+  speedup 无统计意义、跨后端无同簇基线、多 shape 顶层无标量），backend/host_tag/lane 三轴
+  入 schema；`from_raw_v1`/`load_result_v2` 读侧双 schema 兼容，历史文件不迁移。
+- **A1+A2 `clients/suite.py`**：suite-v1 校验正本（条目三键与 baseline_manifest 同构，
+  `from_baseline` 直升格）＋ `expand` 落盘 ticket 后完全复用 scan/submit/finalize 链路
+  （`_synth_relay_ticket` 先例）；STOCHASTIC 集自 eval_pipeline 源码 AST 吸入（单一正本，
+  规避其 import 副作用）；幂等重跑按 raw.json 存在性 skip。
+- **接线 `clients/ev.py` ＋ `clients/eval_pipeline.py`**：`EV_BACKEND` 环境变量 / `--backend`
+  参数选档案；默认 k3 行为零变化，无 backends.py 的独立部署（板上）自动回落旧常量；
+  `judge()` registry 键按 backend 升格（k3 路径走本地 `cond_key` 保证零漂移）；raw 与
+  result.json 之外随写 `{stem}.result-v2.json`；registry 值非 k3 追加 `backend` 溯源字段。
+- **测试与文档**：`tests/` 新建 45 用例全绿（`python -m unittest discover -s tests`）；
+  ADR-0016/0017/0018 入仓、ADR 索引更新（0016 起跳号避开工作区 0015）；CONTEXT.md 增
+  「评测后端 (Backend Profile)」「评测集 (Suite)」两术语（backend 三义消歧）；本地
+  config.json（gitignore 件）同步板端现行字节。
+- **冻结字节清单更新**：`warmd.py` `023ad2de0fe49f93be9c84c69425bc06`（吸收板端 W0-2，
+  与板逐字节一致）；其余六件 md5 不变。
+
 ## 2026-09-20（三次） — 监控改造 spec 改址重写（服务化拓扑 · 角色化宿主，待审批）
 
 - **监控改造计划迁址并重写**：`docs/spec.md` → [docs/specs/2026-09-20-监控栈改造.md](docs/specs/2026-09-20-监控栈改造.md)，

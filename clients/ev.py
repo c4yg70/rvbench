@@ -24,13 +24,15 @@ PSR 附加门：timing 作业在 K3 8788 上 psr<8 → outcome=psr_infra_fail
 （X100 分核下 PSR 本就 <8）。
 
 用法：
-  ev.py status [--limit 8]                  # 双实例探活 + 车道计数 + 最近作业
+  ev.py status [--limit 8] [--backend k3]          # 双实例探活 + 车道计数 + 最近作业
   ev.py run --op add --shape 64,512,512     # 提交并同步等终态（推荐交互入口）
             [--lane timing|correctness|func] [--dtype float32]
             [--candidate FILE [--deploy-path flag_gems/ops/add.py]]
             [--shape 可重复=多 shape 一单] [--warmup 5 --rep 5] [--timeout-min 15]
             [--bench gemm --batch 8] [--keep-deployed(=定稿 restore:false)]
             [--judge [--cond KOPE] [--stem ev-HHMMSS] [--attempt 1]]
+            [--backend k3|k1|sg2042|rvv_general]    # 评测后端档案（ADR-0016；
+                                                     #  亦可设 EV_BACKEND；默认 k3）
             [--base URL] [--budget-s 480] [--out FILE]
   ev.py submit …                            # 同 run 参数，只投不等，打印 job_id
   ev.py get <job_id> [--wait 60] [--base URL]   # 长轮询一次（≤60s），续接用
@@ -66,12 +68,45 @@ ROOT = REPO_DIR.parent            # 战役工作区根：candidate 相对路径�
 if os.environ.get("EV_WORKSPACE"):   # 仓已独立于工作区，无法从仓位置推导 → 显式覆盖
     ROOT = Path(os.environ["EV_WORKSPACE"]).expanduser().resolve()
 
-BASE = "http://10.18.60.100:8788"
-DEFAULT_CORR_BASE = "http://10.18.60.100:8791"
+BASE_K3 = "http://10.18.60.100:8788"
+DEFAULT_CORR_BASE_K3 = "http://10.18.60.100:8791"
 BOARD_EVALD_DIR = Path("/home/c4y/autoke/evald")   # 板上副本所在目录（token 就近）
 BACKOFF_S = (30, 60, 120, 240)   # 429 退避序列，受 --budget-s 硬约束
 TERMINAL = ("done", "failed", "timeout", "canceled")
 RE_SHAPE_OK = re.compile(r"^[0-9]{1,10}(,[0-9]{1,10}){0,5}$")
+
+
+# ------------------------------------------------- 评测后端（ADR-0016，B1） ---
+# BackendProfile 的客户端侧档案：EV_BACKEND 环境变量 / --backend 参数选择；
+# 板上独立副本没有 backends.py 时回落 k3 常量（本文件单独可用不变）。
+BACKEND = os.environ.get("EV_BACKEND", "k3")
+
+
+def _profile(backend: str | None = None):
+    """解析 BackendProfile；backends.py 不可用（板上独立部署）返回 None=k3 常量语义。"""
+    try:
+        from backends import get as _get   # 同目录 clients/backends.py
+    except Exception:  # noqa: BLE001
+        return None
+    return _get(backend or BACKEND)
+
+
+def bases_for(backend: str | None = None) -> tuple[str, str]:
+    """(timing_base, corr_base)。k3/无 profile → 旧常量；corr 无独立实例 → 同 timing。"""
+    p = _profile(backend)
+    if p is None:
+        return BASE_K3, DEFAULT_CORR_BASE_K3
+    if not p.timing_base:
+        die(f"backend {p.name!r} 尚未布点（timing_base 空，见 clients/backends.py notes）", code=2)
+    return p.timing_base, (p.corr_base or p.timing_base)
+
+
+def backend_of(a: argparse.Namespace | None = None) -> str:
+    """命令实际使用的 backend 名：--backend 参数 > EV_BACKEND > k3。"""
+    return (getattr(a, "backend", None) or BACKEND).strip() or "k3"
+
+
+BASE, DEFAULT_CORR_BASE = bases_for(BACKEND)
 
 
 def now_local() -> str:
@@ -135,18 +170,29 @@ def corr_base() -> str:
         "correctness_base", DEFAULT_CORR_BASE)
 
 
-def base_for_lane(lane: str, override: str | None = None) -> str:
+def base_for_lane(lane: str, override: str | None = None, backend: str | None = None) -> str:
+    """车道 → base URL。--base 显式覆盖最优先；k3 走工作区 corr_base()（8791 可配）；
+    其他 backend 一律取 profile（corr 无独立实例时同 timing，不做工作区回落——
+    工作区 correctness_base 是 k3 双实例的部署细节）。"""
     if override:
         return override.rstrip("/")
+    if backend and backend != "k3":
+        t, c = bases_for(backend)
+        return t if lane == "timing" else c
     return BASE if lane == "timing" else corr_base()
 
 
 def base_label(base: str) -> str:
-    if base.rstrip("/") == BASE:
-        return "k3"
-    if base.rstrip("/").endswith(":8791"):
-        return "k3-acc"
-    return str(base)
+    """统一正本在 backends.base_label（ADR-0016）；板上无 backends.py 时本地同语义。"""
+    try:
+        from backends import base_label as _bl
+        return _bl(base)
+    except Exception:  # noqa: BLE001
+        if base.rstrip("/") == BASE:
+            return "k3"
+        if base.rstrip("/").endswith(":8791"):
+            return "k3-acc"
+        return str(base)
 
 
 def resolve_kind(lane: str) -> str:
@@ -248,7 +294,7 @@ def healthz_gate(base: str) -> None:
 # ------------------------------------------------------------------ judge ---
 
 def finalize(job: dict, base: str, cond: str, op: str, stem: str, attempt: int,
-             meta: dict) -> dict:
+             meta: dict, backend: str = "k3") -> dict:
     """对终态作业做机械判定并落盘（契约与管线 finalize_ticket 同构）。
 
     需要仓库上下文（eval_pipeline 的 judge()/registry/cond_root）；板上副本
@@ -268,6 +314,7 @@ def finalize(job: dict, base: str, cond: str, op: str, stem: str, attempt: int,
         (job.get("request") or {}).get("lane", "timing"))
     r, cases = _split_cases(job)
     tk = {"op": op, "kind": kind, "attempt": attempt, "cond": cond,
+          "backend": backend,   # ADR-0016：judge 按 backend 升格 registry 键（k3=旧格式零漂移）
           "shape": (job.get("request") or {}).get("shape") or meta.get("shape_sent"),
           "dtype": (job.get("request") or {}).get("dtype"),
           "candidate_sha256": meta.get("sha256"),
@@ -276,14 +323,16 @@ def finalize(job: dict, base: str, cond: str, op: str, stem: str, attempt: int,
     registry = load_json(REGISTRY_FILE, {})
     outcome, note, registry = judge(tk, job_j, registry, base)
     atomic_write(REGISTRY_FILE, registry)
-    # PSR 附加门：只对 A100 计时正本生效（§4.6；X100 车道 PSR 本就 <8，不设门）
+    # PSR 附加门：只对 k3 计时正本生效（§4.6；X100 车道 PSR 本就 <8，不设门；
+    # 按 host 标签判——多后端下 BASE 常量不再唯一指向 k3）
     psr = r.get("psr") if isinstance(r, dict) else None
-    if kind == "timing-final" and base.rstrip("/") == BASE and psr is not None and float(psr) < 8:
+    if kind == "timing-final" and base_label(base) == "k3" and psr is not None and float(psr) < 8:
         outcome = "psr_infra_fail"
         note = f"{note}；PSR={psr}<8 按 infra 失败处置（不计候选 attempt）"
     res_dir.mkdir(parents=True, exist_ok=True)
     raw = {
         "schema": "raw-v1", "writer": "ev-v1", "condition": cond, "kind": kind,
+        "backend": backend,
         "op": op, "shape": tk["shape"], "dtype": tk["dtype"], "attempt": attempt,
         "candidate_sha256": meta.get("sha256"), "candidate_path": meta.get("candidate_path"),
         "deploy_path": meta.get("deploy_path"),
@@ -312,6 +361,18 @@ def finalize(job: dict, base: str, cond: str, op: str, stem: str, attempt: int,
               "outcome": outcome, "retry_notes": note, "semantics_note": note,
               "judge": "ev-v1-mechanical（与管线共享 judge()）"}
     atomic_write(res_dir / f"{stem}.result.json", result)
+    # B2（ADR-0017）：统一结果视图随写；板上无 result_schema 时显式提示（不静默）
+    lane = {"correctness": "correctness", "func": "func"}.get(kind, "timing")
+    try:
+        from result_schema import to_result_v2
+        atomic_write(res_dir / f"{stem}.result-v2.json", to_result_v2(
+            job_j, backend=backend, host_tag=base_label(base), lane=lane,
+            meta={"condition": cond, "attempt": attempt, "stem": stem, "kind": kind,
+                  "candidate_sha256": meta.get("sha256"),
+                  "candidate_path": meta.get("candidate_path"),
+                  "outcome": outcome, "note": note}))
+    except ImportError:
+        log(f"result-v2 未写（无 result_schema）：{stem}")
     jobs_log = cond_root(cond) / "evald_jobs.jsonl"
     with open(jobs_log, "a", encoding="utf-8") as f:
         f.write(json.dumps({"job_id": job.get("job_id"), "ts": now_local(),
@@ -332,7 +393,8 @@ def finalize(job: dict, base: str, cond: str, op: str, stem: str, attempt: int,
 # -------------------------------------------------------------- commands ---
 
 def cmd_run(a: argparse.Namespace) -> int:
-    base = base_for_lane(a.lane, a.base)
+    bnd = backend_of(a)
+    base = base_for_lane(a.lane, a.base, bnd)
     deadline = time.monotonic() + a.budget_s
     healthz_gate(base)
     body, meta = build_body(a)
@@ -368,7 +430,7 @@ def cmd_run(a: argparse.Namespace) -> int:
     if a.judge:
         stem = a.stem or f"ev-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         meta["kind"] = resolve_kind(a.lane)
-        j = finalize(job, base, a.cond, a.op, stem, a.attempt, meta)
+        j = finalize(job, base, a.cond, a.op, stem, a.attempt, meta, backend=bnd)
         out["outcome"], out["retry_notes"], out["recorded"] = j["outcome"], j["note"], j
         log(f"judged: {j['outcome']} @ {j['raw']}")
     if a.out:
@@ -378,7 +440,7 @@ def cmd_run(a: argparse.Namespace) -> int:
 
 
 def cmd_submit(a: argparse.Namespace) -> int:
-    base = base_for_lane(a.lane, a.base)
+    base = base_for_lane(a.lane, a.base, backend_of(a))
     healthz_gate(base)
     body, meta = build_body(a)
     sub = submit_with_backoff(body, base, time.monotonic() + 600)
@@ -389,7 +451,7 @@ def cmd_submit(a: argparse.Namespace) -> int:
 
 
 def cmd_get(a: argparse.Namespace) -> int:
-    base = a.base.rstrip("/") if a.base else BASE
+    base = a.base.rstrip("/") if a.base else bases_for(backend_of(a))[0]
     job = req("GET", f"/jobs/{a.job_id}?wait={max(1, min(60, a.wait))}",
               timeout_s=a.wait + 30, base=base)
     print(json.dumps(job, ensure_ascii=False))
@@ -397,7 +459,7 @@ def cmd_get(a: argparse.Namespace) -> int:
 
 
 def cmd_judge(a: argparse.Namespace) -> int:
-    base = a.base.rstrip("/") if a.base else BASE
+    base = a.base.rstrip("/") if a.base else bases_for(backend_of(a))[0]
     job = req("GET", f"/jobs/{a.job_id}", timeout_s=30, base=base)
     if job.get("state") not in TERMINAL:
         die(f"作业未终态（state={job.get('state')}）；先 get 等终态再 judge")
@@ -407,7 +469,7 @@ def cmd_judge(a: argparse.Namespace) -> int:
     stem = a.stem or f"ev-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     meta = {"kind": resolve_kind(lane), "sha256": None, "candidate_path": None,
             "deploy_path": None, "shape_sent": req_.get("shape"), "shape_warn": None}
-    j = finalize(job, base, a.cond, op, stem, a.attempt, meta)
+    j = finalize(job, base, a.cond, op, stem, a.attempt, meta, backend=backend_of(a))
     print(json.dumps({"job_id": a.job_id, "op": op, "stem": stem, **j},
                      ensure_ascii=False))
     return 0
@@ -415,7 +477,11 @@ def cmd_judge(a: argparse.Namespace) -> int:
 
 def cmd_status(a: argparse.Namespace) -> int:
     out: dict = {}
-    for name, base in (("timing_8788", BASE), ("corr", corr_base())):
+    bnd = backend_of(a)
+    t, c = bases_for(bnd)
+    if bnd == "k3":       # k3 双实例：corr 旁路 8791 以工作区配置为准
+        c = corr_base()
+    for name, base in ((f"timing_{t.rsplit(':', 1)[-1]}", t), ("corr", c)):
         try:
             h = req("GET", "/healthz", timeout_s=10, base=base)
             out[name] = {"base": base, "ok": h.get("ok"),
@@ -433,14 +499,14 @@ def cmd_status(a: argparse.Namespace) -> int:
 
 
 def cmd_history(a: argparse.Namespace) -> int:
-    base = a.base.rstrip("/") if a.base else BASE
+    base = a.base.rstrip("/") if a.base else bases_for(backend_of(a))[0]
     jobs = req("GET", f"/jobs?limit={a.limit}", timeout_s=15, base=base)["jobs"]
     print(json.dumps([compact(j) for j in jobs], ensure_ascii=False, indent=1))
     return 0
 
 
 def cmd_cancel(a: argparse.Namespace) -> int:
-    base = a.base.rstrip("/") if a.base else BASE
+    base = a.base.rstrip("/") if a.base else bases_for(backend_of(a))[0]
     out = req("DELETE", f"/jobs/{a.job_id}", timeout_s=30, base=base)
     print(json.dumps(out, ensure_ascii=False))
     return 0
@@ -448,12 +514,22 @@ def cmd_cancel(a: argparse.Namespace) -> int:
 
 # ------------------------------------------------------------------- CLI ---
 
+def backend_choices() -> list[str]:
+    try:
+        from backends import PROFILES   # noqa: PLC0415 — 板上无该模块时仅 k3
+        return sorted(PROFILES)
+    except Exception:  # noqa: BLE001
+        return ["k3"]
+
+
 def add_submit_args(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--op", required=True)
     sp.add_argument("--shape", action="append", default=None,
                     help="数字逗号串；可重复传 = 多 shape 一单（一单 N case）")
     sp.add_argument("--dtype", default="float32")
     sp.add_argument("--lane", choices=["timing", "correctness", "func"], default="timing")
+    sp.add_argument("--backend", choices=backend_choices(), default=None,
+                    help="评测后端档案（ADR-0016；默认 EV_BACKEND 或 k3）")
     sp.add_argument("--bench", choices=["op", "gemm"], default="op")
     sp.add_argument("--batch", type=int, default=None, help="仅 gemm")
     sp.add_argument("--candidate", default=None, help="候选文件（仓库相对或绝对路径）")
@@ -464,12 +540,14 @@ def add_submit_args(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--timeout-min", type=float, default=15)
     sp.add_argument("--keep-deployed", action="store_true",
                     help="定稿作业 restore:false——测完保留候选，仅波次收尾用")
-    sp.add_argument("--base", default=None, help="覆盖 evald 地址（默认 K3 8788；"
+    sp.add_argument("--base", default=None, help="覆盖 evald 地址（默认按 backend：K3 8788；"
                                                  "correctness/func 默认 8791）")
 
 
 def add_base_arg(sp: argparse.ArgumentParser) -> None:
-    sp.add_argument("--base", default=None, help="覆盖 evald 地址（默认 K3 8788）")
+    sp.add_argument("--base", default=None, help="覆盖 evald 地址（默认按 backend）")
+    sp.add_argument("--backend", choices=backend_choices(), default=None,
+                    help="评测后端档案（默认 EV_BACKEND 或 k3）")
 
 
 def main() -> None:
@@ -507,6 +585,8 @@ def main() -> None:
 
     st = sub.add_parser("status", help="双实例探活 + 最近作业")
     st.add_argument("--limit", type=int, default=8)
+    st.add_argument("--backend", choices=backend_choices(), default=None,
+                    help="评测后端档案（默认 EV_BACKEND 或 k3）")
     st.set_defaults(fn=cmd_status)
 
     hi = sub.add_parser("history", help="最近作业列表")
