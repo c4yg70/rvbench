@@ -1,0 +1,3679 @@
+[
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "lane": "correctness"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 0,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "lane": "correctness",
+      "requested_warmup": 10,
+      "requested_rep": 50
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "lane": "timing"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "lane": "timing"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "lane": "banana"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "skip_torch": true,
+      "seed": 7
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "skip_torch": true,
+      "seed": 7
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "seed": 0
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "seed": 0
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "skip_torch": "yes"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "skip_torch": null
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "seed": -1
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "seed": 2147483648
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "seed": true
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "mm",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "gemm",
+      "restore": true,
+      "skip_torch": true
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "mm",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "gemm",
+      "restore": true,
+      "seed": 1
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "128,512,512"
+      ],
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "skip_torch": true
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "128,512,512"
+      ],
+      "dtype": "float32",
+      "warmup": 10,
+      "rep": 50,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "skip_torch": true
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 5,
+          "repeat_times": 5,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 5,
+      "rep": 5,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 5,
+          "repeat_times": 5,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 9,
+      "rep": 9
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 9,
+      "rep": 9,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": false
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": false
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "lane": "timing"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": false
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "lane": "func",
+      "warmup": 7,
+      "rep": 9
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 0,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": [],
+      "lane": "func",
+      "requested_warmup": 7,
+      "requested_rep": 9
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "evaluators": {
+        "perf": {
+          "enabled": false
+        },
+        "acc": {
+          "enabled": true,
+          "workers": 2,
+          "cpus": "2-3",
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": true,
+          "workers": 1,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "cpus": "2-3",
+          "omp_threads": 1
+        }
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "lane": "banana"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data16",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "128,256,256"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 2,
+      "files": []
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "128,256,256"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 2,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data16",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "not-a-shape"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 2,
+      "files": []
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data16",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "1024",
+        "1024"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 2,
+      "files": []
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data16",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 2,
+      "files": []
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data16",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": [
+        "64,512,512",
+        "128,256,256"
+      ],
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 999,
+      "files": []
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "perf": {
+        "perf": {
+          "max_concurrency": 2,
+          "max_queue": 8,
+          "cpu_ids": "0-1",
+          "omp_threads": 2
+        },
+        "acc": {
+          "cpu_ids": [
+            12,
+            13,
+            14
+          ],
+          "max_concurrency": 5,
+          "max_queue": 16,
+          "executor": "subprocess",
+          "timeout_min": 6
+        },
+        "func": {
+          "cpu_ids": "4,6",
+          "max_concurrency": 1,
+          "max_queue": 4
+        }
+      },
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 2,
+          "cpus": "0-1",
+          "omp_threads": 2
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 5,
+          "cpus": "12-14",
+          "omp_threads": 1,
+          "executor": "subprocess",
+          "timeout_min": 6.0
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 1,
+          "cpus": "4,6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": 8,
+        "correctness": 16,
+        "func": 4
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "lane": "correctness"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 0,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 6.0,
+      "executor": null,
+      "files": [],
+      "lane": "correctness",
+      "requested_warmup": 25,
+      "requested_rep": 100
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'",
+      "perf": {
+        "perf": {
+          "max_concurrency": 2,
+          "max_queue": 8,
+          "cpu_ids": "0-1",
+          "omp_threads": 2
+        },
+        "acc": {
+          "cpu_ids": [
+            12,
+            13,
+            14
+          ],
+          "max_concurrency": 5,
+          "max_queue": 16,
+          "executor": "subprocess",
+          "timeout_min": 6
+        },
+        "func": {
+          "cpu_ids": "4,6",
+          "max_concurrency": 1,
+          "max_queue": 4
+        }
+      },
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 2,
+          "cpus": "0-1",
+          "omp_threads": 2
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 5,
+          "cpus": "12-14",
+          "omp_threads": 1,
+          "executor": "subprocess",
+          "timeout_min": 6.0
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 1,
+          "cpus": "4,6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": 8,
+        "correctness": 16,
+        "func": 4
+      }
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 25,
+      "rep": 100,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 15,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": "drv-1:op:0001"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [],
+      "client_request_id": "drv-1:op:0001"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": []
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": ""
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": "bad id"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": "bad/id"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": 7
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data20",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "client_request_id": "cid-dup"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [],
+      "client_request_id": "cid-dup"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "current_verified",
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [],
+      "mode": "current_verified",
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "current_verified"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "current_verified",
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "content": "X"
+        }
+      ]
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "deploy"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "deploy",
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "content": "X"
+        }
+      ]
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "sha256": "4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015",
+          "bytes": 1
+        }
+      ],
+      "mode": "deploy"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "banana"
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": true,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1
+    },
+    "valid": false,
+    "sanitized": null
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": true,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "mode": "current_verified",
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [],
+      "mode": "current_verified",
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": true,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "content": "X"
+        }
+      ]
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "sha256": "4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015",
+          "bytes": 1
+        }
+      ]
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data20",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "content": "CANDIDATE_E2E"
+        }
+      ]
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [
+        {
+          "path": "flag_gems/ops/add.py",
+          "sha256": "67bd5500bb37be5830aca69b96c313626247a5adcfbf3b688545e3c692e7d399",
+          "bytes": 13
+        }
+      ]
+    }
+  },
+  {
+    "config": {
+      "token": "local-selftest",
+      "host": "127.0.0.1",
+      "port": 0,
+      "flag_gems_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\fg",
+      "scripts_root": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\scripts",
+      "run_env": "run_env.sh",
+      "data_dir": "C:\\Users\\c4y\\AppData\\Local\\Temp\\evald_selftest_59sg2h5z\\data20",
+      "lock_file": "/tmp/k3_bench.lock",
+      "queue_max": 64,
+      "timeout_default_min": 15,
+      "timeout_max_min": 30,
+      "body_max_bytes": 8388608,
+      "history_mem": 1000,
+      "longpoll_max_s": 60,
+      "executor": "subprocess",
+      "warmd_path": "C:\\Users\\c4y\\AppData\\Local\\Temp\\tmpskecm3qj\\data\\warmd.py",
+      "warmd_env": {},
+      "warmd_output_selfcheck": false,
+      "path_lock_dir": "/tmp/evald-pathlocks",
+      "require_verified_base": false,
+      "correctness_workers": 3,
+      "correctness_cpus": "4-6",
+      "correctness_omp_threads": 1,
+      "correctness_executor": null,
+      "evaluators": {
+        "perf": {
+          "enabled": true,
+          "warmup_times": 25,
+          "repeat_times": 100,
+          "workers": 1,
+          "cpus": null,
+          "omp_threads": null
+        },
+        "acc": {
+          "enabled": true,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 3,
+          "cpus": "4-6",
+          "omp_threads": 1
+        },
+        "func": {
+          "enabled": false,
+          "warmup_times": 0,
+          "repeat_times": 1,
+          "workers": 2,
+          "cpus": "4-6",
+          "omp_threads": 1
+        }
+      },
+      "lane_queue_max": {
+        "timing": null,
+        "correctness": null,
+        "func": null
+      },
+      "bench_command_override": "echo '{\"op\": \"fake\", \"torch_ms\": 2.0, \"gems_ms\": 1.0, \"speedup\": 2.0, \"correct\": true, \"max_abs_err\": 0.0}'"
+    },
+    "body": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "valid": true,
+    "sanitized": {
+      "op": "add",
+      "shape": "64",
+      "dtype": "float32",
+      "warmup": 1,
+      "rep": 1,
+      "bench": "op",
+      "restore": true,
+      "timeout_min": 1,
+      "executor": null,
+      "files": [],
+      "expect_path": "flag_gems/ops/add.py",
+      "expect_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+]

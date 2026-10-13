@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+spec.hidden.json
+config.json
+evald.env
+evald.log
+evald.pid
+jobs.jsonl
+jobs/
+*.tmp
+.archify/
+artifacts/
+.venv/
+webui/node_modules/
+webui/dist/
+target/

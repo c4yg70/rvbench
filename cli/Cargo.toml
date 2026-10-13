@@ -1,0 +1,22 @@
+[package]
+name = "rvbench-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "rvbench"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+reqwest.workspace = true
+fs2.workspace = true
+rvbench-runtime = { path = "../runtime" }
+rvbench-core = { path = "../core" }
+rvbench-k3 = { path = "../backends/spacemit/k3" }
+serde_json.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rvbench private test cases v1 (operator definitions forbidden)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "(^|/)spec\\.hidden\\.schema\\.json$"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "ready"
+      ]
+    },
+    "public_spec": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?![a-zA-Z]+://)(?:.*[/\\\\])?spec\\.json$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "required": [
+    "$schema",
+    "schema_version",
+    "suite_id",
+    "version",
+    "status",
+    "public_spec",
+    "cases"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "tensor"
+            },
+            "shape": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "dtype": {
+              "enum": [
+                "float16",
+                "bfloat16",
+                "float32",
+                "float64",
+                "int32",
+                "int64",
+                "bool"
+              ]
+            },
+            "layout": {
+              "$ref": "#/$defs/layout"
+            },
+            "generator": {
+              "$ref": "#/$defs/generator"
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "shape",
+            "dtype",
+            "layout",
+            "generator"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "none"
+            }
+          },
+          "required": [
+            "name",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "generator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "torch_cpu_uniform_v1"
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "low": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "seed",
+            "low",
+            "high"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "constant_v1"
+            },
+            "value": {
+              "type": [
+                "number",
+                "boolean"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "contiguous",
+            "strided"
+          ]
+        },
+        "axes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "strides": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "storage_offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "kind",
+        "axes"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "strided"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "strides"
+            ]
+          }
+        }
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "pending_probe",
+            "ready",
+            "blocked",
+            "skip"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reason",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "derivation": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "operator",
+        "contract_ref",
+        "inputs",
+        "attrs",
+        "execution",
+        "derivation"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$id": "urn:rvbench:spec-hidden:1.0.0"
+}

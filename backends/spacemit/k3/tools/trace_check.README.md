@@ -1,10 +1,10 @@
-# trace_check.py — T3 harness-trace 落盘管线校验脚本
+# rvbench-tools trace — harness-trace 校验
 
 当前版本 **v1.1**（2026-09-09：runs/PILOT 端到端演练缺陷 D2/D3/D4 协调者裁决回写；
 变更见下文「v1.1 条件感知规则」）。T3 spec 执行内容 3 的本地校验工具。
 校验 `runs/<task>/<condition>/<op>/trace.jsonl`
 （每候选一行 JSON）的必填字段、枚举、hash 格式、跨根污染与候选序完整性。
-纯 Python stdlib，Windows Git Bash 可跑；不修改 `data/harness-trace.template.json`。
+原生 Rust，Windows/Linux 可运行；不修改 `data/harness-trace.template.json`。
 
 依据：`2026-kemos-cgo27/experiments/specs/T3-orchestration.md`（执行内容 2/3/5、隔离纪律）、
 `2026-kemos-cgo27/data/harness-trace.template.json`（字段模板）、
@@ -15,13 +15,13 @@
 ## 用法
 
 ```bash
-python tools/trace_check.py --dir results/conditions/full/add   # 单目录：目录内直接含 trace.jsonl，或递归其子树
-python tools/trace_check.py --root runs/          # 从 runs 根递归收集并按 task/condition 汇总
-python tools/trace_check.py --root runs/ --json   # stdout 输出机器可读 JSON（人读摘要转 stderr）
+rvbench-tools trace --dir results/conditions/full/add   # 单目录：目录内直接含 trace.jsonl，或递归其子树
+rvbench-tools trace --root runs/          # 从 runs 根递归收集并按 task/condition 汇总
+rvbench-tools trace --root runs/ --json   # stdout 输出机器可读 JSON
 ```
 
 `--dir` / `--root` 二选一（必填）。`--json` 的 JSON 结构：
-`{tool, version, generated_at, mode, base, ok, summary{files,lines,errors,warnings},
+`{tool, version, generated_at, base, ok, summary{files,lines,errors,warnings},
 by_task, by_condition, files[{path,task,condition,op,lines,errors,warnings,issues[]}]}`
 ，issue 为 `{severity, line, code, field, message}`。
 
@@ -31,7 +31,7 @@ by_task, by_condition, files[{path,task,condition,op,lines,errors,warnings,issue
 |---|---|
 | 0 | 无 ERROR（WARN 不影响结果） |
 | 1 | 至少一个 ERROR |
-| 2 | 用法/IO 错误（缺参数、路径不存在、找不到任何 trace.jsonl） |
+| 2 | 命令行用法错误；IO/未找到 trace 返回 1 |
 
 ## 每行候选的必填字段（16 个，存在且非空）
 
@@ -100,12 +100,12 @@ Windows 反斜杠路径会先归一化为 `/` 再比对；前缀比对大小写�
 
 ## Fixtures 自测
 
-`tools/trace_fixtures/good/E1/G/add/trace.jsonl`：3 行合法候选
+`trace_fixtures/good/E1/G/add/trace.jsonl`：3 行历史夹具，memory_root 仍为 results/，在原 Python 与 Rust 的 D4 规则下均有 6 个错误。将 memory_root 改为 runs/E1/G/memory 后通过。原文件保留用于兼容回归
 （accepted_correctness_and_faster / rejected_slower / repaired）。
-`tools/trace_fixtures/bad/E4/R_ONLY/relu/trace.jsonl`：2 行违规
+`trace_fixtures/bad/E4/R_ONLY/relu/trace.jsonl`：2 行违规（9 个错误、1 个警告）
 （非法 hash、null 理由、枚举外结果态、kope-mem 与 mem/ 引用、空注入证据、跨条件路径、重复 job_id）。
 
 ```bash
-python tools/trace_check.py --dir tools/trace_fixtures/good   # 必须 PASS，exit 0
-python tools/trace_check.py --dir tools/trace_fixtures/bad    # 必须 FAIL，exit 1
+rvbench-tools trace --dir backends/spacemit/k3/tools/trace_fixtures/good   # 历史 D4 违规，exit 1
+rvbench-tools trace --dir backends/spacemit/k3/tools/trace_fixtures/bad    # 必须 FAIL，exit 1
 ```

@@ -1,0 +1,224 @@
+{
+  "$schema": "../schemas/eval_results.schema.json",
+  "schema_version": "1.0.0",
+  "version": "0.1.1",
+  "run": {
+    "id": "synthetic-run-not-a-measurement",
+    "mode": "standalone",
+    "manager_arch": null,
+    "status": "completed",
+    "created_at": "2026-10-08T04:00:00Z",
+    "finished_at": "2026-10-08T04:00:30Z",
+    "purpose": "synthetic",
+    "visibility": "public"
+  },
+  "specs": {
+    "public": {
+      "suite_id": "typical8",
+      "schema_version": "2.0.0",
+      "version": "0.2.1",
+      "sha256": "ec4aae80794f92c1af59a38c7b22a3883f256cdd38f9bb4c17fa4bd35a9120a3"
+    },
+    "hidden": null
+  },
+  "execution": {
+    "mode": "perf",
+    "warmup": 1,
+    "repetitions": 3,
+    "timing_contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "selection_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidate": {
+      "id": "synthetic-reference",
+      "kind": "reference",
+      "sha256": null
+    }
+  },
+  "environments": [
+    {
+      "id": "synthetic-env",
+      "fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "architecture": "rv64",
+      "worker_id": null,
+      "boot_id": null,
+      "cpu": {
+        "model": "synthetic",
+        "isa": "synthetic",
+        "logical_cpus": 1,
+        "affinity": [
+          0
+        ]
+      },
+      "runtime": {
+        "python": "synthetic",
+        "torch": "synthetic",
+        "triton": "synthetic",
+        "flag_gems": "synthetic",
+        "runner": "synthetic",
+        "adapter": "synthetic",
+        "generator": "synthetic"
+      },
+      "isolation": {
+        "kind": "host_lock",
+        "description": "Synthetic example; not measured evidence."
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "typical8.abs.C01",
+      "operator": "abs",
+      "source": "public",
+      "contract_ref": "typical8.abs.C01",
+      "status": "passed",
+      "reason": null,
+      "redacted": false,
+      "selected_attempt_id": "synthetic-attempt-2",
+      "attempts": [
+        {
+          "id": "synthetic-attempt-1",
+          "job_id": null,
+          "lease_epoch": null,
+          "environment_id": "synthetic-env",
+          "status": "infra_error",
+          "started_at": "2026-10-08T04:00:01Z",
+          "finished_at": "2026-10-08T04:00:05Z",
+          "trusted": false,
+          "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "loaded_candidate_sha256": null,
+          "inputs": [],
+          "attrs": {},
+          "outputs": [],
+          "checks": [],
+          "timing": null,
+          "cleanup": {
+            "status": "failed",
+            "reason": {
+              "code": "SYNTHETIC_PROCESS_FAILURE",
+              "message": "Synthetic fixture: no benchmark was executed."
+            }
+          },
+          "exit_code": 1,
+          "reason": {
+            "code": "SYNTHETIC_PROCESS_FAILURE",
+            "message": "Synthetic fixture: no benchmark was executed."
+          },
+          "artifacts": []
+        },
+        {
+          "id": "synthetic-attempt-2",
+          "job_id": null,
+          "lease_epoch": null,
+          "environment_id": "synthetic-env",
+          "status": "passed",
+          "started_at": "2026-10-08T04:00:10Z",
+          "finished_at": "2026-10-08T04:00:20Z",
+          "trusted": true,
+          "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "loaded_candidate_sha256": null,
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "strides": [
+                1024,
+                1
+              ],
+              "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -10,
+                "high": 10
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "status": "produced",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "checks": [
+            {
+              "id": "synthetic-allclose",
+              "kind": "numeric",
+              "outputs": [
+                "out"
+              ],
+              "status": "passed",
+              "reason": null,
+              "metrics": {
+                "max_abs_error": 0.0
+              },
+              "method": "synthetic-allclose",
+              "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "parameters": {
+                "synthetic": true
+              }
+            }
+          ],
+          "timing": {
+            "unit": "ms",
+            "scope": "call",
+            "statistic": "median",
+            "preparation": "excluded",
+            "synchronization": "synthetic-no-execution",
+            "warmup": 1,
+            "repetitions": 3,
+            "reference_samples_ms": [
+              4.0,
+              5.0,
+              6.0
+            ],
+            "candidate_samples_ms": [
+              2.0,
+              2.5,
+              3.0
+            ],
+            "reference_median_ms": 5.0,
+            "candidate_median_ms": 2.5,
+            "speedup": 2.0
+          },
+          "cleanup": {
+            "status": "ok",
+            "reason": null
+          },
+          "exit_code": 0,
+          "reason": null,
+          "artifacts": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "outcomes": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "unverifiable": 0,
+      "infra_error": 0,
+      "canceled": 0
+    },
+    "timing_groups": [
+      {
+        "environment_id": "synthetic-env",
+        "eligible_case_count": 1,
+        "geomean_speedup": 2.0
+      }
+    ]
+  }
+}

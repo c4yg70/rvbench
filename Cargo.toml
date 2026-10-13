@@ -1,0 +1,30 @@
+[workspace]
+members = ["core", "cli", "tools", "runtime", "backends/spacemit/k3"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+fs2 = "0.4"
+jsonschema = { version = "0.49.9", default-features = false }
+libc = "0.2"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+ryu = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "float_roundtrip"] }
+sha2 = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+walkdir = "2"
+
+[profile.release]
+lto = "thin"
+strip = true

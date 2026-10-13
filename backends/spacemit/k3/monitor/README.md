@@ -1,7 +1,7 @@
 # K3 评估服务器监控（面板 prometheus.yml 正本）
 
 K3 评估服务器（10.18.60.100）＋双 evald 实例的网页监控。面板零依赖单文件
-[`../dashboard.html`](../dashboard.html)（file:// 双击直开），本目录存放 Prometheus 配置与说明。
+[`webui/dashboard.html`](../../../../webui/dashboard.html)（file:// 双击直开），本目录存放 Prometheus 配置与说明。
 
 > **2026-09-10 深夜迁址**：原 `work/k1-monitor/`（README、prometheus.yml、eval-probe/、attic/）
 > 在邻会话文件架构重建中被删除且无搬迁映射，本目录为按上下文重建的正本。
@@ -11,7 +11,7 @@ K3 评估服务器（10.18.60.100）＋双 evald 实例的网页监控。面板�
 
 ## 面板
 
-- 双击 `../dashboard.html`（file:// 直开，Prometheus CORS 对 null origin 放行）；
+- 从主仓根打开 `webui/dashboard.html`（file:// 直开，Prometheus CORS 对 null origin 放行）；
   `?prom=<url>` 可覆盖数据源（记忆于 localStorage）。
 - 刷新节奏（2026-09-10 起）：**即时值 5s**；重查询（query_range 火花线＋5m/1m 窗口统计）
   每 9 轮＝45s 一次（`dashboard.html` 顶部 `TICK_MS` / `RANGE_EVERY`）。
@@ -50,9 +50,11 @@ textfile 探针已于 2026-09-09 退役（原生 /metrics 全量覆盖）；K1 �
 ```bash
 # 启动（已启动则跳过）。目录挂载（单文件 bind 在 Windows 会 inode 失效）；
 # --config.file 必须 MSYS_NO_PATHCONV=1（否则 /monitor 被 Git Bash 改写成 C:/Program Files/Git/...）
+# 在 rvbench 主仓根执行（Windows Git Bash）。
+MONITOR_DIR="$(cygpath -m "$PWD/backends/spacemit/k3/monitor")"
 MSYS_NO_PATHCONV=1 docker run -d --name k1-prom --restart unless-stopped \
   -p 127.0.0.1:9090:9090 \
-  -v "C:/Users/c4y/c4y-dev/autoke/rv-k3-kernel-opti/riscv-flagos-kernel-eval-server/monitor:/k1mon:ro" \
+  -v "$MONITOR_DIR:/k1mon:ro" \
   prom/prometheus:latest --config.file=/k1mon/prometheus.yml
 
 # 改配置后生效
