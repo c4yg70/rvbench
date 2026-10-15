@@ -2,7 +2,9 @@
 
 原生 Rust 客户端。使用 `rvbench --help`、`rvbench ev --help`、`rvbench suite --help` 查看参数。
 
-`validate spec|hidden|results`、`digest` 为离线合同工具。`ev run|submit|get|judge|status|history|cancel` 使用 HTTP 作业服务。`suite validate|expand|from-baseline|run` 处理历史 suite-v1；`pipeline` 处理工作区 ticket，`op-status` 展示本地状态。
+`validate spec|hidden|results|baseline-results`、`digest` 为离线合同工具。`ev run|submit|get|judge|status|history|cancel` 使用 HTTP 作业服务。`suite validate|expand|from-baseline|run` 处理历史 suite-v1；`pipeline` 处理工作区 ticket，`op-status` 展示本地状态。
+
+可选基准包使用 `validate spec FILE` 核验；历史测速使用 `validate baseline-results FILE --spec SPEC`；`digest SPEC --baseline ID` 输出实现与 case 合同摘要。它们不执行 `baseline.run` 或修改 registry。详见 [baseline 格式](../docs/specs/2026-10-16-suite-baseline格式.md)。
 
 全局参数：`--root` 主仓，`--workspace` 工作区，`--backend` 档案，`--base` 显式服务地址，`--token` 认证。推荐通过 `EV_TOKEN` 提供 token，避免命令行历史；支持 `EV_WORKSPACE` 和 `EV_BACKEND`。
 

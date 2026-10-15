@@ -16,3 +16,5 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo run -p rvbench-cli --locked -- validate spec suites/kernels/typical8/spec.json
       - run: cargo run -p rvbench-cli --locked -- validate results examples/eval_results.json --spec suites/kernels/typical8/spec.json
+      - run: cargo run -p rvbench-cli --locked -- validate spec examples/baseline/spec.json
+      - run: cargo run -p rvbench-cli --locked -- validate baseline-results examples/baseline/baseline-results.json --spec examples/baseline/spec.json

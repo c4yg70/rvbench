@@ -133,6 +133,19 @@ fn check(root: &Path) -> Result<()> {
         .is_empty(),
         "synthetic result invalid"
     );
+    let baseline_base = root.join("examples/baseline");
+    let baseline_spec = rvbench_core::load_json(baseline_base.join("spec.json"))?;
+    let baseline_result = rvbench_core::load_json(baseline_base.join("baseline-results.json"))?;
+    ensure!(
+        rvbench_core::validate_baseline_results(
+            &baseline_result,
+            Some(&baseline_spec),
+            Some(&baseline_base),
+            Some(&baseline_base),
+        )
+        .is_empty(),
+        "baseline example invalid"
+    );
     println!("VALID: Rust workspace and public contracts");
     Ok(())
 }

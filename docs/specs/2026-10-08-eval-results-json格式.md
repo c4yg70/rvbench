@@ -2,7 +2,7 @@
 
 状态：Schema、语义校验器与 synthetic 示例已落仓（2026-10-08）；Rust manager/worker 和 Python runner 的结果写入尚未实现。
 
-- 结构正本：[eval_results.schema.json](../../schemas/eval_results.schema.json)，JSON Schema Draft 2020-12，`$id=urn:rvbench:eval-results:1.0.0`。
+- 结构正本：[eval_results.schema.json](../../schemas/eval_results.schema.json)，JSON Schema Draft 2020-12，`$id=urn:rvbench:eval-results:1.1.0`，兼容 1.0.0。
 - 语义校验：[core/src/results.rs](../../core/src/results.rs)，不加载 torch、不执行算子。
 - 示例：[examples/eval_results.json](../../examples/eval_results.json)，`run.purpose=synthetic`，其中时间、摘要、环境及指标均为测试夹具，不是实际评测证据。
 
@@ -10,9 +10,9 @@
 
 `eval_results.json` 是一次 Run 的可查询结果快照：保留所有所选 case 的终态、全部历史 attempt 与有效结果选择，并由同一批 case 重算汇总。Run 完成表示流程结束，允许包含 failed/skip/infra_error；不等同于所有测试通过。尚未执行或丢失的 case 仍保留，用 `infra_error / canceled / unverifiable` 和原因解释，不能从分母删除。运行中的调度状态由服务状态库管理，不把 queued/running 伪装成终态。
 
-`$schema` 指向 `eval_results.schema.json`；`schema_version=1.0.0` 匹配其格式；顶层 `version` 是该结果文件自身的内容修订版本（初始可为 0.1.0）。重试、选择变化或重新生成快照须递增自身 `version`，不得修改原始 attempt 的证据。版本采用无前导零的三段非负整数，未知格式拒绝。
+`$schema` 指向 `eval_results.schema.json`；`schema_version` 接受 1.0.0/1.1.0；顶层 `version` 是该结果文件自身的内容修订版本（初始可为 0.1.0）。重试、选择变化或重新生成快照须递增自身 `version`，不得修改原始 attempt 的证据。版本采用无前导零的三段非负整数，未知格式拒绝。
 
-`specs.public`、`specs.hidden` 各保存 `{suite_id, schema_version, version, sha256}`。当前分别接受公开格式 2.0.0、隐藏格式 1.0.0；`hidden=null` 表示未加载隐藏集。内容摘要使用现有 `spec_digest` 的 canonical JSON v1 算法，包含版本字段，绝不只凭名称或自身版本认定内容相同。结果文件自身版本、Schema 版本与测试定义版本各有职责。Rust 实现仍须通过跨语言 digest golden corpus 门禁。
+`specs.public`、`specs.hidden` 各保存 `{suite_id, schema_version, version, sha256}`。结果格式 1.0.0 仍只接受公开格式 2.0.0；1.1.0 可接受 2.0.0/2.1.0，以支持可选 baseline。隐藏格式保持 1.0.0；`hidden=null` 表示未加载隐藏集。内容摘要使用现有 `spec_digest` 的 canonical JSON v1 算法，包含版本字段，绝不只凭名称或自身版本认定内容相同。结果文件自身版本、Schema 版本与测试定义版本各有职责。Rust 实现仍须通过跨语言 digest golden corpus 门禁。
 
 ## 2. 顶层结构
 

@@ -38,6 +38,8 @@ rvbench/
 cargo build --workspace --locked
 cargo run -p rvbench-cli -- validate spec suites/kernels/typical8/spec.json
 cargo run -p rvbench-cli -- validate results examples/eval_results.json --spec suites/kernels/typical8/spec.json
+cargo run -p rvbench-cli -- validate spec examples/baseline/spec.json
+cargo run -p rvbench-cli -- validate baseline-results examples/baseline/baseline-results.json --spec examples/baseline/spec.json
 cargo run -p rvbench-tools -- check
 cargo run -p rvbench-cli -- ev --help
 ```
@@ -74,5 +76,6 @@ token 使用 `EV_TOKEN`，客户端也支持本地私有 K3 配置；工作区�
 - [架构图](docs/architecture.html)
 - [spec 格式](docs/specs/2026-10-08-spec-json格式.md)
 - [结果格式](docs/specs/2026-10-08-eval-results-json格式.md)
+- [可选 baseline 定义与历史测速](docs/specs/2026-10-16-suite-baseline格式.md)
 
 原两仓完整本地备份在工作区 `.repo-backups/2026-10-14/`；本次迁移的旧 Python 控制代码按原路径保存于 `artifacts/python-legacy-2026-10-14/`，附逐文件 SHA-256 清单。历史文档位于 `docs/history/` 和 `docs/backends/`。
