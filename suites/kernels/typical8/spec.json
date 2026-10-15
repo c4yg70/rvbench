@@ -1,6 +1,6 @@
 {
   "$schema": "../../../schemas/spec.schema.json",
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "suite": {
     "id": "typical8",
     "title": "典型 8 算子 — 首批来源用例",
@@ -52,8 +52,9 @@
       "statistic": "median",
       "preparation": "excluded",
       "contract": {
-        "status": "pending",
-        "reason": "既有 timing-contract.md 尚未迁入本仓；M3/M4 绑定其版本与内容摘要后计时。"
+        "status": "resolved",
+        "path": "baselines/pytorch/timing-contract.json",
+        "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
       }
     }
   },
@@ -1359,5 +1360,393 @@
       ]
     }
   ],
-  "version": "0.2.1"
+  "version": "0.3.1",
+  "baseline": {
+    "entries": [
+      {
+        "id": "pytorch_abs",
+        "operator_id": "abs",
+        "case_ids": [
+          "typical8.abs.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "abs.py",
+              "sha256": "5b92847a34534b5db991a9d46578da9e464a1e7ee91a85ea28b61d8f8c45391a"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "abs.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_abs",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/abs.json",
+            "sha256": "c1e72c0675597592c0c51cb1d39175c85f062139f4e9a5986fc9c57adacf3593"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_aminmax",
+        "operator_id": "aminmax",
+        "case_ids": [
+          "typical8.aminmax.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "aminmax.py",
+              "sha256": "c510735f01d893029d90173a6325a47282953a743f119e6fc37a7214e538b73d"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "aminmax.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_aminmax",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/aminmax.json",
+            "sha256": "ef2fd2c6a820316acf4b69282498c57ac1798e5b424a50bc8f2c9bb4012b7ddf"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_softmax",
+        "operator_id": "softmax",
+        "case_ids": [
+          "typical8.softmax.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "softmax.py",
+              "sha256": "c2526d38708c38e9610a230a113cce675c7fd322b6f03ebb4a206fbe1302574c"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "softmax.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_softmax",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/softmax.json",
+            "sha256": "df9e4248c39d262367d3e9483b4b4405b0992f9fa9942270f75d94b1cf7846e8"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_mv",
+        "operator_id": "mv",
+        "case_ids": [
+          "typical8.mv.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "mv.py",
+              "sha256": "42e8d54c155e4c6a49684074d9263d82b057eb026a16baa00ffbfa768e1376ed"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "mv.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_mv",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/mv.json",
+            "sha256": "c9d4c051bb23dcdbf30fc83f7e382d66c733efd4fac7bb6cdf2f4e0ee024bd6d"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_mm",
+        "operator_id": "mm",
+        "case_ids": [
+          "typical8.mm.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "mm.py",
+              "sha256": "78b5e541a6a4ebffbb69bcb748110077144dc8bd57e7f139b0fda16706a98d51"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "mm.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_mm",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/mm.json",
+            "sha256": "01c7431a6466b07fe84e51927cb20fd7e3bc92413f6dff70790ad44a15c47bd0"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_conv2d",
+        "operator_id": "conv2d",
+        "case_ids": [
+          "typical8.conv2d.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "conv2d.py",
+              "sha256": "ae7225089c1a782ac48908f3a4699d857c72ffc3507a4a99a99178cf6c5e2f30"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "conv2d.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_conv2d",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/conv2d.json",
+            "sha256": "9a231c5c55b4187dd1f14faebe55a060c00595adab0c8b51183aadec92097efb"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_topk",
+        "operator_id": "topk",
+        "case_ids": [
+          "typical8.topk.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "topk.py",
+              "sha256": "8b2a0f9c2f1de20bdec3ee9a27210bed319e7ab9305461a4741f5545532446f9"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "topk.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_topk",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/topk.json",
+            "sha256": "0e395194217de503e21c9c6cfb5b757c17e9470432c4c37fc4265851cd35ed07"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_flash_attention_forward",
+        "operator_id": "_flash_attention_forward",
+        "case_ids": [
+          "typical8._flash_attention_forward.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "flash_attention_forward.py",
+              "sha256": "087b4f0d6792927527ad633d185c12e6c59d2fa8fbcaee7d28252dd0a4b5670e"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "flash_attention_forward.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_flash_attention_forward",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/flash_attention_forward.json",
+            "sha256": "be4f2c5d4f348c1ac1d8f826eb87071401e739a7d22b9341d3a7957387213ccb"
+          }
+        ]
+      }
+    ]
+  }
 }

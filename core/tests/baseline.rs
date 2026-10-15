@@ -193,6 +193,33 @@ fn historical_bindings_have_no_digest_cycle_and_track_effective_contracts() {
 }
 
 #[test]
+fn typical8_has_an_independent_pytorch_source_and_command_for_every_operator() {
+    let spec = load_json(root().join("suites/kernels/typical8/spec.json")).unwrap();
+    let entries = spec["baseline"]["entries"].as_array().unwrap();
+    for op in spec["operators"].as_array().unwrap() {
+        let entry = entries
+            .iter()
+            .find(|e| e["operator_id"] == op["id"])
+            .unwrap();
+        let filename = format!("{}.py", op["id"].as_str().unwrap().trim_start_matches('_'));
+        assert_eq!(entry["run"]["argv"][1], filename);
+        let file = entry["code"]["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["path"] == filename)
+            .unwrap();
+        let path = root()
+            .join("suites/kernels/typical8")
+            .join(entry["code"]["root"].as_str().unwrap())
+            .join(&filename);
+        let bytes = fs::read(path).unwrap();
+        assert_eq!(file["sha256"], sha256(&bytes));
+        assert!(String::from_utf8(bytes).unwrap().contains("def baseline("));
+    }
+}
+
+#[test]
 fn rejects_inconsistent_historical_measurements() {
     let (temp, spec, result) = fixture();
     for (pointer, value) in [
