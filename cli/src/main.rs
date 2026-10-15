@@ -44,6 +44,9 @@ enum Command {
     },
     Digest {
         file: PathBuf,
+        /// Report implementation and covered case digests for a baseline entry.
+        #[arg(long)]
+        baseline: Option<String>,
     },
     Ev {
         #[command(subcommand)]
@@ -86,6 +89,11 @@ enum Validation {
         spec: Option<PathBuf>,
         #[arg(long)]
         hidden_spec: Option<PathBuf>,
+    },
+    BaselineResults {
+        file: PathBuf,
+        #[arg(long)]
+        spec: PathBuf,
     },
 }
 #[derive(Args)]
@@ -324,6 +332,18 @@ fn validate(kind: &Validation) -> Result<i32> {
                 spec.as_ref().and_then(|p| p.parent()),
             ))?;
             println!("VALID: result schema and semantic consistency (does not attest execution)");
+            Ok(0)
+        }
+        Validation::BaselineResults { file, spec } => {
+            checked(rvbench_core::validate_baseline_results(
+                &load_json(file)?,
+                Some(&load_json(spec)?),
+                spec.parent(),
+                file.parent(),
+            ))?;
+            println!(
+                "VALID: historical baseline evidence (does not attest execution or comparability)"
+            );
             Ok(0)
         }
     }
@@ -613,7 +633,30 @@ fn suite(options: &Options, action: &Suite) -> Result<()> {
 fn execute(options: &Options) -> Result<i32> {
     match &options.command {
         Command::Validate { kind } => return validate(kind),
-        Command::Digest { file } => println!("{}", spec_digest(&load_json(file)?)),
+        Command::Digest { file, baseline } => {
+            let spec = load_json(file)?;
+            if let Some(id) = baseline {
+                checked(validate_spec(&spec, file.parent()))?;
+                let entry = spec["baseline"]["entries"]
+                    .as_array()
+                    .and_then(|entries| entries.iter().find(|entry| entry["id"] == *id))
+                    .ok_or_else(|| anyhow::anyhow!("unknown baseline id"))?;
+                let op = spec["operators"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|op| op["id"] == entry["operator_id"])
+                    .unwrap();
+                let cases: Vec<_> = op["cases"].as_array().unwrap().iter()
+                    .filter(|case| entry["case_ids"].as_array().unwrap().contains(&case["id"]))
+                    .map(|case| json!({"case_id":case["id"],"case_contract_sha256":rvbench_core::baseline::case_contract_digest(&spec,op,case)})).collect();
+                print(
+                    &json!({"baseline_id":id,"implementation_sha256":rvbench_core::baseline::implementation_digest(entry),"cases":cases}),
+                );
+            } else {
+                println!("{}", spec_digest(&spec));
+            }
+        }
         Command::Ev { action } => ev(options, action)?,
         Command::Suite { action } => suite(options, action)?,
         Command::ResultUpgrade { file, out } => {

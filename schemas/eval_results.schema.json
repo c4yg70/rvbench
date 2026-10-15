@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:rvbench:eval-results:1.0.0",
-  "title": "rvbench eval_results.json v1",
-  "$comment": "Cross-field invariants require tools/validate_eval_results.py; this schema alone does not attest execution.",
+  "$id": "urn:rvbench:eval-results:1.1.0",
+  "title": "rvbench eval_results.json v1.0/v1.1",
+  "$comment": "Structural constraints; core/src/results.rs checks semantic consistency without attesting execution.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -11,7 +11,10 @@
       "pattern": "(^|/)eval_results\\.schema\\.json$"
     },
     "schema_version": {
-      "const": "1.0.0"
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ]
     },
     "version": {
       "type": "string",
@@ -104,7 +107,10 @@
               "minLength": 1
             },
             "schema_version": {
-              "const": "2.0.0"
+              "enum": [
+                "2.0.0",
+                "2.1.0"
+              ]
             },
             "version": {
               "type": "string",
@@ -1137,5 +1143,31 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.0.0"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "specs": {
+            "properties": {
+              "public": {
+                "properties": {
+                  "schema_version": {
+                    "const": "2.0.0"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

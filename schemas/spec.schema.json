@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "rvbench operator suite spec v2",
+  "title": "rvbench operator suite spec v2.0/v2.1",
   "type": "object",
   "properties": {
     "$schema": {
@@ -9,7 +9,10 @@
       "pattern": "(^|/)spec\\.schema\\.json$"
     },
     "schema_version": {
-      "const": "2.0.0"
+      "enum": [
+        "2.0.0",
+        "2.1.0"
+      ]
     },
     "suite": {
       "type": "object",
@@ -151,6 +154,22 @@
     "version": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseline_entry"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "entries"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -884,7 +903,134 @@
         "cases"
       ],
       "additionalProperties": false
+    },
+    "baseline_file": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "baseline_entry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        },
+        "operator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "code": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/baseline_file"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "root",
+            "files"
+          ],
+          "additionalProperties": false
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "argv": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "cwd",
+            "argv",
+            "env"
+          ],
+          "additionalProperties": false
+        },
+        "reference_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseline_file"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "operator_id",
+        "case_ids",
+        "code",
+        "run",
+        "reference_results"
+      ],
+      "additionalProperties": false
     }
   },
-  "$id": "urn:rvbench:spec:2.0.0"
+  "$id": "urn:rvbench:spec:2.1.0",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "2.0.0"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "baseline"
+          ]
+        }
+      }
+    }
+  ]
 }

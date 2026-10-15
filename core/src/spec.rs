@@ -27,6 +27,10 @@ pub fn readiness_blockers(spec: &Value) -> Vec<String> {
         errors.push("suite.status is draft".into());
     }
     walk(spec, "$".into(), &mut |path, v| {
+        // Baseline command/environment data is not part of case readiness.
+        if path == "$.baseline" || path.starts_with("$.baseline.") {
+            return;
+        }
         if v.is_object()
             && (v["status"] == "pending" || v["kind"] == "pending" || v["method"] == "pending")
         {
@@ -359,6 +363,9 @@ pub fn validate_spec(spec: &Value, base_dir: Option<&Path>) -> Vec<String> {
         return errors;
     }
     walk(spec, "$".into(), &mut |path, v| {
+        if path == "$.baseline" || path.starts_with("$.baseline.") {
+            return;
+        }
         if v.is_object() && v["status"] == "resolved" && v.get("sha256").is_some() {
             let relative = s(&v["path"]);
             let p = Path::new(relative);
@@ -648,5 +655,6 @@ pub fn validate_spec(spec: &Value, base_dir: Option<&Path>) -> Vec<String> {
             "suite.status=ready cannot contain pending contracts or unready cases",
         );
     }
+    errors.extend(crate::baseline::validate_baseline(spec, base_dir));
     errors
 }

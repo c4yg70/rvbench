@@ -1,0 +1,120 @@
+{
+  "$schema": "../../schemas/baseline_results.schema.json",
+  "schema_version": "1.0.0",
+  "purpose": "synthetic",
+  "suite_id": "baseline_abs_demo",
+  "baseline_id": "torch_abs",
+  "implementation_sha256": "afbc1423e2720b6a637531f9d36fb659139c5cd833c6ef9fd0b250610f375faf",
+  "environments": [
+    {
+      "id": "synthetic-env",
+      "fingerprint_sha256": "206e5f11181ebb3a5075a34653439421f5c5b701621f517abf04fca51882daf5",
+      "architecture": "rv64",
+      "worker_id": null,
+      "boot_id": null,
+      "cpu": {
+        "model": "synthetic",
+        "isa": "synthetic",
+        "logical_cpus": 1,
+        "affinity": [
+          0
+        ]
+      },
+      "runtime": {
+        "python": "synthetic",
+        "torch": "synthetic",
+        "triton": "synthetic",
+        "flag_gems": "synthetic",
+        "runner": "synthetic",
+        "adapter": "synthetic",
+        "generator": "synthetic"
+      },
+      "isolation": {
+        "kind": "host_lock",
+        "description": "Synthetic example; not measured evidence."
+      },
+      "backend": "spacemit",
+      "host_tag": "synthetic-not-a-board",
+      "omp_threads": 4
+    }
+  ],
+  "measurements": [
+    {
+      "case_id": "baseline_abs_demo.abs.C01",
+      "case_contract_sha256": "5b4d4d3fd01c327aae636ad820fd487715ae7ab81788babaa0a354a3f9452d3c",
+      "inputs_sha256": "b537f9895602bddd393bd82cd23ed0c3fbe9b98b76f7f09f9b74da0008d73ff4",
+      "inputs": [
+        {
+          "name": "x",
+          "kind": "tensor",
+          "shape": [
+            1024,
+            1024
+          ],
+          "dtype": "float32",
+          "strides": [
+            1024,
+            1
+          ],
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generator": {
+            "kind": "torch_cpu_uniform_v1",
+            "seed": 0,
+            "low": -10,
+            "high": 10
+          },
+          "storage_offset": 0
+        }
+      ],
+      "attrs": {},
+      "environment_id": "synthetic-env",
+      "recorded_at": "2026-10-16T00:00:00Z",
+      "correctness": {
+        "status": "passed",
+        "reason": null,
+        "checks": [
+          {
+            "id": "synthetic-exact",
+            "kind": "numeric",
+            "outputs": [
+              "out"
+            ],
+            "status": "passed",
+            "reason": null,
+            "metrics": {
+              "max_abs_error": 0.0
+            },
+            "method": "exact_values",
+            "contract_sha256": null,
+            "parameters": {
+              "synthetic": true
+            }
+          }
+        ]
+      },
+      "timing": {
+        "unit": "ms",
+        "scope": "call",
+        "statistic": "median",
+        "preparation": "excluded",
+        "synchronization": "synthetic-no-execution",
+        "timing_contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "warmup": 5,
+        "repetitions": 3,
+        "samples_ms": [
+          0.45,
+          0.47,
+          0.46
+        ],
+        "median_ms": 0.46
+      },
+      "artifacts": [
+        {
+          "path": "synthetic-evidence.txt",
+          "sha256": "b6563705f2f45cf5513d70d2b9bbcbc340eef9657b2ab97817ce98ec06a9a555",
+          "size_bytes": 77
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 //! Platform-independent contracts. No Python runtime or vendor implementation.
+pub mod baseline;
 pub mod compat;
 pub mod hidden;
 pub mod json;
@@ -6,6 +7,7 @@ pub mod results;
 pub mod spec;
 pub mod suite;
 
+pub use baseline::validate_baseline_results;
 pub use hidden::{hidden_readiness_blockers, resolve_hidden_case, validate_hidden_spec};
 pub use json::{load_json, parse_json, spec_digest};
 pub use results::validate_eval_results;
@@ -71,6 +73,7 @@ pub(crate) fn schema_errors(value: &Value, kind: &str) -> Vec<String> {
     static PUBLIC: OnceLock<jsonschema::Validator> = OnceLock::new();
     static HIDDEN: OnceLock<jsonschema::Validator> = OnceLock::new();
     static RESULTS: OnceLock<jsonschema::Validator> = OnceLock::new();
+    static BASELINE_RESULTS: OnceLock<jsonschema::Validator> = OnceLock::new();
     let (cell, text, formats) = match kind {
         "spec" => (
             &PUBLIC,
@@ -85,6 +88,11 @@ pub(crate) fn schema_errors(value: &Value, kind: &str) -> Vec<String> {
         "results" => (
             &RESULTS,
             include_str!("../../schemas/eval_results.schema.json"),
+            true,
+        ),
+        "baseline-results" => (
+            &BASELINE_RESULTS,
+            include_str!("../../schemas/baseline_results.schema.json"),
             true,
         ),
         _ => return vec!["unknown schema".into()],

@@ -1,0 +1,214 @@
+{
+  "$schema": "../../schemas/spec.schema.json",
+  "schema_version": "2.1.0",
+  "suite": {
+    "id": "baseline_abs_demo",
+    "title": "Baseline package example (not measured)",
+    "status": "draft",
+    "target": {
+      "architecture": "riscv64",
+      "backend": "spacemit",
+      "device": "SpacemiT K3"
+    },
+    "coverage": {
+      "scope": "typical",
+      "planned_case_count": 1
+    }
+  },
+  "sources": [
+    {
+      "id": "source_document",
+      "kind": "document",
+      "title": "8 个典型算子：接口说明与典型用例（2026-09-25）",
+      "location": "docs/specs/2026-10-08-典型8算子评测集.md#附证据与来源",
+      "revision": null,
+      "revision_status": "not_applicable"
+    },
+    {
+      "id": "flaggems",
+      "kind": "repository",
+      "title": "FlagGems",
+      "location": "FlagGems master（来源文档绑定）",
+      "revision": "d17e23e48",
+      "revision_status": "abbreviated"
+    },
+    {
+      "id": "cannbench",
+      "kind": "repository",
+      "title": "CANNBench",
+      "location": "CANNBench tasks/level2 与 tasks/level3",
+      "revision": null,
+      "revision_status": "unresolved"
+    }
+  ],
+  "policies": {
+    "input_reuse": "same_materialized_inputs",
+    "implicit_shape_override": "forbidden",
+    "implicit_dtype_fallback": "forbidden",
+    "unknown_check": "not_passed",
+    "timing": {
+      "scope": "call",
+      "unit": "ms",
+      "statistic": "median",
+      "preparation": "excluded",
+      "contract": {
+        "status": "pending",
+        "reason": "既有 timing-contract.md 尚未迁入本仓；M3/M4 绑定其版本与内容摘要后计时。"
+      }
+    }
+  },
+  "operators": [
+    {
+      "id": "abs",
+      "display_name": "abs",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "elementwise",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.abs"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.abs"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "baseline_abs_demo.abs.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -10,
+                "high": 10
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "exact_values",
+                "contract": null,
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_abs.py: POINTWISE_SHAPES[2] × float32",
+            "basis": "source_typical",
+            "note": "非原地实数 abs；C01 仅比较数值，不要求 ±0.0 位模式一致。"
+          }
+        }
+      ]
+    }
+  ],
+  "version": "0.1.0",
+  "baseline": {
+    "entries": [
+      {
+        "id": "torch_abs",
+        "operator_id": "abs",
+        "case_ids": [
+          "baseline_abs_demo.abs.C01"
+        ],
+        "code": {
+          "root": "code",
+          "files": [
+            {
+              "path": "abs.py",
+              "sha256": "ea07fc9672a36d8fe12bfc27b6ec8f6240ac765c6f8fc514c174d593d47dc7a3"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "abs.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baseline-results.json",
+            "sha256": "e8132d8d9539db120212113f7335a5aff12f9ea8b62281b48cf13955ceb8d1ac"
+          }
+        ]
+      }
+    ]
+  }
+}
