@@ -15,8 +15,7 @@ pub fn build_bundle(root: &Path, output: &Path, binary: Option<&Path>) -> Result
     let mut files: Vec<(PathBuf, PathBuf)> = [
         "worker/config.example.json",
         "manager/config.example.json",
-        "worker/ui.html",
-        "manager/ui.html",
+        "webui/console.html",
         "contract/openapi.json",
         "worker/contract/openapi.yaml",
         "manager/contract/openapi.yaml",

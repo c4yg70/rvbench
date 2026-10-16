@@ -11,6 +11,7 @@ fn registration() -> WorkerRegistration {
 async fn atomic_claims_fencing_replays_and_durable_results() {
     let temp = tempfile::tempdir().unwrap();
     let config = Config {
+        victoriametrics: None,
         listen: "127.0.0.1:0".into(),
         data_dir: temp.path().into(),
     };
@@ -22,7 +23,9 @@ async fn atomic_claims_fencing_replays_and_durable_results() {
     req.kind = JobKind::Correctness;
     req.client_request_id = Some("same".into());
     let j = m.submit(req.clone()).await.unwrap();
+    let counters_before = m.console.snapshot().metrics.clone();
     assert_eq!(m.submit(req.clone()).await.unwrap().job_id, j.job_id);
+    assert_eq!(counters_before, m.console.snapshot().metrics);
     let mut changed = req.clone();
     changed.seed += 1;
     assert_eq!(m.submit(changed).await.unwrap_err().0, 409);
@@ -66,6 +69,8 @@ async fn atomic_claims_fencing_replays_and_durable_results() {
     m.acknowledge(a.lease_id.clone(), ack, true).await.unwrap();
     let phase:PhaseResult=serde_json::from_value(json!({"status":"passed","details":{},"artifacts":[{"path":"evaluation.json","sha256":"0".repeat(64),"size_bytes":1}]})).unwrap();
     let mut r = j;
+    let logical_submitted_at = r.submitted_at.clone();
+    r.submitted_at = "2030-01-01T00:00:00Z".into();
     r.state = JobState::Done;
     r.compilation = Some(phase.clone());
     r.evaluation = Some(phase);
@@ -83,6 +88,16 @@ async fn atomic_claims_fencing_replays_and_durable_results() {
         record: r,
     };
     m.receive(a.assignment_id.clone(), e.clone()).await.unwrap();
+    assert_eq!(
+        m.console
+            .snapshot()
+            .results
+            .iter()
+            .find(|r| r.job_id == a.job_id)
+            .unwrap()
+            .submitted_at,
+        logical_submitted_at
+    );
     assert_eq!(
         m.receive(a.assignment_id.clone(), e.clone()).await.unwrap()["duplicate"],
         true
@@ -107,6 +122,7 @@ async fn atomic_claims_fencing_replays_and_durable_results() {
 async fn unauthenticated_http_validates_contract_and_role_matching() {
     let temp = tempfile::tempdir().unwrap();
     let m = Manager::open(Config {
+        victoriametrics: None,
         listen: "127.0.0.1:0".into(),
         data_dir: temp.path().into(),
     })

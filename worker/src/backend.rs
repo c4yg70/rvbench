@@ -114,7 +114,7 @@ impl Backend {
     }
     pub fn probe(&self, dir: &Path) -> Result<Value> {
         std::fs::create_dir_all(dir)?;
-        let details = if self.config.backend == BackendId::K1 {
+        let mut details = if self.config.backend == BackendId::K1 {
             let version = self.command(&self.config.cc, &["--version"], dir, 20)?;
             json!({"compiler":version.lines().next(),"runtime":"native-c","ops":K1_OPS,"dtypes":["float32"]})
         } else {
@@ -126,6 +126,19 @@ impl Backend {
             v["unavailable_ops"] = json!({"flash_attention_forward":{"ready":false,"reason":"Full Flash auxiliary-output contract is pending; SDPA is not an equivalent adapter and failed SpacemiT compilation in probed cases."}});
             v
         };
+        details["execution_cpus"] = json!(self.config.cpus);
+        details["ai_thread"] = json!(self.config.ai_thread);
+        details["host_kernel"] = json!(
+            std::fs::read_to_string("/proc/sys/kernel/osrelease")
+                .unwrap_or_default()
+                .trim()
+        );
+        details["architecture"] = json!(std::env::consts::ARCH);
+        details["compiler_flags"] = json!(if self.config.backend == BackendId::K1 {
+            "-O3 -fno-fast-math"
+        } else {
+            "torch/flag_gems-jit"
+        });
         Ok(details)
     }
 }

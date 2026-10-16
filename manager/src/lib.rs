@@ -9,6 +9,8 @@ use axum::{
 use rvbench_protocol::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+pub mod observability;
+use rvbench_protocol::console::{Console, LeaseView};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
@@ -21,6 +23,8 @@ use std::{
 pub struct Config {
     pub listen: String,
     pub data_dir: PathBuf,
+    #[serde(default)]
+    pub victoriametrics: Option<String>,
 }
 #[derive(Default, Serialize, Deserialize)]
 pub struct ManagerData {
@@ -46,6 +50,9 @@ struct Grant {
     lease_until: f64,
 }
 pub struct Manager {
+    pub console: Arc<Console>,
+    pub collection: std::sync::RwLock<CollectionHealth>,
+    pub query_limit: tokio::sync::Semaphore,
     pub config: Config,
     store: Store<ManagerData>,
     client: reqwest::Client,
@@ -60,7 +67,13 @@ impl Manager {
             .write(true)
             .open(config.data_dir.join("manager.lock"))?;
         fs2::FileExt::try_lock_exclusive(&lock)?;
-        let store = Store::<ManagerData>::open(&config.data_dir.join("manager.sqlite"))?;
+        let console = Console::new("manager", None);
+        let project = console.clone();
+        let store = Store::<ManagerData>::open(&config.data_dir.join("manager.sqlite"))?.with_observer(move |s| {
+            let ws=s.workers.values().map(|n|serde_json::from_value(json!({"worker":n.info,"last_seen":n.last_seen,"online":true,"drained":n.drained,"pending_ack":0,"acknowledged":0,"uncertain":0})).unwrap()).collect();
+            let leases=s.assignments.values().filter(|g|!terminal(&s.jobs[&g.assignment.job_id].state)).map(|g|LeaseView{worker:g.assignment.worker_id.clone(),acknowledged:g.acknowledged,deadline:if g.acknowledged{g.lease_until}else{g.assignment.expires_at}}).collect();
+            project.update(s.jobs.values().map(|j|(j,"managed")).collect(),ws,leases,0,0.);
+        })?;
         store
             .tx(|s| {
                 if s.epoch.is_empty() {
@@ -71,6 +84,9 @@ impl Manager {
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
         Ok(Arc::new(Self {
+            console,
+            collection: std::sync::RwLock::new(serde_json::from_value(json!({"status":"unavailable","errors":["Waiting for VictoriaMetrics health check"]})).unwrap()),
+            query_limit: tokio::sync::Semaphore::new(4),
             config,
             store,
             client: reqwest::Client::builder()
@@ -80,6 +96,13 @@ impl Manager {
         }))
     }
     pub fn start(self: &Arc<Self>) {
+        let health = self.clone();
+        tokio::spawn(async move {
+            loop {
+                health.update_collection().await;
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
+        });
         let manager = self.clone();
         tokio::spawn(async move {
             loop {
@@ -358,7 +381,9 @@ impl Manager {
                     }
                     return Ok(json!({"accepted":true,"duplicate":true}));
                 }
-                s.jobs.insert(a.job_id.clone(), e.record);
+                let mut completed = e.record;
+                completed.submitted_at = s.jobs[&a.job_id].submitted_at.clone();
+                s.jobs.insert(a.job_id.clone(), completed);
                 s.events.insert(e.event_id, hash);
                 Ok(json!({"accepted":true,"duplicate":false}))
             })
@@ -445,7 +470,14 @@ fn allocate(
     Ok(Some(a))
 }
 pub fn router(manager: Arc<Manager>) -> Router {
+    let metrics = manager.console.clone();
     Router::new()
+        .route("/metrics", get(observability::metrics))
+        .route("/observability/summary", get(observability::summary))
+        .route("/observability/targets", get(observability::targets))
+        .route("/observability/range", get(observability::range))
+        .route("/results", get(observability::results))
+        .route("/leaderboard", get(observability::leaderboard))
         .route(
             "/healthz",
             get(|| async {
@@ -461,8 +493,15 @@ pub fn router(manager: Arc<Manager>) -> Router {
         .route("/cluster/assignments/{id}/ack", post(ack))
         .route("/cluster/assignments/{id}/events", post(events))
         .route("/cluster/leases/{id}/renew", post(renew))
-        .route("/ui", get(|| async { Html(include_str!("../ui.html")) }))
+        .route(
+            "/ui",
+            get(|| async { Html(include_str!("../../webui/console.html")) }),
+        )
         .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
+        .layer(axum::middleware::from_fn_with_state(
+            metrics,
+            console::http_metrics,
+        ))
         .with_state(manager)
 }
 async fn submit(
@@ -589,6 +628,7 @@ mod tests {
     async fn push_pull_race_and_expired_execution_never_allocate_twice() {
         let temp = tempfile::tempdir().unwrap();
         let m = Manager::open(Config {
+            victoriametrics: None,
             listen: "127.0.0.1:0".into(),
             data_dir: temp.path().into(),
         })

@@ -8,6 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use backend::{Backend, BackendConfig, Compiler, Evaluator};
+use rvbench_protocol::console::Console;
 use rvbench_protocol::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -21,6 +22,8 @@ use std::{
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default)]
+    pub host_metrics_url: Option<String>,
     pub listen: String,
     pub url: String,
     pub worker_id: String,
@@ -44,6 +47,7 @@ struct LocalJob {
     acknowledged: bool,
 }
 pub struct Worker {
+    pub console: Arc<Console>,
     pub config: Config,
     pub info: WorkerRegistration,
     store: Store<WorkerData>,
@@ -81,7 +85,9 @@ impl Worker {
         })
         .await??;
         let info = WorkerRegistration {
-            observability: None,
+            observability: Some(serde_json::from_value(
+                json!({"metrics_version":"1.0.0","metrics_path":"/metrics","host_metrics_url":config.host_metrics_url}),
+            )?),
             worker_id: config.worker_id.clone(),
             board_id: config.board_id.clone(),
             instance_id: id(),
@@ -96,7 +102,22 @@ impl Worker {
             protocol_version: WorkerRegistrationProtocolVersion::Variant100,
         };
         validate("WorkerRegistration", &serde_json::to_value(&info)?)?;
-        let store = Store::<WorkerData>::open(&config.data_dir.join("worker.sqlite"))?;
+        let console = Console::new(
+            "worker",
+            Some((
+                config.worker_id.clone(),
+                config.board_id.clone(),
+                config.backend.backend.to_string(),
+            )),
+        );
+        let project = console.clone();
+        let local_info = info.clone();
+        let store = Store::<WorkerData>::open(&config.data_dir.join("worker.sqlite"))?.with_observer(move |s| {
+            let mut info=local_info.clone();info.direct_active=s.jobs.values().filter(|j|j.assignment.is_none() && !terminal(&j.record.state)).count() as i64;
+            let worker=serde_json::from_value(json!({"worker":info,"last_seen":seconds(),"online":true,"drained":false,"pending_ack":0,"acknowledged":0,"uncertain":0})).unwrap();
+            let oldest=s.outbox.values().filter_map(|e|e.record.finished_at.as_deref().and_then(console::timestamp)).reduce(f64::min).unwrap_or(0.);
+            project.update(s.jobs.values().map(|j|(&j.record,if j.assignment.is_some(){"managed"}else{"direct"})).collect(),vec![worker],vec![],s.outbox.len(),oldest);
+        })?;
         store
             .tx(|s| {
                 // Never silently reexecute an attempt after a process restart. systemd KillMode
@@ -128,6 +149,7 @@ impl Worker {
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
         Ok(Arc::new(Self {
+            console,
             config,
             info,
             store,
@@ -277,18 +299,43 @@ impl Worker {
                 let environment = self.info.environment.clone();
                 let r = tokio::task::spawn_blocking(move || {
                     let start = Instant::now();
+                    let queue_wait = r
+                        .started_at
+                        .as_deref()
+                        .and_then(console::timestamp)
+                        .zip(console::timestamp(&r.submitted_at))
+                        .map(|(a, b)| (a - b).max(0.));
+                    let mut timings = JobRecordPhaseTimingsSeconds {
+                        compiler: None,
+                        evaluator: None,
+                        queue_wait,
+                    };
+                    let mut phase_start = Instant::now();
+                    let mut evaluating = false;
                     let result = (|| -> anyhow::Result<()> {
                         let p = backend.prepare(&r.request, &dir)?;
+                        timings.compiler = Some(phase_start.elapsed().as_secs_f64());
                         r.compilation = Some(p.compilation.clone());
                         if r.request.kind != JobKind::Func {
+                            evaluating = true;
+                            phase_start = Instant::now();
                             let mut request = r.request.clone();
                             request.timeout_secs =
                                 (r.request.timeout_secs - start.elapsed().as_secs() as i64).max(0);
                             anyhow::ensure!(request.timeout_secs > 0, "job timeout");
                             r.evaluation = Some(backend.evaluate(&request, &p)?);
+                            timings.evaluator = Some(phase_start.elapsed().as_secs_f64());
                         }
                         Ok(())
                     })();
+                    if result.is_err() {
+                        if evaluating {
+                            timings.evaluator = Some(phase_start.elapsed().as_secs_f64());
+                        } else {
+                            timings.compiler = Some(phase_start.elapsed().as_secs_f64());
+                        }
+                    }
+                    r.phase_timings_seconds = Some(timings);
                     match result {
                         Ok(()) => {
                             r.state = if r
@@ -600,7 +647,12 @@ fn event(a: &Assignment, r: &JobRecord) -> JobEvent {
     }
 }
 pub fn router(worker: Arc<Worker>) -> Router {
+    let metrics = worker.console.clone();
     Router::new()
+        .route("/metrics",get(|State(w):State<Arc<Worker>>|async move {([(axum::http::header::CONTENT_TYPE,"text/plain; version=0.0.4; charset=utf-8")],w.console.metrics())}))
+        .route("/observability/summary",get(|State(w):State<Arc<Worker>>|async move {Json(w.console.summary(serde_json::from_value(json!({"status":"unavailable","errors":["Historical metrics are available through the manager; standalone execution is independent"]})).unwrap()))}))
+        .route("/results",get(|State(w):State<Arc<Worker>>,Query(q):Query<ResultQuery>|async move {w.console.results(q).map(Json)}))
+        .route("/leaderboard",get(|State(w):State<Arc<Worker>>,Query(q):Query<LeaderboardQuery>|async move {w.console.leaderboard(q).map(Json)}))
         .route(
             "/healthz",
             get(|| async {
@@ -616,8 +668,9 @@ pub fn router(worker: Arc<Worker>) -> Router {
         .route("/jobs", post(submit).get(list))
         .route("/jobs/{id}", get(job).delete(cancel))
         .route("/attempts/{id}", get(attempt))
-        .route("/ui", get(|| async { Html(include_str!("../ui.html")) }))
+        .route("/ui", get(|| async { Html(include_str!("../../webui/console.html")) }))
         .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
+        .layer(axum::middleware::from_fn_with_state(metrics,console::http_metrics))
         .with_state(worker)
 }
 async fn submit(
@@ -713,6 +766,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let data = temp.path().to_path_buf();
         let config = Config {
+            host_metrics_url: None,
             listen: "127.0.0.1:0".into(),
             url: "http://127.0.0.1:1".into(),
             worker_id: "test".into(),
@@ -732,6 +786,7 @@ mod tests {
         };
         let info:WorkerRegistration=serde_json::from_value(json!({"worker_id":"test","board_id":"board","instance_id":id(),"backend":"k1","kinds":["performance"],"delivery":"hybrid","url":"http://127.0.0.1:1","capacity":1,"direct_active":0,"ready":true,"environment":{},"protocol_version":"1.0.0"})).unwrap();
         let mut worker = Worker {
+            console: Console::new("worker", None),
             config,
             info: info.clone(),
             store: Store::open(&data.join("test.sqlite")).unwrap(),

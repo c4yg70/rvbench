@@ -7,5 +7,6 @@
   "kinds": ["func", "correctness", "performance"],
   "delivery": "hybrid",
   "manager": null,
+  "host_metrics_url": null,
   "backend": {"backend": "k1", "cc": "gcc", "python": "python3", "environment": {}, "cpus": null, "ai_thread": false}
 }

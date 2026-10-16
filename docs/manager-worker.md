@@ -97,7 +97,8 @@ K3 func/correctness 使用 CPU0–7，K1 使用 CPU0–7。
 ## 使用
 
 manager 页面 `http://10.18.60.100:18800/ui`，每块板 worker 页面 `http://板IP:18801/ui`。
-HTML 内联样式和脚本，无 CDN；分别提供能力/节点、任务提交和结果查询。
+两端共用 `webui/console.html`，内联样式和脚本，无 CDN。
+四个标签页为系统状态、任务提交、任务结果、排行榜。观测、指标与部署见 [observability.md](observability.md)。
 
 ```sh
 rvbench --base http://10.18.60.100:18800 control workers

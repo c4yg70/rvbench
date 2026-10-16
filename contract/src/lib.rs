@@ -14,6 +14,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 pub use wire::*;
+pub mod console;
 
 pub const SPEC: &str = include_str!("../openapi.json");
 pub fn validate(name: &str, value: &Value) -> Result<()> {
@@ -121,12 +122,14 @@ impl IntoResponse for ApiError {
 pub struct Store<T> {
     connection: Arc<Mutex<rusqlite::Connection>>,
     marker: std::marker::PhantomData<T>,
+    observer: Option<Arc<dyn Fn(&T) + Send + Sync>>,
 }
 impl<T> Clone for Store<T> {
     fn clone(&self) -> Self {
         Self {
             connection: self.connection.clone(),
             marker: std::marker::PhantomData,
+            observer: self.observer.clone(),
         }
     }
 }
@@ -145,13 +148,26 @@ impl<T: Default + Serialize + DeserializeOwned + Send + 'static> Store<T> {
         Ok(Self {
             connection: Arc::new(Mutex::new(c)),
             marker: std::marker::PhantomData,
+            observer: None,
         })
+    }
+    /// Publish an initial projection and then only committed mutations, in commit order.
+    pub fn with_observer(mut self, observer: impl Fn(&T) + Send + Sync + 'static) -> Result<Self> {
+        let body: String = self.connection.lock().unwrap().query_row(
+            "SELECT body FROM control_state WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        observer(&serde_json::from_str(&body)?);
+        self.observer = Some(Arc::new(observer));
+        Ok(self)
     }
     pub async fn tx<R: Send + 'static>(
         &self,
         f: impl FnOnce(&mut T) -> Result<R, ApiError> + Send + 'static,
     ) -> Result<R, ApiError> {
         let connection = self.connection.clone();
+        let observer = self.observer.clone();
         tokio::task::spawn_blocking(move || {
             let mut c = connection
                 .lock()
@@ -165,11 +181,15 @@ impl<T: Default + Serialize + DeserializeOwned + Send + 'static> Store<T> {
             let mut state: T = serde_json::from_str(&body).map_err(anyhow::Error::from)?;
             let result = f(&mut state)?;
             let next = serde_json::to_string(&state).map_err(anyhow::Error::from)?;
-            if next != body {
+            let changed = next != body;
+            if changed {
                 tx.execute("UPDATE control_state SET body=?1 WHERE id=1", [next])
                     .map_err(anyhow::Error::from)?;
             }
             tx.commit().map_err(anyhow::Error::from)?;
+            if changed && let Some(observer) = observer {
+                observer(&state);
+            }
             Ok(result)
         })
         .await

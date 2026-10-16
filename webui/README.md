@@ -2,6 +2,10 @@
 
 评测服务器前端页面设计与实现的统一目录。
 
+- `console.html`：当前 manager / 独立 worker 共用的四标签页控制台。
+  包含系统状态、任务提交、任务结果、排行榜，支持明暗主题，所有内容内联。
+  接口与部署见 [observability.md](../docs/observability.md)。
+
 - `dashboard.html`：现有 K3 监控页面，单文件、零构建依赖。
 - `design/k3-evald-specs.html`：原服务规格设计稿，作为历史设计参考。
 
@@ -9,4 +13,5 @@
 
 后续评测集选择、提交、状态、结果与证据页面，以及共用资源和构建配置，统一归入本目录；当前 dashboard 的功能是监控。
 
-`rvbench-tools bundle` 将页面复制为部署包的 `evald/dashboard.html`。前端源码只在这里维护，复制文件是部署产物。Prometheus 配置位于 `backends/spacemit/k3/monitor/`。
+`rvbench-tools bundle` 复制当前控制台、两端契约、监控配置与部署 / 验收脚本。
+当前 VictoriaMetrics 配置位于 `deploy/observability/`；旧 Prometheus 配置位于 `backends/spacemit/k3/monitor/`。

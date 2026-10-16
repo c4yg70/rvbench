@@ -73,15 +73,18 @@ if sys.argv[1] == "prepare":
     print(json.dumps({"prepared": True}))
     sys.exit(0)
 
-if r["kind"] == "correctness":
+if r["kind"] in ("correctness", "performance"):
     expected = ref()
     actuals = list(actual) if isinstance(actual, tuple) else [actual]
     expecteds = list(expected) if isinstance(expected, tuple) else [expected]
     atol, rtol = (0.05, 0.05) if dtype == torch.float16 else (0.005, 0.005)
     checks = [x.shape == y.shape and (torch.allclose(x, y, atol=atol, rtol=rtol) if x.is_floating_point() else torch.equal(x, y)) for x, y in zip(actuals, expecteds)]
     errors = [(x.float() - y.float()).abs().max().item() for x, y in zip(actuals, expecteds) if x.shape == y.shape]
-    print(json.dumps({"correct": len(actuals) == len(expecteds) and all(checks), "max_abs_error": max(errors, default=0), "atol": atol, "rtol": rtol, "reference": "pytorch-native", "scope": "submitted-case", "seed": r["seed"]}, allow_nan=False))
-else:
+    validation = {"correct": len(actuals) == len(expecteds) and all(checks), "max_abs_error": max(errors, default=0), "atol": atol, "rtol": rtol, "reference": "pytorch-native", "scope": "submitted-case", "seed": r["seed"]}
+    if r["kind"] == "correctness" or not validation["correct"]:
+        print(json.dumps(validation, allow_nan=False))
+        sys.exit(0)
+if r["kind"] == "performance":
     for _ in range(r["warmup"]):
         fn()
     def measure(f):
@@ -96,4 +99,4 @@ else:
     for _ in range(r["warmup"]):
         ref()
     reference = measure(ref)
-    print(json.dumps({"samples_ms": samples, "median_ms": statistics.median(samples), "reference_samples_ms": reference, "reference_median_ms": statistics.median(reference), "reference": "pytorch-native", "warmup": r["warmup"], "repetitions": r["repetitions"], "clock": "perf_counter_ns", "compilation_excluded": True}, allow_nan=False))
+    print(json.dumps({**validation, "samples_ms": samples, "median_ms": statistics.median(samples), "reference_samples_ms": reference, "reference_median_ms": statistics.median(reference), "reference": "pytorch-native", "warmup": r["warmup"], "repetitions": r["repetitions"], "clock": "perf_counter_ns", "compilation_excluded": True}, allow_nan=False))
