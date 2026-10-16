@@ -1,0 +1,500 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "rvbench shared control protocol",
+    "version": "1.0.0",
+    "description": "Contract-first wire authority. No authentication. func invokes compiler only; evaluator kinds are correctness and performance."
+  },
+  "security": [],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "JobKind": {
+        "type": "string",
+        "enum": [
+          "func",
+          "correctness",
+          "performance"
+        ]
+      },
+      "EvaluatorKind": {
+        "type": "string",
+        "enum": [
+          "correctness",
+          "performance"
+        ]
+      },
+      "BackendId": {
+        "type": "string",
+        "enum": [
+          "k3",
+          "k1"
+        ]
+      },
+      "DeliveryMode": {
+        "type": "string",
+        "enum": [
+          "push",
+          "pull",
+          "hybrid"
+        ]
+      },
+      "JobState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed",
+          "timeout",
+          "canceled"
+        ]
+      },
+      "PhaseStatus": {
+        "type": "string",
+        "enum": [
+          "passed",
+          "failed",
+          "skipped",
+          "not_required"
+        ]
+      },
+      "JobRequest": {
+        "type": "object",
+        "properties": {
+          "backend": {
+            "$ref": "#/components/schemas/BackendId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JobKind"
+          },
+          "op": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,47}$"
+          },
+          "shape": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16777216
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "dtype": {
+            "type": "string",
+            "enum": [
+              "float32",
+              "float16"
+            ]
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "warmup": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "repetitions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "timeout_secs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800
+          },
+          "client_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 1048576
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Opaque user metadata only. Does not change execution or scheduling semantics."
+          }
+        },
+        "required": [
+          "backend",
+          "kind",
+          "op",
+          "shape",
+          "dtype",
+          "seed",
+          "warmup",
+          "repetitions",
+          "timeout_secs"
+        ],
+        "additionalProperties": false,
+        "description": "Canonical UTF-8 request is at most 2097152 bytes. source is additionally limited to 1048576 UTF-8 bytes. Assignment/event envelopes may contain the request twice."
+      },
+      "Artifact": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "size_bytes"
+        ],
+        "additionalProperties": false
+      },
+      "PhaseResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PhaseStatus"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "details",
+          "artifacts"
+        ],
+        "additionalProperties": false
+      },
+      "JobRecord": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "request": {
+            "$ref": "#/components/schemas/JobRequest"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "board_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string",
+            "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "submitted_at": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "compilation": {
+            "$ref": "#/components/schemas/PhaseResult"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/PhaseResult"
+          },
+          "error": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "string"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "job_id",
+          "state",
+          "request",
+          "worker_id",
+          "board_id",
+          "instance_id",
+          "submitted_at",
+          "logs"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerRegistration": {
+        "type": "object",
+        "properties": {
+          "worker_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "board_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "backend": {
+            "$ref": "#/components/schemas/BackendId"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobKind"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliveryMode"
+          },
+          "url": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "direct_active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "protocol_version": {
+            "type": "string",
+            "enum": [
+              "1.0.0"
+            ]
+          }
+        },
+        "required": [
+          "worker_id",
+          "board_id",
+          "instance_id",
+          "backend",
+          "kinds",
+          "delivery",
+          "url",
+          "capacity",
+          "direct_active",
+          "ready",
+          "environment",
+          "protocol_version"
+        ],
+        "additionalProperties": false
+      },
+      "Assignment": {
+        "type": "object",
+        "properties": {
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "worker_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manager_epoch": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "expires_at": {
+            "type": "number"
+          },
+          "request": {
+            "$ref": "#/components/schemas/JobRequest"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "attempt_id",
+          "lease_id",
+          "job_id",
+          "worker_id",
+          "instance_id",
+          "manager_epoch",
+          "request_sha256",
+          "expires_at",
+          "request"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerSubmission": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/JobRequest"
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/Assignment"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "additionalProperties": false
+      },
+      "ClaimRequest": {
+        "type": "object",
+        "properties": {
+          "worker_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wait_s": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "worker_id",
+          "instance_id",
+          "request_id",
+          "wait_s"
+        ],
+        "additionalProperties": false,
+        "description": "Idempotent claim. Nonempty receipts retained with attempts; empty receipts replay for at least 300 seconds."
+      },
+      "Ack": {
+        "type": "object",
+        "properties": {
+          "worker_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "worker_job_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "worker_id",
+          "instance_id",
+          "lease_id",
+          "worker_job_id"
+        ],
+        "additionalProperties": false
+      },
+      "JobEvent": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "event_seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/Assignment"
+          },
+          "record": {
+            "$ref": "#/components/schemas/JobRecord"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_seq",
+          "assignment",
+          "record"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
