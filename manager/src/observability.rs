@@ -217,19 +217,19 @@ fn grid_points(values: &Value, start: f64, end: f64, step: i64) -> Vec<Value> {
                     .as_str()
                     .and_then(|s| s.parse::<f64>().ok())
                     .filter(|x| x.is_finite());
-                samples.insert(t.round() as i64, value);
+                samples.insert((t * 1000.).round() as i64, value);
             }
         }
     }
     let mut points = vec![];
-    let mut t = (start / step as f64).ceil() as i64 * step;
-    while t as f64 <= end {
+    let mut t = start;
+    while t <= end {
         let mut p = json!({"timestamp":t});
-        if let Some(Some(v)) = samples.get(&t) {
+        if let Some(Some(v)) = samples.get(&((t * 1000.).round() as i64)) {
             p["value"] = json!(v);
         }
         points.push(p);
-        t += step;
+        t += step as f64;
     }
     points
 }
@@ -441,5 +441,9 @@ mod tests {
         assert!(p[1].get("value").is_none());
         assert!(p[2].get("value").is_none());
         assert_eq!(p[3]["value"], 0.);
+        let hourly = grid_points(&json!([[61, "5"], [3661, "6"]]), 61., 3661., 3600);
+        assert_eq!(hourly[0]["timestamp"], 61.);
+        assert_eq!(hourly[0]["value"], 5.);
+        assert_eq!(hourly[1]["value"], 6.);
     }
 }
