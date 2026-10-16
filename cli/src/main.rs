@@ -1,4 +1,5 @@
 mod client;
+mod control;
 mod pipeline;
 use anyhow::{Result, ensure};
 use clap::{Args, Parser, Subcommand};
@@ -38,6 +39,11 @@ pub struct Options {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Manager / standalone worker contract v1 (no authentication).
+    Control {
+        #[command(subcommand)]
+        action: control::Action,
+    },
     Validate {
         #[command(subcommand)]
         kind: Validation,
@@ -632,6 +638,7 @@ fn suite(options: &Options, action: &Suite) -> Result<()> {
 }
 fn execute(options: &Options) -> Result<i32> {
     match &options.command {
+        Command::Control { action } => control::run(options.base.as_deref(), action)?,
         Command::Validate { kind } => return validate(kind),
         Command::Digest { file, baseline } => {
             let spec = load_json(file)?;

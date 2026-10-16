@@ -1,0 +1,16 @@
+[package]
+name = "rvbench-manager"
+version.workspace = true
+edition.workspace = true
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+fs2.workspace = true
+reqwest.workspace = true
+rvbench-protocol = { path = "../contract" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+[dev-dependencies]
+tempfile.workspace = true

@@ -2,10 +2,7 @@
 name = "rvbench-k3"
 version.workspace = true
 edition.workspace = true
-
-[[bin]]
-name = "rvbench-evald"
-path = "src/main.rs"
+autobins = false
 
 [dependencies]
 anyhow.workspace = true
