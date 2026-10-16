@@ -27,7 +27,7 @@ fn traces_keep_d4_policy_and_detect_cross_root_evidence() {
 fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let temp = tempfile::tempdir().unwrap();
-    let binary = temp.path().join("rvbench-evald");
+    let binary = temp.path().join("rvbench-worker");
     fs::write(&binary, b"MZ").unwrap();
     assert!(build_bundle(root, &temp.path().join("wrong"), Some(&binary)).is_err());
     let mut elf = vec![0u8; 64];
@@ -46,7 +46,8 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
         let bytes = fs::read(output.join(path)).unwrap();
         assert_eq!(item["sha256"], json!(rvbench_core::json::sha256(&bytes)));
     }
-    assert!(output.join("evald/warmd.py").is_file());
-    assert!(output.join("scripts/bench_op.py").is_file());
+    assert!(output.join("bin/rvbench-worker").is_file());
+    assert!(output.join("worker/adapters/k3.py").is_file());
+    assert!(!output.join("evald/config.example.json").exists());
     assert!(build_bundle(root, &output, Some(&binary)).is_err());
 }

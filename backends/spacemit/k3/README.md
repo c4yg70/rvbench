@@ -1,3 +1,5 @@
+> 新部署使用 `rvbench-worker` / `rvbench-manager`，见 [当前部署说明](../../../docs/manager-worker.md)。本页保留旧 evald 库与历史部署资料；旧 Rust 服务二进制不再构建。
+
 # SpacemiT K3 后端
 
 `rvbench-evald` 为 Rust 服务。`src/` 负责 K3 配置、资源/车道、请求校验、候选路径白名单、执行器和旧 registry 判定；通用服务机制由 `rvbench-runtime` 提供。

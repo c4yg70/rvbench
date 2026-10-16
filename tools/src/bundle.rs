@@ -12,25 +12,29 @@ pub fn build_bundle(root: &Path, output: &Path, binary: Option<&Path>) -> Result
         !output.exists(),
         "bundle output already exists; choose a new directory"
     );
-    let k3 = root.join("backends/spacemit/k3");
-    let mut files: Vec<(PathBuf, PathBuf)> = vec![
-        (k3.join("evald/evaldctl.sh"), "evald/evaldctl.sh".into()),
-        (
-            k3.join("evald/config.example.json"),
-            "evald/config.example.json".into(),
-        ),
-        (k3.join("adapters/python/warmd.py"), "evald/warmd.py".into()),
-        (
-            root.join("webui/dashboard.html"),
-            "evald/dashboard.html".into(),
-        ),
-    ];
+    let mut files: Vec<(PathBuf, PathBuf)> = [
+        "worker/config.example.json",
+        "manager/config.example.json",
+        "worker/ui.html",
+        "manager/ui.html",
+        "contract/openapi.json",
+        "worker/contract/openapi.yaml",
+        "manager/contract/openapi.yaml",
+        "docs/manager-worker.md",
+        "tools/deploy_cluster.py",
+        "tools/cluster_smoke.py",
+        "tools/cluster_recovery_smoke.py",
+        "tools/verify_cluster_artifacts.py",
+    ]
+    .into_iter()
+    .map(|p| (root.join(p), PathBuf::from(p)))
+    .collect();
     let candidate = binary
         .map(Path::to_owned)
-        .unwrap_or_else(|| root.join("target/riscv64gc-unknown-linux-gnu/release/rvbench-evald"));
+        .unwrap_or_else(|| root.join("target/riscv64gc-unknown-linux-gnu/release/rvbench-worker"));
     ensure!(
         candidate.is_file(),
-        "Rust evald binary is missing; build the board target or pass --binary"
+        "Rust worker binary is missing; build the board target or pass --binary"
     );
     let header = fs::read(&candidate)?;
     ensure!(
@@ -41,11 +45,21 @@ pub fn build_bundle(root: &Path, output: &Path, binary: Option<&Path>) -> Result
             && u16::from_le_bytes([header[18], header[19]]) == 243,
         "K3 bundle requires a 64-bit RISC-V ELF; host binaries are for local checks"
     );
-    files.push((candidate, "evald/rvbench-evald".into()));
-    for (source, destination) in [
-        (k3.join("monitor"), "evald/monitor"),
-        (k3.join("adapters/board"), "scripts"),
-    ] {
+    let manager = candidate.with_file_name("rvbench-manager");
+    if manager.is_file() {
+        let header = fs::read(&manager)?;
+        ensure!(
+            header.len() >= 64
+                && header[..4] == *b"\x7fELF"
+                && header[4] == 2
+                && header[5] == 1
+                && u16::from_le_bytes([header[18], header[19]]) == 243,
+            "manager binary must be RISC-V ELF"
+        );
+        files.push((manager, "bin/rvbench-manager".into()));
+    }
+    files.push((candidate, "bin/rvbench-worker".into()));
+    for (source, destination) in [(root.join("worker/adapters"), "worker/adapters")] {
         for entry in WalkDir::new(&source).follow_links(false) {
             let entry = entry?;
             if entry.file_type().is_file()
@@ -78,7 +92,7 @@ pub fn build_bundle(root: &Path, output: &Path, binary: Option<&Path>) -> Result
         let data = fs::read(&destination)?;
         manifest.push(json!({"path":relative.to_string_lossy().replace('\\',"/"),"source":source.strip_prefix(root).unwrap_or(&source).to_string_lossy().replace('\\',"/"),"sha256":sha256(&data),"bytes":data.len()}));
     }
-    let value = json!({"backend":"spacemit-k3","control_plane":"rust","target":"riscv64gc-unknown-linux-gnu","files":manifest});
+    let value = json!({"backends":["k3","k1"],"protocol_version":"1.0.0","control_plane":"rust","target":"riscv64gc-unknown-linux-gnu","files":manifest});
     rvbench_runtime::files::atomic_json(&output.join("manifest.json"), &value)?;
     Ok(value)
 }

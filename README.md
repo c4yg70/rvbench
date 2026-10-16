@@ -7,11 +7,14 @@
 ```text
 rvbench/
 ├── core/                       Rust 通用合同、校验、摘要、旧结果兼容
-├── runtime/                    Rust HTTP、队列、worker、锁、超时与恢复
+├── contract/                   manager/worker 手写 OpenAPI、生成类型与共享校验
+├── worker/                     rvbench-worker，独立编译/评估与 Push/Pull 接入
+├── manager/                    rvbench-manager，统一提交、节点、调度与租约
+├── runtime/                    兼容运行时、进程组、文件锁、超时与恢复
 ├── cli/                        rvbench：校验、作业客户端、suite 与 pipeline
 ├── tools/                      rvbench-tools：检查、部署打包、trace、SSH/SFTP
 ├── backends/spacemit/k3/
-│   ├── src/                    rvbench-evald、配置、平台策略、执行器
+│   ├── src/                    旧协议兼容库、配置、平台策略、执行器
 │   ├── evald/                  启停脚本与配置模板
 │   ├── adapters/board/         Python 算子调用、参照与计时桥接
 │   ├── adapters/python/        Python warmfork 与预编译桥接
@@ -44,11 +47,23 @@ cargo run -p rvbench-tools -- check
 cargo run -p rvbench-cli -- ev --help
 ```
 
-构建生成 `rvbench`、`rvbench-evald`、`rvbench-tools`，位于 `target/debug/`；Windows 后缀为 `.exe`。安装后可直接执行对应命令。
+构建生成 `rvbench`、`rvbench-worker`、`rvbench-manager`、`rvbench-tools`，位于 `target/debug/`；Windows 后缀为 `.exe`。安装后可直接执行对应命令。
 
 公开 spec 仍为 draft，`validate spec ... --require-ready` 返回 2。合同合法与完成板上验证是不同状态。隐藏定义 `suites/kernels/typical8/spec.hidden.json`、真实 `evald/config.json` 和环境文件默认忽略入库。
 
-## 作业与管线
+## 新 manager / worker
+
+[实现、contract、三板部署与使用说明](docs/manager-worker.md)。新接口无认证，worker 可独立工作。
+
+```sh
+rvbench --base http://10.18.60.100:18800 control workers
+rvbench --base http://10.18.60.100:18800 control submit contract/examples/job.json --wait
+```
+
+manager 页面：`http://10.18.60.100:18800/ui`；worker 页面：`http://板IP:18801/ui`。
+下列 ev / pipeline 说明仅适用于保留的旧 evald 兼容协议。
+
+## 旧协议作业与管线
 
 ```sh
 rvbench --base http://127.0.0.1:8788 ev status
