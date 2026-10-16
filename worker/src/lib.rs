@@ -81,6 +81,7 @@ impl Worker {
         })
         .await??;
         let info = WorkerRegistration {
+            observability: None,
             worker_id: config.worker_id.clone(),
             board_id: config.board_id.clone(),
             instance_id: id(),

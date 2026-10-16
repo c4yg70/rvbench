@@ -73,6 +73,7 @@ pub fn terminal(s: &JobState) -> bool {
 }
 pub fn record(request: JobRequest) -> JobRecord {
     JobRecord {
+        phase_timings_seconds: None,
         job_id: id(),
         request,
         state: JobState::Queued,

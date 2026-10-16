@@ -1,5 +1,9 @@
 # rvbench control-plane contracts v1.0.0
 
+2026-10-17 观测扩展：两端 HTTP contract 版本为 1.1.0，保留 1.0.0 wire 注册兼容。
+新增指标、分页结果、排行榜和固定历史查询，见 [observability.md](observability.md)
+与 [metrics.json](metrics.json)。字段仍从本目录 OpenAPI 生成。
+
 用户已于 2026-10-17 批准实施。先建立本目录与两端 contract，再生成 wire 类型、运行 conformance 测试，最后实现。
 
 人工权威：

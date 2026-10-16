@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "rvbench-manager",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "security": [],
   "paths": {
@@ -477,6 +477,323 @@
           }
         },
         "security": []
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "managerMetrics",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain; version=0.0.4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        }
+      }
+    },
+    "/observability/summary": {
+      "get": {
+        "operationId": "managerSummary",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/ObservationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        }
+      }
+    },
+    "/results": {
+      "get": {
+        "operationId": "managerResults",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/ResultsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/JobKind"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/JobState"
+            }
+          },
+          {
+            "name": "op",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 48
+            }
+          },
+          {
+            "name": "worker_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "operationId": "managerLeaderboard",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/LeaderboardPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+            }
+          },
+          {
+            "name": "op",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 48
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ]
+      }
+    },
+    "/observability/targets": {
+      "get": {
+        "operationId": "managerTargets",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "../../contract/openapi.json#/components/schemas/DiscoveryTarget"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        }
+      }
+    },
+    "/observability/range": {
+      "get": {
+        "operationId": "managerRange",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/MetricRange"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "metric_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cpu_percent",
+                "x100_cpu_percent",
+                "a100_cpu_percent",
+                "memory_percent",
+                "disk_percent",
+                "temperature_c",
+                "load1",
+                "queue_depth",
+                "running",
+                "throughput",
+                "submissions",
+                "completed",
+                "outbox",
+                "collection_up"
+              ]
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "worker_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "step_seconds",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 3600
+            }
+          }
+        ]
       }
     }
   }

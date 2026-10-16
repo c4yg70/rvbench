@@ -15,6 +15,142 @@ pub struct WorkerSubmission {
     pub request: JobRequest,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ResultsPage {
+    pub generated_at: f64,
+    pub items: Vec<ResultEntry>,
+    ///Constraint: minimum=0
+    pub limit: i64,
+    ///Constraint: minimum=0
+    pub offset: i64,
+    ///Constraint: minimum=0
+    pub total: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ResultQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backend: Option<BackendId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<JobKind>,
+    ///Constraint: minimum=1, maximum=100
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<i64>,
+    ///Constraint: maxLength=48
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op: Option<String>,
+    ///Constraint: maxLength=128
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<JobState>,
+    ///Constraint: maxLength=64
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RangeQuery {
+    ///Constraint: maxLength=64
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub board_id: Option<String>,
+    pub end: f64,
+    pub metric_id: RangeQueryMetricId,
+    pub start: f64,
+    ///Constraint: minimum=30, maximum=3600
+    pub step_seconds: i64,
+    ///Constraint: maxLength=64
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum RangeQueryMetricId {
+    #[default]
+    #[serde(rename = "cpu_percent")]
+    CpuPercent,
+    #[serde(rename = "x100_cpu_percent")]
+    X100CpuPercent,
+    #[serde(rename = "a100_cpu_percent")]
+    A100CpuPercent,
+    #[serde(rename = "memory_percent")]
+    MemoryPercent,
+    #[serde(rename = "disk_percent")]
+    DiskPercent,
+    #[serde(rename = "temperature_c")]
+    TemperatureC,
+    #[serde(rename = "load1")]
+    Load1,
+    #[serde(rename = "queue_depth")]
+    QueueDepth,
+    #[serde(rename = "running")]
+    Running,
+    #[serde(rename = "throughput")]
+    Throughput,
+    #[serde(rename = "submissions")]
+    Submissions,
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "outbox")]
+    Outbox,
+    #[serde(rename = "collection_up")]
+    CollectionUp,
+}
+impl RangeQueryMetricId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CpuPercent => "cpu_percent",
+            Self::X100CpuPercent => "x100_cpu_percent",
+            Self::A100CpuPercent => "a100_cpu_percent",
+            Self::MemoryPercent => "memory_percent",
+            Self::DiskPercent => "disk_percent",
+            Self::TemperatureC => "temperature_c",
+            Self::Load1 => "load1",
+            Self::QueueDepth => "queue_depth",
+            Self::Running => "running",
+            Self::Throughput => "throughput",
+            Self::Submissions => "submissions",
+            Self::Completed => "completed",
+            Self::Outbox => "outbox",
+            Self::CollectionUp => "collection_up",
+        }
+    }
+}
+impl ::std::fmt::Display for RangeQueryMetricId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for RangeQueryMetricId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ObservationSummary {
+    pub collection: CollectionHealth,
+    pub counts: Vec<CountEntry>,
+    pub generated_at: f64,
+    pub outbox_oldest_age_seconds: f64,
+    ///Constraint: minimum=0
+    pub outbox_pending: i64,
+    pub schema_version: ObservationSummarySchemaVersion,
+    pub service: ObservationSummaryService,
+    pub workers: Vec<ObservedWorker>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ObservedWorker {
+    ///Constraint: minimum=0
+    pub acknowledged: i64,
+    pub drained: bool,
+    pub last_seen: f64,
+    pub online: bool,
+    ///Constraint: minimum=0
+    pub pending_ack: i64,
+    ///Constraint: minimum=0
+    pub uncertain: i64,
+    pub worker: WorkerRegistration,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WorkerRegistration {
     pub backend: BackendId,
     ///Constraint: minLength=1, maxLength=64
@@ -28,6 +164,8 @@ pub struct WorkerRegistration {
     pub instance_id: String,
     ///Constraint: minItems=1, uniqueItems=true
     pub kinds: Vec<JobKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observability: Option<ObservabilityRegistration>,
     pub protocol_version: WorkerRegistrationProtocolVersion,
     pub ready: bool,
     pub url: String,
@@ -92,6 +230,272 @@ impl AsRef<str> for DeliveryMode {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ObservationSummaryService {
+    #[default]
+    #[serde(rename = "manager")]
+    Manager,
+    #[serde(rename = "worker")]
+    Worker,
+}
+impl ObservationSummaryService {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Manager => "manager",
+            Self::Worker => "worker",
+        }
+    }
+}
+impl ::std::fmt::Display for ObservationSummaryService {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ObservationSummaryService {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ObservationSummarySchemaVersion {
+    #[default]
+    #[serde(rename = "1.0.0")]
+    Variant100,
+}
+impl ObservationSummarySchemaVersion {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Variant100 => "1.0.0",
+        }
+    }
+}
+impl ::std::fmt::Display for ObservationSummarySchemaVersion {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ObservationSummarySchemaVersion {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ObservabilityRegistration {
+    ///Constraint: pattern=`^http://[^/]+/metrics$`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_metrics_url: Option<String>,
+    pub metrics_path: ObservabilityRegistrationMetricsPath,
+    pub metrics_version: ObservabilityRegistrationMetricsVersion,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ObservabilityRegistrationMetricsVersion {
+    #[default]
+    #[serde(rename = "1.0.0")]
+    Variant100,
+}
+impl ObservabilityRegistrationMetricsVersion {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Variant100 => "1.0.0",
+        }
+    }
+}
+impl ::std::fmt::Display for ObservabilityRegistrationMetricsVersion {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ObservabilityRegistrationMetricsVersion {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ObservabilityRegistrationMetricsPath {
+    #[default]
+    #[serde(rename = "/metrics")]
+    Metrics,
+}
+impl ObservabilityRegistrationMetricsPath {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Metrics => "/metrics",
+        }
+    }
+}
+impl ::std::fmt::Display for ObservabilityRegistrationMetricsPath {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ObservabilityRegistrationMetricsPath {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MetricRange {
+    pub errors: Vec<String>,
+    pub generated_at: f64,
+    pub metric_id: MetricRangeMetricId,
+    pub partial: bool,
+    pub series: Vec<MetricSeries>,
+    ///Constraint: minimum=0
+    pub step_seconds: i64,
+    pub unit: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MetricSeries {
+    pub labels: MetricSeriesLabels,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sample_at: Option<f64>,
+    pub points: Vec<MetricPoint>,
+    pub stale: bool,
+}
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct MetricSeriesLabels {
+    /// Additional properties matching the spec's
+    /// `additionalProperties` value schema.
+    #[serde(flatten)]
+    pub additional_properties: std::collections::BTreeMap<String, String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MetricPoint {
+    pub timestamp: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum MetricRangeMetricId {
+    #[default]
+    #[serde(rename = "cpu_percent")]
+    CpuPercent,
+    #[serde(rename = "x100_cpu_percent")]
+    X100CpuPercent,
+    #[serde(rename = "a100_cpu_percent")]
+    A100CpuPercent,
+    #[serde(rename = "memory_percent")]
+    MemoryPercent,
+    #[serde(rename = "disk_percent")]
+    DiskPercent,
+    #[serde(rename = "temperature_c")]
+    TemperatureC,
+    #[serde(rename = "load1")]
+    Load1,
+    #[serde(rename = "queue_depth")]
+    QueueDepth,
+    #[serde(rename = "running")]
+    Running,
+    #[serde(rename = "throughput")]
+    Throughput,
+    #[serde(rename = "submissions")]
+    Submissions,
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "outbox")]
+    Outbox,
+    #[serde(rename = "collection_up")]
+    CollectionUp,
+}
+impl MetricRangeMetricId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CpuPercent => "cpu_percent",
+            Self::X100CpuPercent => "x100_cpu_percent",
+            Self::A100CpuPercent => "a100_cpu_percent",
+            Self::MemoryPercent => "memory_percent",
+            Self::DiskPercent => "disk_percent",
+            Self::TemperatureC => "temperature_c",
+            Self::Load1 => "load1",
+            Self::QueueDepth => "queue_depth",
+            Self::Running => "running",
+            Self::Throughput => "throughput",
+            Self::Submissions => "submissions",
+            Self::Completed => "completed",
+            Self::Outbox => "outbox",
+            Self::CollectionUp => "collection_up",
+        }
+    }
+}
+impl ::std::fmt::Display for MetricRangeMetricId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for MetricRangeMetricId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct LeaderboardQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backend: Option<BackendId>,
+    ///Constraint: maxLength=64
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    ///Constraint: maxLength=48
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LeaderboardPage {
+    ///Constraint: minimum=0
+    pub excluded: i64,
+    pub generated_at: f64,
+    pub groups: Vec<RankingGroup>,
+    pub policy: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RankingGroup {
+    pub backend: BackendId,
+    pub board_id: String,
+    pub clock: String,
+    pub dtype: String,
+    pub entries: Vec<RankedResult>,
+    pub environment_sha256: String,
+    pub group_id: String,
+    pub op: String,
+    ///Constraint: minimum=0
+    pub repetitions: i64,
+    ///Constraint: minimum=0
+    pub seed: i64,
+    pub shape: Vec<i64>,
+    ///Constraint: minimum=0
+    pub warmup: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RankedResult {
+    pub job: ResultEntry,
+    ///Constraint: minimum=0
+    pub rank: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speedup: Option<f64>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ResultEntry {
+    pub backend: BackendId,
+    pub board_id: String,
+    pub compilation_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub correct: Option<bool>,
+    pub dtype: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub evaluation_status: String,
+    pub job_id: String,
+    pub kind: JobKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub median_ms: Option<f64>,
+    pub op: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_median_ms: Option<f64>,
+    pub shape: Vec<i64>,
+    pub source_sha256: String,
+    pub state: JobState,
+    pub submitted_at: String,
+    pub worker_id: String,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JobEvent {
     pub assignment: Assignment,
@@ -121,12 +525,26 @@ pub struct JobRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lease_id: Option<String>,
     pub logs: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase_timings_seconds: Option<JobRecordPhaseTimingsSeconds>,
     pub request: JobRequest,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
     pub state: JobState,
     pub submitted_at: String,
     pub worker_id: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct JobRecordPhaseTimingsSeconds {
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compiler: Option<f64>,
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluator: Option<f64>,
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_wait: Option<f64>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PhaseResult {
@@ -181,6 +599,26 @@ pub struct Artifact {
     ///Constraint: minimum=0, maximum=2147483647
     pub size_bytes: i64,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DiscoveryTarget {
+    pub labels: DiscoveryTargetLabels,
+    pub targets: Vec<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct DiscoveryTargetLabels {
+    /// Additional properties matching the spec's
+    /// `additionalProperties` value schema.
+    #[serde(flatten)]
+    pub additional_properties: std::collections::BTreeMap<String, String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CountEntry {
+    ///Constraint: minimum=0
+    pub count: i64,
+    pub kind: JobKind,
+    pub origin: CountEntryOrigin,
+    pub state: JobState,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum JobState {
     #[default]
@@ -215,6 +653,89 @@ impl ::std::fmt::Display for JobState {
     }
 }
 impl AsRef<str> for JobState {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum CountEntryOrigin {
+    #[default]
+    #[serde(rename = "direct")]
+    Direct,
+    #[serde(rename = "managed")]
+    Managed,
+}
+impl CountEntryOrigin {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Direct => "direct",
+            Self::Managed => "managed",
+        }
+    }
+}
+impl ::std::fmt::Display for CountEntryOrigin {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for CountEntryOrigin {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CollectionHealth {
+    pub errors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_success_at: Option<f64>,
+    pub status: CollectionHealthStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets: Option<Vec<CollectionTarget>>,
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets_total: Option<i64>,
+    ///Constraint: minimum=0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets_up: Option<i64>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CollectionTarget {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub board_id: Option<String>,
+    pub error: String,
+    pub job: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_scrape_at: Option<f64>,
+    pub up: bool,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum CollectionHealthStatus {
+    #[default]
+    #[serde(rename = "ok")]
+    Ok,
+    #[serde(rename = "degraded")]
+    Degraded,
+    #[serde(rename = "unavailable")]
+    Unavailable,
+}
+impl CollectionHealthStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Degraded => "degraded",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+impl ::std::fmt::Display for CollectionHealthStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for CollectionHealthStatus {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
