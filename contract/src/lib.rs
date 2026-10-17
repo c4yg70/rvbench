@@ -119,10 +119,11 @@ impl IntoResponse for ApiError {
 
 /// One atomic control-state snapshot per service. SQLite WAL + FULL sync; no process/network IO
 /// inside transactions. Blocking database work always runs off the Tokio executor.
+type StoreObserver<T> = Arc<dyn Fn(&T) + Send + Sync>;
 pub struct Store<T> {
     connection: Arc<Mutex<rusqlite::Connection>>,
     marker: std::marker::PhantomData<T>,
-    observer: Option<Arc<dyn Fn(&T) + Send + Sync>>,
+    observer: Option<StoreObserver<T>>,
 }
 impl<T> Clone for Store<T> {
     fn clone(&self) -> Self {
@@ -219,6 +220,52 @@ pub fn validate_request(request: &JobRequest) -> Result<()> {
     );
     Ok(())
 }
+
+pub fn default_implementation(backend: &BackendId) -> KernelImplementation {
+    match backend {
+        BackendId::K1 => KernelImplementation::NativeC,
+        BackendId::K3 => KernelImplementation::Triton,
+    }
+}
+pub fn implementation(request: &JobRequest) -> KernelImplementation {
+    request
+        .implementation
+        .clone()
+        .unwrap_or_else(|| default_implementation(&request.backend))
+}
+/// Shared by direct admission and the manager's push/pull scheduler. Older workers
+/// only support their original implicit runtime; never infer cross-runtime support.
+pub fn worker_supports_request(worker: &WorkerRegistration, request: &JobRequest) -> bool {
+    if worker.backend != request.backend || !worker.kinds.contains(&request.kind) {
+        return false;
+    }
+    let env = &worker.environment.additional_properties;
+    let selected = implementation(request);
+    let (ops, dtypes) = if let Some(modes) = env.get("implementations") {
+        let Some(capability) = modes.get(selected.as_str()) else {
+            return false;
+        };
+        if capability["ready"] != true {
+            return false;
+        }
+        (capability.get("ops"), capability.get("dtypes"))
+    } else {
+        // Older HTTP contracts reject the new field, even when it names their
+        // implicit runtime. Keep its request/digest intact and wait for an upgrade.
+        if request.implementation.is_some() {
+            return false;
+        }
+        if selected != default_implementation(&worker.backend) {
+            return false;
+        }
+        (env.get("ops"), env.get("dtypes"))
+    };
+    ops.and_then(Value::as_array)
+        .is_some_and(|ops| ops.contains(&json!(request.op)))
+        && dtypes
+            .and_then(Value::as_array)
+            .is_some_and(|ds| ds.contains(&json!(request.dtype)))
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,6 +296,72 @@ mod tests {
             digest(&json!({"small":1e-7})),
             rvbench_core::json::spec_digest(&json!({"small":1e-7}))
         );
+    }
+    #[test]
+    fn implementation_is_independent_of_hardware_and_optional() {
+        for example in [
+            include_str!("../examples/k3-native-c.json"),
+            include_str!("../examples/k1-triton.json"),
+        ] {
+            let value: Value = serde_json::from_str(example).unwrap();
+            validate("JobRequest", &value).unwrap();
+            let request: JobRequest = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(request).unwrap(), value);
+        }
+        let mut value: Value = serde_json::from_str(include_str!("../examples/job.json")).unwrap();
+        for invalid in [json!("cuda"), json!(null), json!(123)] {
+            value["implementation"] = invalid;
+            assert!(validate("JobRequest", &value).is_err());
+        }
+    }
+    #[test]
+    fn capabilities_match_runtime_op_and_dtype_without_inference() {
+        for hardware in [BackendId::K1, BackendId::K3] {
+            let mut request: JobRequest =
+                serde_json::from_str(include_str!("../examples/job.json")).unwrap();
+            request.backend = hardware.clone();
+            let mut worker: WorkerRegistration =
+                serde_json::from_str(include_str!("../examples/worker.json")).unwrap();
+            worker.backend = hardware.clone();
+            worker.kinds = vec![request.kind.clone()];
+            worker.environment =
+                serde_json::from_value(json!({"ops":["add"],"dtypes":["float32"]})).unwrap();
+            assert_eq!(implementation(&request), default_implementation(&hardware));
+            assert!(worker_supports_request(&worker, &request));
+            // Old workers cannot decode the new optional request field.
+            request.implementation = Some(default_implementation(&hardware));
+            assert!(!worker_supports_request(&worker, &request));
+            worker.environment = serde_json::from_value(
+                json!({"ops":["add"],"dtypes":["float32"],"implementations":{
+                    "native-c":{"ready":true,"ops":["add","abs"],"dtypes":["float32"]},
+                    "triton":{"ready":false,"ops":["add","sum"],"dtypes":["float32","float16"]}
+                }}),
+            )
+            .unwrap();
+            request.implementation = Some(KernelImplementation::NativeC);
+            assert!(worker_supports_request(&worker, &request));
+            request.dtype = JobRequestDtype::Float16;
+            assert!(!worker_supports_request(&worker, &request));
+            request.implementation = Some(KernelImplementation::Triton);
+            assert!(!worker_supports_request(&worker, &request));
+            worker
+                .environment
+                .additional_properties
+                .get_mut("implementations")
+                .unwrap()["triton"]["ready"] = json!(true);
+            assert!(worker_supports_request(&worker, &request));
+            request.op = "abs".into();
+            assert!(!worker_supports_request(&worker, &request));
+            worker
+                .environment
+                .additional_properties
+                .get_mut("implementations")
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove("triton");
+            assert!(!worker_supports_request(&worker, &request));
+        }
     }
     #[test]
     fn identifiers_and_role_references_are_checked() {

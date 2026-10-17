@@ -1,5 +1,9 @@
 # rvbench control-plane contracts v1.0.0
 
+2026-10-17 实现类型扩展：JobRequest 可选 implementation=native-c/triton，与 K1/K3
+硬件独立。省略时 K1 使用 native-c，K3 使用 triton，保持既有请求摘要与行为。
+能力探测、准入与调度约定见 ../worker/contract/backend.md。
+
 2026-10-17 观测扩展：两端 HTTP contract 版本为 1.1.0，保留 1.0.0 wire 注册兼容。
 新增指标、分页结果、排行榜和固定历史查询，见 [observability.md](observability.md)
 与 [metrics.json](metrics.json)。字段仍从本目录 OpenAPI 生成。

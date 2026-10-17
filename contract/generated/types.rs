@@ -455,6 +455,8 @@ pub struct RankingGroup {
     pub entries: Vec<RankedResult>,
     pub environment_sha256: String,
     pub group_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implementation: Option<KernelImplementation>,
     pub op: String,
     ///Constraint: minimum=0
     pub repetitions: i64,
@@ -483,6 +485,8 @@ pub struct ResultEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub evaluation_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implementation: Option<KernelImplementation>,
     pub job_id: String,
     pub kind: JobKind,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -766,6 +770,8 @@ pub struct JobRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_request_id: Option<String>,
     pub dtype: JobRequestDtype,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implementation: Option<KernelImplementation>,
     pub kind: JobKind,
     ///Constraint: pattern=`^[a-z][a-z0-9_]{0,47}$`
     pub op: String,
@@ -782,6 +788,33 @@ pub struct JobRequest {
     pub timeout_secs: i64,
     ///Constraint: minimum=0, maximum=1000
     pub warmup: i64,
+}
+///Operator implementation, independent of hardware backend. Omission preserves legacy defaults: k1=native-c, k3=triton.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum KernelImplementation {
+    #[default]
+    #[serde(rename = "native-c")]
+    NativeC,
+    #[serde(rename = "triton")]
+    Triton,
+}
+impl KernelImplementation {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::NativeC => "native-c",
+            Self::Triton => "triton",
+        }
+    }
+}
+impl ::std::fmt::Display for KernelImplementation {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for KernelImplementation {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum JobRequestDtype {

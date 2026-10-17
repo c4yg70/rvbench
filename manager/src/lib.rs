@@ -418,24 +418,7 @@ fn allocate(
         .filter(|j| {
             j.state == JobState::Queued
                 && j.assignment_id.is_none()
-                && j.request.backend == node.info.backend
-                && node.info.kinds.contains(&j.request.kind)
-        })
-        .filter(|j| {
-            node.info
-                .environment
-                .additional_properties
-                .get("ops")
-                .and_then(Value::as_array)
-                .is_some_and(|ops| ops.contains(&json!(j.request.op)))
-        })
-        .filter(|j| {
-            node.info
-                .environment
-                .additional_properties
-                .get("dtypes")
-                .and_then(Value::as_array)
-                .is_some_and(|ds| ds.contains(&json!(j.request.dtype)))
+                && worker_supports_request(&node.info, &j.request)
         })
         .min_by_key(|j| j.submitted_at.clone())
         .map(|j| j.job_id.clone());

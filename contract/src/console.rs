@@ -54,7 +54,7 @@ pub fn median(mut v: Vec<f64>) -> Option<f64> {
     }
     v.sort_by(f64::total_cmp);
     let n = v.len();
-    Some(if n % 2 == 0 {
+    Some(if n.is_multiple_of(2) {
         (v[n / 2 - 1] + v[n / 2]) / 2.
     } else {
         v[n / 2]
@@ -177,6 +177,7 @@ impl Console {
                 })
                 .map(|a| a.sha256.clone());
             let mut row = json!({"job_id":r.job_id,"submitted_at":r.submitted_at,"backend":r.request.backend,"kind":r.request.kind,"state":r.state,"op":r.request.op,"shape":r.request.shape,"dtype":r.request.dtype,"worker_id":r.worker_id,"board_id":r.board_id,"source_sha256":implementation.clone().unwrap_or_else(||digest(&r.request.source)),"compilation_status":r.compilation.as_ref().map(|p|p.status.as_str()).unwrap_or("unknown"),"evaluation_status":r.evaluation.as_ref().map(|p|p.status.as_str()).unwrap_or("unknown")});
+            row["implementation"] = json!(crate::implementation(&r.request));
             if let Some(x) = ms {
                 row["median_ms"] = json!(x);
             }
@@ -212,6 +213,14 @@ impl Console {
             let mut env = details["environment"].clone();
             if let Some(env) = env.as_object_mut() {
                 env.remove("probe_compilation");
+                if let Some(modes) = env
+                    .get_mut("implementations")
+                    .and_then(Value::as_object_mut)
+                {
+                    for mode in modes.values_mut().filter_map(Value::as_object_mut) {
+                        mode.remove("probe_compilation");
+                    }
+                }
             }
             let harness = comp
                 .artifacts
@@ -222,7 +231,7 @@ impl Console {
                 continue;
             }
             let env_hash = digest(&env);
-            let context = json!({"board_id":r.board_id,"backend":r.request.backend,"op":r.request.op,"shape":r.request.shape,"dtype":r.request.dtype,"seed":r.request.seed,"warmup":r.request.warmup,"repetitions":r.request.repetitions,"environment_sha256":env_hash,"clock":eval["clock"],"harness_sha256":harness.unwrap().sha256});
+            let context = json!({"board_id":r.board_id,"backend":r.request.backend,"implementation":crate::implementation(&r.request),"op":r.request.op,"shape":r.request.shape,"dtype":r.request.dtype,"seed":r.request.seed,"warmup":r.request.warmup,"repetitions":r.request.repetitions,"environment_sha256":env_hash,"clock":eval["clock"],"harness_sha256":harness.unwrap().sha256});
             let group_id = digest(&context);
             let (mut group, latest) = groups
                 .remove(&group_id)
@@ -629,6 +638,47 @@ mod tests {
         assert!(median(vec![f64::NAN]).is_none());
         assert!(median(vec![]).is_none());
         assert_eq!(median(vec![1., 4., 2.]), Some(2.));
+    }
+    #[test]
+    fn ranking_separates_runtimes_and_ignores_probe_artifacts() {
+        let c = Console::new("worker", None);
+        let mut a = measured("A", "a");
+        a.request.implementation = Some(KernelImplementation::NativeC);
+        a.compilation.as_mut().unwrap().details.additional_properties.insert("environment".into(), json!({
+            "implementations":{"native-c":{"ready":true,"probe_compilation":{"random_path":"first","smoke_ms":10}}}
+        }));
+        let mut b = a.clone();
+        b.job_id = id();
+        b.submitted_at = "2000-01-01".into();
+        b.compilation
+            .as_mut()
+            .unwrap()
+            .details
+            .additional_properties
+            .get_mut("environment")
+            .unwrap()["implementations"]["native-c"]["probe_compilation"] =
+            json!({"random_path":"second","smoke_ms":20});
+        let mut t = a.clone();
+        t.job_id = id();
+        t.request.implementation = Some(KernelImplementation::Triton);
+        c.update(
+            vec![(&a, "direct"), (&b, "direct"), (&t, "direct")],
+            vec![],
+            vec![],
+            0,
+            0.,
+        );
+        let v = c.snapshot();
+        assert_eq!(v.ranking.len(), 2);
+        assert!(v.ranking.iter().all(|g| g.entries.len() == 1));
+        assert!(
+            v.ranking
+                .iter()
+                .all(|g| g.entries[0].job.job_id != b.job_id)
+        );
+        for group in &v.ranking {
+            validate("RankingGroup", &json!(group)).unwrap();
+        }
     }
     #[tokio::test]
     async fn projection_publishes_only_after_successful_commit() {

@@ -24,22 +24,34 @@ worker 可在 `manager: null` 时独立接收、排队、编译、评估、返�
 `Compiler::prepare` 创建不可变请求快照和源文件、实际编译/JIT 并 smoke 调用。
 `Evaluator::evaluate` 分 correctness、performance。`func` 只做编译验证。
 正确性结果仅证明提交的 shape / dtype / seed，不代表整个 suite 已通过。
-当前烟测容差：K3 float32 的 atol/rtol 均为 0.005，float16 均为 0.05；
-K1 原生 C 的 atol=0.000001、rtol=0.00001。这些值不代替 suite 待裁决的正式容差。
+当前烟测容差：Triton float32 的 atol/rtol 均为 0.005，float16 均为 0.05；
+native C 的 atol=0.000001、rtol=0.00001。这些值不代替 suite 待裁决的正式容差。
 性能结果保存真实样本、warmup 和重复次数；编译和首次调用不计入样本。
-K3 另测原生 PyTorch 参照，每个结果保留 worker/board/instance、工件大小和 SHA-256。
+Triton 另测原生 PyTorch 参照，每个结果保留 worker/board/instance、工件大小和 SHA-256。
 
-K3 后端使用已安装 Torch / Triton / FlagGems，用户源文件导出
+K1 和 K3 均可选择 `implementation: "native-c"` 或 `"triton"`，
+支持 func、correctness、performance。省略该字段时保留旧默认值：K1=native-c、K3=triton。
+两种实现共用硬件亲和、进程隔离、超时、工件和数值预检流程。
+
+Triton 使用所选 worker 配置的 Python 及已安装 Torch / Triton / FlagGems，用户源文件导出
 `candidate(*inputs)`。源文件在独立作业目录导入，不覆盖安装树。
 支持 add/sub/mul/div/abs/exp/relu/sum/softmax/mm/mv/aminmax/topk/conv2d，
 float32/float16；mm/mv 要求二维，conv2d 使用 NCHW。
-其余输入构造和参数见 `worker/adapters/k3.py`。
+其余输入构造和参数见 `worker/adapters/triton.py`。
 Flash attention 不列入可用能力：完整辅助输出合同仍 pending，SDPA 与完整 Flash 接口不等价，
 且 SDPA 适配探测的 float32/float16 输入触发 SpacemiT 编译失败。注册环境明确保存 unavailable_ops。
 
-K1 v1 使用本机 gcc 的原生 C 后端，支持 add/abs 和 float32。
+native C 在两种硬件上均使用配置的 `cc`（默认 gcc），支持 add/abs 和 float32。
 候选签名为 `void candidate(const float *a, const float *b, float *out, int n)`。
-没有声称 K1 已装好 PyTorch / Triton；后续增加该运行环境需要单独验证。
+编译参数为 `-O3 -fno-fast-math`，参照和计时见 `worker/adapters/native.c`。
+
+启动时分别实际编译和 smoke 调用两种实现，在 `environment.implementations` 中保存
+各实现的 ready、ops、dtypes 和 probe_compilation，缺失环境记录 ready=false 与 error。
+至少一种实现可用即可启动；一种环境失败不会屏蔽另一种。K1 的 Triton 能力同样必须
+由板上配置的 Torch/Triton/FlagGems 环境探测通过，代码支持不会代替环境安装。
+manager 与直连准入按 implementation/op/dtype 匹配；排行榜按实现类型分别分组。
+旧 worker 没有 implementations 能力表，只接收省略新字段的原默认实现任务。
+请求示例见 `contract/examples/k3-native-c.json` 和 `contract/examples/k1-triton.json`。
 
 一个 worker 广告一个执行槽；直连、Push、Pull 使用同一持久接收索引与执行循环。
 直连队列上限 32，另保留一个已授予 manager 作业的排队位置，以处理容量快照与直连提交的竞争。
@@ -52,7 +64,7 @@ K1 v1 使用本机 gcc 的原生 C 后端，支持 add/abs 和 float32。
 
 ## 调度和一致性
 
-manager 只接收统一请求、保存队列、匹配 backend/kind/op/dtype/readiness，按剩余槽位分配。
+manager 只接收统一请求、保存队列、匹配 backend/implementation/kind/op/dtype/readiness，按剩余槽位分配。
 Push、Pull 共用 SQLite 原子授予入口。不同 worker 竞争时，最早提交且兼容的任务优先。
 注册心跳与执行续租独立；心跳间隔约 2–3 秒、在线 TTL 30 秒、执行 lease 30 秒。
 分配与网络交付分离：先提交分配事务，再派发；丢失响应重发相同 assignment。
@@ -86,8 +98,17 @@ python tools/cluster_recovery_smoke.py
 python tools/verify_cluster_artifacts.py artifacts/cluster-smoke-2026-10-17/final
 ```
 
+在匹配的板端环境中运行真实 Triton 回归（默认本地测试会跳过）：
+
+```sh
+RVBENCH_TEST_PYTHON=/path/to/venv/bin/python cargo test -p rvbench-worker real_triton -- --ignored
+```
+
+K1 配置同样需将 `backend.python` 指向已安装对应工具链的解释器，并设置所需的
+`backend.environment`（如供应商选择、动态库路径）；部署脚本不安装这些硬件依赖。
+
 部署脚本只用已有 SSH 密钥，不保存登录口令。`.100` 和 K1 使用 c4y 的 systemd user 服务并启用 linger；
-`.18` 使用 system service 的 initer 用户。首次启动先完成真实编译探测后才开放 HTTP 并广告 ready。
+`.18` 使用 system service 的 initer 用户。首次启动先完成两种实现的独立编译探测后才开放 HTTP 并广告 ready。
 性能 K3 必须先注册 `/proc/set_ai_thread` 再设置 CPU8–15 亲和性。
 K3 func/correctness 使用 CPU0–7，K1 使用 CPU0–7。
 新服务端口 18800/18801；旧 `.100` 的 8788/8791 不受这次部署替换。

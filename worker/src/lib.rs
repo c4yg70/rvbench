@@ -70,15 +70,6 @@ impl Worker {
         let probe_dir = config.data_dir.join("probe");
         let environment = tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
             let mut env = backend.probe(&probe_dir)?;
-            let mut request: JobRequest =
-                serde_json::from_str(include_str!("../../contract/examples/job.json"))?;
-            request.backend = backend.config.backend.clone();
-            request.op = "add".into();
-            request.shape = vec![128];
-            request.kind = JobKind::Func;
-            request.timeout_secs = 120;
-            let prepared = backend.prepare(&request, &probe_dir)?;
-            env["probe_compilation"] = serde_json::to_value(prepared.compilation)?;
             env["components"] = json!({"compiler":true,"evaluator":["correctness","performance"]});
             env["config_sha256"] = json!(digest(&backend.config));
             Ok(env)
@@ -190,6 +181,11 @@ impl Worker {
         }
         .supported(&submission.request)
         .map_err(ApiError::bad)?;
+        if !worker_supports_request(&self.info, &submission.request) {
+            return Err(ApiError::bad(
+                "implementation/op/dtype unavailable on this worker",
+            ));
+        }
         if !self.config.kinds.contains(&submission.request.kind) {
             return Err(ApiError::bad("kind not enabled on this worker"));
         }
@@ -784,7 +780,7 @@ mod tests {
                 environment: Default::default(),
             },
         };
-        let info:WorkerRegistration=serde_json::from_value(json!({"worker_id":"test","board_id":"board","instance_id":id(),"backend":"k1","kinds":["performance"],"delivery":"hybrid","url":"http://127.0.0.1:1","capacity":1,"direct_active":0,"ready":true,"environment":{},"protocol_version":"1.0.0"})).unwrap();
+        let info:WorkerRegistration=serde_json::from_value(json!({"worker_id":"test","board_id":"board","instance_id":id(),"backend":"k1","kinds":["performance"],"delivery":"hybrid","url":"http://127.0.0.1:1","capacity":1,"direct_active":0,"ready":true,"environment":{"ops":["add","abs"],"dtypes":["float32"]},"protocol_version":"1.0.0"})).unwrap();
         let mut worker = Worker {
             console: Console::new("worker", None),
             config,

@@ -47,7 +47,8 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
         assert_eq!(item["sha256"], json!(rvbench_core::json::sha256(&bytes)));
     }
     assert!(output.join("bin/rvbench-worker").is_file());
-    assert!(output.join("worker/adapters/k3.py").is_file());
+    assert!(output.join("worker/adapters/triton.py").is_file());
+    assert!(output.join("worker/adapters/native.c").is_file());
     assert!(!output.join("evald/config.example.json").exists());
     assert!(build_bundle(root, &output, Some(&binary)).is_err());
 }

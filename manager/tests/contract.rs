@@ -8,6 +8,55 @@ fn registration() -> WorkerRegistration {
     serde_json::from_value(json!({"worker_id":"test","board_id":"board","instance_id":id(),"backend":"k3","kinds":["func","correctness"],"delivery":"hybrid","url":"http://127.0.0.1:18801","capacity":1,"direct_active":0,"ready":true,"environment":{"ops":["add","abs"],"dtypes":["float32"]},"protocol_version":"1.0.0"})).unwrap()
 }
 #[tokio::test]
+async fn claims_match_implementation_capabilities_on_either_hardware() {
+    for hardware in [BackendId::K1, BackendId::K3] {
+        let temp = tempfile::tempdir().unwrap();
+        let m = Manager::open(Config {
+            victoriametrics: None,
+            listen: "127.0.0.1:0".into(),
+            data_dir: temp.path().into(),
+        })
+        .await
+        .unwrap();
+        let mut c = registration();
+        c.backend = hardware.clone();
+        c.environment = serde_json::from_value(json!({"implementations":{
+            "native-c":{"ready":true,"ops":["add"],"dtypes":["float32"]},
+            "triton":{"ready":false,"ops":["add"],"dtypes":["float32","float16"]}
+        }}))
+        .unwrap();
+        m.register(c.clone()).await.unwrap();
+        let mut t = c.clone();
+        t.worker_id = "triton-worker".into();
+        t.instance_id = id();
+        t.environment = serde_json::from_value(json!({"implementations":{
+            "triton":{"ready":true,"ops":["add"],"dtypes":["float32","float16"]}
+        }}))
+        .unwrap();
+        m.register(t.clone()).await.unwrap();
+        let mut r = request();
+        r.backend = hardware;
+        r.implementation = Some(KernelImplementation::Triton);
+        r.dtype = JobRequestDtype::Float16;
+        let triton_job = m.submit(r.clone()).await.unwrap();
+        r.implementation = Some(KernelImplementation::NativeC);
+        let unsupported_dtype = m.submit(r.clone()).await.unwrap();
+        r.dtype = JobRequestDtype::Float32;
+        let c_job = m.submit(r).await.unwrap();
+        let claim = |w: &WorkerRegistration| ClaimRequest {
+            worker_id: w.worker_id.clone(),
+            instance_id: w.instance_id.clone(),
+            request_id: id(),
+            wait_s: 0,
+        };
+        let a = m.claim(claim(&c)).await.unwrap().unwrap();
+        assert_eq!(a.job_id, c_job.job_id);
+        assert_ne!(a.job_id, unsupported_dtype.job_id);
+        let a = m.claim(claim(&t)).await.unwrap().unwrap();
+        assert_eq!(a.job_id, triton_job.job_id);
+    }
+}
+#[tokio::test]
 async fn atomic_claims_fencing_replays_and_durable_results() {
     let temp = tempfile::tempdir().unwrap();
     let config = Config {

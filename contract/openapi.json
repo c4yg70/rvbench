@@ -31,6 +31,11 @@
           "k1"
         ]
       },
+      "KernelImplementation": {
+        "type": "string",
+        "enum": ["native-c", "triton"],
+        "description": "Operator implementation, independent of hardware backend. Omission preserves legacy defaults: k1=native-c, k3=triton."
+      },
       "DeliveryMode": {
         "type": "string",
         "enum": [
@@ -62,6 +67,9 @@
       "JobRequest": {
         "type": "object",
         "properties": {
+          "implementation": {
+            "$ref": "#/components/schemas/KernelImplementation"
+          },
           "backend": {
             "$ref": "#/components/schemas/BackendId"
           },
@@ -921,6 +929,9 @@
       "ResultEntry": {
         "type": "object",
         "properties": {
+          "implementation": {
+            "$ref": "#/components/schemas/KernelImplementation"
+          },
           "job_id": {
             "type": "string"
           },
@@ -1069,6 +1080,9 @@
       "RankingGroup": {
         "type": "object",
         "properties": {
+          "implementation": {
+            "$ref": "#/components/schemas/KernelImplementation"
+          },
           "group_id": {
             "type": "string"
           },

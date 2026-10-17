@@ -1,4 +1,4 @@
-"""Isolated K3 compiler/evaluator. Candidate exports candidate(*inputs). No installed code edits."""
+"""Isolated K1/K3 Triton compiler/evaluator. Candidate exports candidate(*inputs)."""
 import importlib.util
 import hashlib
 import inspect

@@ -4,6 +4,7 @@
 
 - `console.html`：当前 manager / 独立 worker 共用的四标签页控制台。
   包含系统状态、任务提交、任务结果、排行榜，支持明暗主题，所有内容内联。
+  K1/K3 与 native C/Triton 可独立选择，按各实现探测能力展示算子、dtype 和匹配节点。
   接口与部署见 [observability.md](../docs/observability.md)。
 
 - `dashboard.html`：现有 K3 监控页面，单文件、零构建依赖。
