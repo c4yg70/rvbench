@@ -6,8 +6,9 @@
 
 ## Contract-first
 
-人工权威为协议仓 `rvbench-core-rust` 的 `openapi.json`（共享 schema）、worker 仓的 `contract/openapi.yaml`、
-本仓 `manager/contract/openapi.yaml`；后两份是 JSON 语法的合法 YAML，引用共享 schema。
+人工权威为本仓 `contracts/openapi.json`（共享 schema），worker 仓的 `contract/openapi.yaml` 与本仓
+`manager/contract/openapi.yaml` 以 YAML 语法引用它；后两份是 JSON 语法的合法 YAML，共享 schema 走 `$ref`。
+协议仓 `rvbench-core-rust` 内的 `openapi.json` 是随 crate 发布的副本，正本改动后用 `python tools/sync_contract.py` 同步。
 先编写 contract 和正反例，再使用锁定的 openapi-to-rust 0.15.0 生成类型。
 运行时校验原始 JSON 后反序列化生成类型。CLI、两端服务共用该类型和校验器。
 变更 wire 接口必须先改 contract，然后生成、校验与实现。

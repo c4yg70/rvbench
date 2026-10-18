@@ -29,7 +29,7 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 
 ### 合同优先
 
-`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是 [rvbench-core-rust](https://github.com/rvbench/rvbench-core-rust) 里的 `openapi.json`，manager 与 worker 各自的 OpenAPI 以 YAML 语法引用同一批 schema。
+`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/openapi.json`](contracts/README.md)，manager 与 worker 各自的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
 
 wire 类型由 `openapi-to-rust` 0.15.0 生成，不手写平行 DTO。接口变更顺序固定：改合同 → 重新生成 → conformance 测试 → 实现 → 实机验证。运行时先校验原始 JSON，再反序列化为生成类型；CLI 与两端服务共用同一套校验器与规范 JSON 摘要。
 
@@ -77,6 +77,7 @@ rvbench/
 ├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── schemas/                spec / results / baseline 的 JSON Schema 正本
+├── contracts/              控制面 wire 正本：共享 OpenAPI schema，两端 OpenAPI 以 $ref 引用
 ├── suites/kernels/         typical8 评测集定义
 ├── examples/               合成结果、baseline 与 hello-world 冒烟用例
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
