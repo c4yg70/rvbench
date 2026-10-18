@@ -39,7 +39,7 @@ pub fn run(base: Option<&str>, action: &Action) -> Result<()> {
         .build()?;
     let (method, path, body, wait) = match action {
         Action::Submit { file, direct, wait } => {
-            let value: Value = rvbench_core::load_json(file)?;
+            let value: Value = crate::load_json(file)?;
             validate("JobRequest", &value)?;
             let request: JobRequest = serde_json::from_value(value.clone())?;
             (

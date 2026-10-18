@@ -1,13 +1,39 @@
 # rvbench CLI
 
-原生 Rust 客户端。使用 `rvbench --help`、`rvbench ev --help`、`rvbench suite --help` 查看参数。
+原生 Rust 客户端与离线校验库。`rvbench --help`、`rvbench control --help` 查看参数。
 
-`validate spec|hidden|results|baseline-results`、`digest` 为离线合同工具。`ev run|submit|get|judge|status|history|cancel` 使用 HTTP 作业服务。`suite validate|expand|from-baseline|run` 处理历史 suite-v1；`pipeline` 处理工作区 ticket，`op-status` 展示本地状态。
+## 二进制
 
-可选基准包使用 `validate spec FILE` 核验；历史测速使用 `validate baseline-results FILE --spec SPEC`；`digest SPEC --baseline ID` 输出实现与 case 合同摘要。它们不执行 `baseline.run` 或修改 registry。详见 [baseline 格式](../docs/specs/2026-10-16-suite-baseline格式.md)。
+```sh
+rvbench control workers                      # 节点
+rvbench control capabilities                # 能力表
+rvbench control submit job.json --wait      # 提交
+rvbench control get JOB_UUID --wait         # 查询
+rvbench control cancel JOB_UUID             # 取消未运行任务
+rvbench control drain WORKER_ID             # 排空节点
+```
 
-全局参数：`--root` 主仓，`--workspace` 工作区，`--backend` 档案，`--base` 显式服务地址，`--token` 认证。推荐通过 `EV_TOKEN` 提供 token，避免命令行历史；支持 `EV_WORKSPACE` 和 `EV_BACKEND`。
+`--base` 指向 manager（默认 `http://127.0.0.1:18800`）或独立 worker 的 18801；直连 worker 时加 `--direct`。
 
-管线持久化为 `runs/.rvbench-pipeline.json`，与旧 Python state 不互读。ticket 布局为 `runs/<wave>/<condition>/<op>/tickets/<stem>.ticket.json`；同一 ticket 路径与内容生成稳定重试 ID，不同 wave 独立。非 baseline ticket 必须提供候选文件；声明摘要时必须匹配。
+离线工具不访问网络：
 
-结果沿用 raw-v1/result-v2 并更新旧 registry。它们不代表新的 eval_results 合同中已采齐输入、清理与计时证据。
+```sh
+rvbench validate spec suites/kernels/typical8/spec.json
+rvbench validate hidden suites/kernels/typical8/spec.hidden.json
+rvbench validate results out.json --spec suites/kernels/typical8/spec.json
+rvbench validate baseline-results results.json --spec examples/baseline/spec.json
+rvbench digest suites/kernels/typical8/spec.json
+rvbench digest suites/kernels/typical8/spec.json --baseline pytorch
+```
+
+`validate spec|hidden` 的 `--require-ready` 在仍有 readiness blocker 时返回 2；合同合法与完成板上验证是两件事。
+
+## 库
+
+`rvbench_cli` 同时是 lib，供 `rvbench-tools` 复用同一套校验与 I/O：
+
+- `spec` / `results` / `baseline` / `hidden`：schema 与语义校验、readiness、摘要
+- `files`：原子写入
+- `control`：HTTP 客户端
+
+`json`（严格解析、canonical 序列化、SHA-256）来自 `rvbench-protocol`，与 manager / worker 共用同一实现。

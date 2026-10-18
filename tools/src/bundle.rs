@@ -1,5 +1,5 @@
 use anyhow::{Result, ensure};
-use rvbench_core::json::sha256;
+use rvbench_cli::json::sha256;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -100,6 +100,6 @@ pub fn build_bundle(root: &Path, output: &Path, binary: Option<&Path>) -> Result
         manifest.push(json!({"path":relative.to_string_lossy().replace('\\',"/"),"source":source.strip_prefix(root).unwrap_or(&source).to_string_lossy().replace('\\',"/"),"sha256":sha256(&data),"bytes":data.len()}));
     }
     let value = json!({"backends":["k3","k1"],"protocol_version":"1.0.0","control_plane":"rust","target":"riscv64gc-unknown-linux-gnu","files":manifest});
-    rvbench_runtime::files::atomic_json(&output.join("manifest.json"), &value)?;
+    rvbench_cli::files::atomic_json(&output.join("manifest.json"), &value)?;
     Ok(value)
 }

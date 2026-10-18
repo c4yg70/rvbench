@@ -1,4 +1,4 @@
-use rvbench_core::{
+use rvbench_cli::{
     parse_json, spec_digest, validate_eval_results, validate_hidden_spec, validate_spec,
 };
 use std::fs;

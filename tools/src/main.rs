@@ -116,15 +116,14 @@ fn check(root: &Path) -> Result<()> {
             "cargo check failed"
         );
     }
-    let public = rvbench_core::load_json(root.join("suites/kernels/typical8/spec.json"))?;
+    let public = rvbench_cli::load_json(root.join("suites/kernels/typical8/spec.json"))?;
     ensure!(
-        rvbench_core::validate_spec(&public, Some(&root.join("suites/kernels/typical8")))
-            .is_empty(),
+        rvbench_cli::validate_spec(&public, Some(&root.join("suites/kernels/typical8"))).is_empty(),
         "public spec invalid"
     );
-    let result = rvbench_core::load_json(root.join("examples/eval_results.json"))?;
+    let result = rvbench_cli::load_json(root.join("examples/eval_results.json"))?;
     ensure!(
-        rvbench_core::validate_eval_results(
+        rvbench_cli::validate_eval_results(
             &result,
             Some(&public),
             None,
@@ -134,10 +133,10 @@ fn check(root: &Path) -> Result<()> {
         "synthetic result invalid"
     );
     let baseline_base = root.join("examples/baseline");
-    let baseline_spec = rvbench_core::load_json(baseline_base.join("spec.json"))?;
-    let baseline_result = rvbench_core::load_json(baseline_base.join("baseline-results.json"))?;
+    let baseline_spec = rvbench_cli::load_json(baseline_base.join("spec.json"))?;
+    let baseline_result = rvbench_cli::load_json(baseline_base.join("baseline-results.json"))?;
     ensure!(
-        rvbench_core::validate_baseline_results(
+        rvbench_cli::validate_baseline_results(
             &baseline_result,
             Some(&baseline_spec),
             Some(&baseline_base),
@@ -262,7 +261,7 @@ async fn main() -> Result<()> {
                 remote_root.trim_end_matches('/'),
                 uuid::Uuid::new_v4().simple()
             );
-            let quote = rvbench_k3::executor::shell_quote;
+            let quote = shell_quote;
             let (code, _, stderr) = session
                 .exec(
                     &format!("mkdir -p {}", quote(&directory)),
@@ -311,4 +310,8 @@ async fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }

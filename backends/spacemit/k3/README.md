@@ -1,65 +1,40 @@
-> 新部署使用 `rvbench-worker` / `rvbench-manager`，见 [当前部署说明](../../../docs/manager-worker.md)。本页保留旧 evald 库与历史部署资料；旧 Rust 服务二进制不再构建。
+# SpacemiT K3 板端资产
 
-# SpacemiT K3 后端
+服务端已由 `rvbench-worker` / `rvbench-manager` 承担，见 [部署说明](../../../docs/manager-worker.md)。本目录只剩板端脚本与平台资料，不参与 Rust workspace 构建。
 
-`rvbench-evald` 为 Rust 服务。`src/` 负责 K3 配置、资源/车道、请求校验、候选路径白名单、执行器和旧 registry 判定；通用服务机制由 `rvbench-runtime` 提供。
-
-`adapters/board/` 保留算子调用、torch 参照、fallback 与计时脚本。`adapters/python/warmd.py` 保留不变量预加载及每作业 fork 协议；`precompile_driver.py` 仅用于 Triton JIT。板端 Python 环境由已有 `run_env.sh` 激活。
-
-## 本地检查
-
-```sh
-cargo test -p rvbench-k3 --locked
-cargo run -p rvbench-k3 -- --config backends/spacemit/k3/evald/config.example.json --check-config
-```
-
-配置检查不会连接板端或加载 torch。模板中的 token 必须替换；生成 token 使用 `rvbench-evald --gen-token`。真实配置 `evald/config.json` 和 `evald.env` 忽略入库。
-
-## RISC-V Linux 构建
-
-板上原生编译可执行 `cargo build -p rvbench-k3 --release --locked`。从主机交叉编译：
-
-```sh
-rustup target add riscv64gc-unknown-linux-gnu
-cargo install cargo-zigbuild --locked --version 0.23.4
-# 将 Zig 0.14.0 放入 PATH；x-cmd 可用 x env use zig 安装
-cargo zigbuild -p rvbench-k3 --release --target riscv64gc-unknown-linux-gnu --locked
-cargo run -p rvbench-tools -- bundle --output artifacts/k3-rust-bundle
-```
-
-包内布局：
+## 内容
 
 ```text
-bundle/
-├── evald/
-│   ├── rvbench-evald
-│   ├── evaldctl.sh
-│   ├── config.example.json
-│   ├── warmd.py
-│   ├── dashboard.html
-│   └── monitor/
-├── scripts/                    bench_op/bench_gemm/torch_reference/fallback_refs
-└── manifest.json               文件 SHA-256、字节数及目标平台
+k3/
+├── adapters/board/     算子调用、torch 参照、fallback 与计时脚本
+├── adapters/python/    warmd 预加载与 Triton JIT 预编译驱动
+├── evald/              run_env 启动脚本与配置模板
+├── monitor/            Prometheus 抓取配置
+├── profiles/           平台档案说明
+└── clients/            旧客户端归档
 ```
 
-打包器检查 ELF64 little-endian RISC-V 标识，拒绝 Windows/其他架构程序，拒绝覆盖已存在的输出目录。不包含真实配置、token 或隐藏定义。它只生成本地包。
+真实的 `evald/config.json` 与环境文件按 `.gitignore` 不入库。
 
-部署时将 evald 和 scripts 的内容放到对应板端目录，保留既有私有配置与 run_env；核对 `data_dir`、`scripts_root`、`flag_gems_root`、`warmd_path` 与 CPU 亲和。跨 Windows 复制后设置执行权限：
+## 板端环境
+
+Python 侧需要匹配的 torch / Triton / FlagGems，由板端 `run_env.sh` 激活。`rvbench-worker` 启动时会实际编译并 smoke 调用所选实现，环境缺失只会让该实现 `ready=false`，不影响另一种实现。
+
+跨 Windows 复制脚本后需恢复执行权限：
 
 ```sh
-chmod +x /home/c4y/autoke/evald/rvbench-evald /home/c4y/autoke/evald/evaldctl.sh
-cd /home/c4y/autoke/evald
-./rvbench-evald --config config.json --check-config
-./evaldctl.sh start
-./evaldctl.sh status
+chmod +x ~/autoke/evald/*.sh ~/autoke/evald/*.py
 ```
 
-`evaldctl.sh` 可通过 `EVALD_BIN`、`EVALD_CONFIG` 覆盖位置；`start-ai` 保留 SpacemiT AI 线程启动方式。`stop` 发送 TERM 并等待清理，超时保留 PID 文件。
+## 维护工具
 
-本次已完成 Windows 本地测试和 RISC-V release 编译，未部署或运行 K3 真机。warmfork 与真实 torch/Triton 的性能、数值及 ABI 兼容需板上验证。
+SSH/SFTP 与预编译由 `rvbench-tools` 提供：
 
-## API 与维护
+```sh
+rvbench-tools pssh <host> "<command>"
+rvbench-tools precompile --help
+```
 
-公开健康/指标端点 `/healthz`、`/metrics`；作业端点 `/jobs` 使用 `X-K3-Token`。客户端为 `rvbench ev ...`。SSH/SFTP 为 `rvbench-tools pssh`，预编译为 `rvbench-tools precompile`。SSH 支持配置别名、私钥或环境密码、known_hosts 校验；当前不支持 SSH agent 及 ProxyJump。
+## 历史文档
 
-旧 Python clients/ops/evald/tests 在本地 `artifacts/python-legacy-2026-10-14/` 保存。原技术文档见仓库 `docs/backends/spacemit-k3/`，其中旧入口只作为历史参考。
+原 evald 技术文档保留在 `docs/backends/spacemit-k3/`，仅作设计参考。

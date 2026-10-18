@@ -44,7 +44,7 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
         assert!(!path.ends_with("/config.json") && !path.contains("spec.hidden"));
         assert_ne!(path, "evald/evald.py");
         let bytes = fs::read(output.join(path)).unwrap();
-        assert_eq!(item["sha256"], json!(rvbench_core::json::sha256(&bytes)));
+        assert_eq!(item["sha256"], json!(rvbench_cli::json::sha256(&bytes)));
     }
     assert!(output.join("bin/rvbench-worker").is_file());
     assert!(output.join("worker/adapters/triton.py").is_file());

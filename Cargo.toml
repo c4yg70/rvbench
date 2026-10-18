@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "cli", "tools", "runtime", "backends/spacemit/k3", "contract", "worker", "manager"]
+members = ["cli", "tools", "contract", "worker", "manager"]
 resolver = "3"
 
 [workspace.package]

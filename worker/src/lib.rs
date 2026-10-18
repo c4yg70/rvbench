@@ -1,5 +1,6 @@
 //! Independent worker service. Direct, push and pull share durable admission/execution.
 pub mod backend;
+pub mod process;
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Path, Query, State},

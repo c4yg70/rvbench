@@ -1,7 +1,7 @@
 //! Native harness trace checks with the original D2/D3/D4 policies.
 use anyhow::{Result, ensure};
 use regex::Regex;
-use rvbench_core::parse_json;
+use rvbench_cli::parse_json;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -304,7 +304,7 @@ pub fn check_file(path: &Path) -> Result<Value> {
                 );
             }
         }
-        rvbench_core::spec::walk(&rec, String::new(), &mut |field, value| {
+        rvbench_cli::spec::walk(&rec, String::new(), &mut |field, value| {
             if field == ".memory_root" {
                 return;
             }

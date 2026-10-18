@@ -3,21 +3,23 @@ name = "rvbench-cli"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "rvbench_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "rvbench"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+chrono.workspace = true
 clap.workspace = true
+jsonschema.workspace = true
 reqwest.workspace = true
-fs2.workspace = true
-rvbench-runtime = { path = "../runtime" }
-rvbench-core = { path = "../core" }
 rvbench-protocol = { path = "../contract" }
-rvbench-k3 = { path = "../backends/spacemit/k3" }
 serde_json.workspace = true
-walkdir.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

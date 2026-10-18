@@ -2490,48 +2490,13 @@ name = "rvbench-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap",
- "fs2",
- "reqwest",
- "rvbench-core",
- "rvbench-k3",
- "rvbench-protocol",
- "rvbench-runtime",
- "serde_json",
- "tempfile",
- "walkdir",
-]
-
-[[package]]
-name = "rvbench-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
  "chrono",
+ "clap",
  "jsonschema",
- "regex",
- "ryu",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
-]
-
-[[package]]
-name = "rvbench-k3"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "regex",
  "reqwest",
- "rvbench-core",
- "rvbench-runtime",
+ "rvbench-protocol",
  "serde_json",
  "tempfile",
- "tokio",
  "uuid",
 ]
 
@@ -2560,31 +2525,13 @@ dependencies = [
  "chrono",
  "jsonschema",
  "rusqlite",
- "rvbench-core",
+ "ryu",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
  "uuid",
-]
-
-[[package]]
-name = "rvbench-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "fs2",
- "libc",
- "reqwest",
- "rvbench-core",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "uuid",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2597,9 +2544,7 @@ dependencies = [
  "regex",
  "russh",
  "russh-sftp",
- "rvbench-core",
- "rvbench-k3",
- "rvbench-runtime",
+ "rvbench-cli",
  "serde_json",
  "tempfile",
  "tokio",
@@ -2615,15 +2560,16 @@ dependencies = [
  "axum",
  "clap",
  "fs2",
+ "libc",
  "reqwest",
  "rvbench-protocol",
- "rvbench-runtime",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
  "tokio",
  "walkdir",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

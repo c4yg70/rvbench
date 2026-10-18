@@ -102,7 +102,7 @@ impl Backend {
             .envs(&self.config.environment);
         // Compile artifacts belong to this request on either hardware backend.
         command.env("TRITON_CACHE_DIR", dir.join("triton-cache"));
-        let out = rvbench_runtime::process::run(&mut command, Duration::from_secs(timeout))?;
+        let out = crate::process::run(&mut command, Duration::from_secs(timeout))?;
         std::fs::write(dir.join("last-stdout.log"), &out.stdout)?;
         std::fs::write(dir.join("last-stderr.log"), &out.stderr)?;
         if out.timed_out {

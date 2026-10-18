@@ -15,6 +15,8 @@ use std::{
 };
 pub use wire::*;
 pub mod console;
+pub mod json;
+pub use json::{load_json, parse_json, spec_digest};
 
 pub const SPEC: &str = include_str!("../openapi.json");
 pub fn validate(name: &str, value: &Value) -> Result<()> {
@@ -40,7 +42,7 @@ pub fn decode<T: DeserializeOwned>(name: &str, value: Value) -> Result<T, ApiErr
     serde_json::from_value(value).map_err(ApiError::bad)
 }
 pub fn digest(value: &impl Serialize) -> String {
-    rvbench_core::json::spec_digest(&serde_json::to_value(value).unwrap())
+    crate::json::spec_digest(&serde_json::to_value(value).unwrap())
 }
 /// Parse the original body before schema validation; serde_json::Value alone would
 /// silently keep the last value of a duplicate object key.
@@ -55,9 +57,7 @@ impl<S: Send + Sync> axum::extract::FromRequest<S> for RawJson {
             .await
             .map_err(|e| ApiError(e.status(), e.to_string()))?;
         let text = std::str::from_utf8(&bytes).map_err(ApiError::bad)?;
-        Ok(Self(
-            rvbench_core::json::parse_json(text).map_err(ApiError::bad)?,
-        ))
+        Ok(Self(crate::json::parse_json(text).map_err(ApiError::bad)?))
     }
 }
 pub fn id() -> String {
@@ -294,7 +294,7 @@ mod tests {
         );
         assert_eq!(
             digest(&json!({"small":1e-7})),
-            rvbench_core::json::spec_digest(&json!({"small":1e-7}))
+            crate::json::spec_digest(&json!({"small":1e-7}))
         );
     }
     #[test]

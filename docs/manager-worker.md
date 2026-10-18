@@ -134,8 +134,5 @@ rvbench --base http://10.18.60.100:18800 control drain WORKER_ID
 所有端点见 OpenAPI。工件路径相对 worker 的 `data_dir/jobs/JOB_UUID`，可用 SSH 取回并核对摘要；
 v1 API 返回 manifest，不提供任意文件路径下载。
 
-旧 `rvbench ev` / pipeline 与 `rvbench-k3` 库继续支持原 evald 的协议和历史结果；
-新 API 使用 `rvbench control`。旧 token 配置只属于保留的旧客户端/兼容库，新服务不会读取它。
-旧 lane 映射：func→func（compiler），correctness→correctness（evaluator），timing→performance（evaluator）。
-旧部署路径、warmfork、registry judge 不能直接作为新源文件或 wire 请求传入。
+两端互不依赖，各自只依赖 `rvbench-protocol`；`rvbench-worker` 与 `rvbench-manager` 都没有共享的运行时 crate。
 公开 typical8 suite 的 draft/readiness 状态保持原有证据要求；服务上线并不自动使 suite ready。

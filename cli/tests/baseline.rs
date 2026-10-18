@@ -1,4 +1,4 @@
-use rvbench_core::{
+use rvbench_cli::{
     baseline::*, json::sha256, load_json, readiness_blockers, spec_digest,
     validate_baseline_results, validate_eval_results, validate_spec,
 };
@@ -51,7 +51,7 @@ fn examples_validate_and_baseline_is_optional_for_both_spec_versions() {
     assert!(validate_spec(&spec, Some(temp.path())).is_empty());
     assert!(errors(&spec, &result, temp.path()).is_empty());
     assert!(!validate_spec(&spec, None).is_empty());
-    let legacy = rvbench_core::parse_json(include_str!("fixtures/contracts.json")).unwrap();
+    let legacy = rvbench_cli::parse_json(include_str!("fixtures/contracts.json")).unwrap();
     let old = legacy
         .as_array()
         .unwrap()
@@ -374,7 +374,7 @@ fn measured_records_bind_native_execution_timing_and_evidence_without_promoting_
 
 #[test]
 fn new_eval_result_version_accepts_spec_21_without_weakening_version_10() {
-    let legacy = rvbench_core::parse_json(include_str!("fixtures/contracts.json")).unwrap();
+    let legacy = rvbench_cli::parse_json(include_str!("fixtures/contracts.json")).unwrap();
     let pair = legacy
         .as_array()
         .unwrap()

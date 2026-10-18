@@ -234,7 +234,7 @@ impl Session {
         if let Some(parent) = local.parent().filter(|p| !p.as_os_str().is_empty()) {
             fs::create_dir_all(parent)?;
         }
-        rvbench_runtime::files::atomic_write(local, &bytes)?;
+        rvbench_cli::files::atomic_write(local, &bytes)?;
         sftp.close().await?;
         Ok(())
     }

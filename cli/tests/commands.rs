@@ -13,10 +13,10 @@ fn contract_commands_work_outside_repository_and_reject_duplicate_keys() {
         .output()
         .unwrap();
     assert!(result.status.success(), "{:?}", result);
-    let document = rvbench_core::load_json(&public).unwrap();
+    let document = rvbench_cli::load_json(&public).unwrap();
     assert!(String::from_utf8_lossy(&result.stdout).contains(&format!(
         "readiness blockers: {}",
-        rvbench_core::readiness_blockers(&document).len()
+        rvbench_cli::readiness_blockers(&document).len()
     )));
     let ready = Command::new(cli)
         .current_dir(temp.path())
@@ -35,7 +35,7 @@ fn contract_commands_work_outside_repository_and_reject_duplicate_keys() {
     assert!(digest.status.success());
     assert_eq!(
         String::from_utf8_lossy(&digest.stdout).trim(),
-        rvbench_core::spec_digest(&document)
+        rvbench_cli::spec_digest(&document)
     );
     let results = Command::new(cli)
         .current_dir(temp.path())

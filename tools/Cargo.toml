@@ -14,11 +14,9 @@ chrono.workspace = true
 regex.workspace = true
 russh = { version = "0.63", default-features = false, features = ["ring", "flate2", "rsa"] }
 russh-sftp = "2"
-rvbench-k3 = { path = "../backends/spacemit/k3" }
-rvbench-runtime = { path = "../runtime" }
+rvbench-cli = { path = "../cli" }
 tokio.workspace = true
 uuid.workspace = true
-rvbench-core = { path = "../core" }
 serde_json.workspace = true
 walkdir.workspace = true
 

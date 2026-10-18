@@ -54,30 +54,28 @@ client (rvbench CLI / webui)
         └── Evaluator::evaluate  correctness / performance
 ```
 
-worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager 分配任务。两端共用 `rvbench-runtime`（Axum/Tokio、限流队列、SQLite WAL 事务、路径锁、进程组超时清理、Prometheus 指标）与 `rvbench-protocol`（生成类型、校验、canonical JSON、存储）。
+worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager 分配任务。两端只通过 `rvbench-protocol` 互通：生成类型、JSON Schema 校验、canonical JSON 与事务存储。服务机制各自持有——worker 内建进程组隔离与超时回收，manager 内建队列、账本与租约，没有共享的运行时 crate。
 
 ### 目录与职责
 
 ```text
 rvbench/
-├── core/                   通用合同、8 算子输出推导、readiness、baseline 与摘要
-├── contract/               共享 OpenAPI 正本、生成类型、conformance 与不变量
-├── runtime/                服务运行时：队列、持久化、锁、进程树、指标
-├── worker/                 rvbench-worker，编译/评估与平台适配器（adapters/）
-├── manager/                rvbench-manager，提交、节点、调度、租约与观测汇总
-├── cli/                    rvbench：校验、摘要、control 客户端
+├── contract/               唯一共享 crate：OpenAPI 正本、生成类型、校验、摘要、事务存储
+├── worker/                 rvbench-worker，自包含：编译/评估、进程隔离、平台适配器（adapters/）
+├── manager/                rvbench-manager，自包含：提交、队列、调度、租约与观测汇总
+├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── schemas/                spec / results / baseline 的 JSON Schema 正本
 ├── suites/kernels/         typical8、hello-world 评测集定义
 ├── examples/               合成结果与 baseline 示例
 ├── webui/                  manager / worker 共用的自包含控制台
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
-├── backends/spacemit/k3/   K3 板端资料：部署脚本、监控配置、平台档案
+├── backends/spacemit/k3/   K3 板端资产：算子脚本、监控配置、平台档案
 ├── docs/                   格式 spec、ADR、运行手册
 └── artifacts/              本地构建、部署包与验收记录（不入库）
 ```
 
-`core` 不依赖任何厂商实现，也不加载 torch。Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
+`worker` 与 `manager` 互不依赖，各自只依赖 `contract`；拆分 worker 到独立仓库时只需带上 `contract`。`cli` 提供 lib（供 `tools` 复用离线校验）与 `control` 客户端；Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
 
 ## 实现与硬件解耦
 
