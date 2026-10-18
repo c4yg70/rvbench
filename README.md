@@ -13,9 +13,9 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 | 仓库 | 内容 |
 |---|---|
 | `rvbench`（本仓） | manager、CLI、运维工具、hello-world 示例评测集 |
-| [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：OpenAPI 正本、生成类型、校验、摘要、存储 |
-| [`rvbench-spacemit-worker`](https://github.com/rvbench/rvbench-spacemit-worker) | 板端执行服务：编译、验证、计时、能力探测 |
-| [`rvbench-official-suites`](https://github.com/rvbench/rvbench-official-suites) | 官方评测集：hello-world、nano |
+| [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：wire 合同副本、生成类型、校验、摘要、存储 |
+| `rvbench-spacemit-worker` | 板端执行服务：编译、验证、计时、能力探测 · *暂未公开* |
+| `rvbench-official-suites` | 完整官方评测集 · *后续开源* |
 
 ## 设计原则
 
@@ -199,7 +199,7 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 ## 评测集与结果合同
 
 - `examples/hello-world/`：最小 add 用例与配套 synthetic 结果，用于跑通提交、编译、执行与结果落盘链路。公开仓只内置这一个示例。
-- `suites/`：评测集体系的定义说明；完整算子评测集随 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites) 开源。
+- `suites/`：评测集体系的定义说明；完整算子评测集随 `rvbench-official-suites` 后续开源。
 - `examples/baseline/`：可选基准包（spec 2.1.0 的 `baseline.entries[]`）。
 
 历史测速与当前通过状态分别管理：基准数据不自动裁决 case 是否 ready，也不写入 incumbent 记录。

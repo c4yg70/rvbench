@@ -6,7 +6,7 @@
 用于跑通提交、编译、执行与结果落盘链路，配套 synthetic 结果见 `examples/hello-world/eval_results.json`。
 它不是性能评测集：`suite.status` 为 draft，计时合同仍为 pending。
 
-完整的算子评测集、基准代码与历史测速随 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites) 开源；
+完整的算子评测集、基准代码与历史测速随 `rvbench-official-suites` 后续开源；
 本仓 `suites/` 只保留评测集体系的定义说明，不再存放具体用例。
 
 隐藏定义（`spec.hidden.json`）引用公开算子与检查合同，默认不入版本控制。
