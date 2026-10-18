@@ -1,0 +1,988 @@
+[
+  {
+    "kind": "from_raw",
+    "args": [
+      {
+        "schema": "raw-v1",
+        "writer": "ev-v1",
+        "condition": "KOPE",
+        "kind": "correctness",
+        "op": "mm",
+        "shape": "384,512",
+        "dtype": "float32",
+        "attempt": 1,
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py",
+        "job_id": "j-t1",
+        "state": "done",
+        "evald_ts": "2026-10-07T09:58:26+08:00",
+        "evald_host": "k3-acc",
+        "queue_wait_s": 0.4,
+        "duration_s": 80.0,
+        "shape_sent": "384,512",
+        "shape_warn": null,
+        "result": {
+          "correct": true,
+          "max_abs_err": 2e-07
+        },
+        "kope_mem": {
+          "speedup": 2.0,
+          "pass_rate": 1.0
+        },
+        "stdout_tail": "lots of output",
+        "stderr_tail": "",
+        "error": null
+      }
+    ],
+    "kwargs": {},
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3-acc",
+      "lane": "correctness",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": null,
+        "gems_ms": null,
+        "speedup": null
+      },
+      "correct": true,
+      "max_abs_err": 2e-07,
+      "error": null,
+      "duration_s": 80.0,
+      "queue_wait_s": 0.4,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "raw-v1",
+      "meta": {
+        "condition": "KOPE",
+        "attempt": 1,
+        "writer": "ev-v1",
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py"
+      }
+    }
+  },
+  {
+    "kind": "from_raw",
+    "args": [
+      {
+        "schema": "raw-v1",
+        "writer": "ev-v1",
+        "condition": "KOPE",
+        "kind": "func",
+        "op": "mm",
+        "shape": "384,512",
+        "dtype": "float32",
+        "attempt": 1,
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py",
+        "job_id": "j-t1",
+        "state": "done",
+        "evald_ts": "2026-10-07T09:58:26+08:00",
+        "evald_host": "k3",
+        "queue_wait_s": 0.4,
+        "duration_s": 80.0,
+        "shape_sent": "384,512",
+        "shape_warn": null,
+        "result": {
+          "torch_ms": 1.2,
+          "gems_ms": 0.6,
+          "speedup": 2.0,
+          "correct": true,
+          "max_abs_err": 0.0
+        },
+        "kope_mem": {
+          "speedup": 2.0,
+          "pass_rate": 1.0
+        },
+        "stdout_tail": "lots of output",
+        "stderr_tail": "",
+        "error": null
+      }
+    ],
+    "kwargs": {},
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "func",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.2,
+        "gems_ms": 0.6,
+        "speedup": 2.0
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 80.0,
+      "queue_wait_s": 0.4,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "raw-v1",
+      "meta": {
+        "condition": "KOPE",
+        "attempt": 1,
+        "writer": "ev-v1",
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py"
+      }
+    }
+  },
+  {
+    "kind": "from_raw",
+    "args": [
+      {
+        "job_id": "j-x",
+        "op": "add"
+      }
+    ],
+    "kwargs": {},
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": null,
+      "lane": null,
+      "job_id": "j-x",
+      "op": "add",
+      "shape": null,
+      "dtype": null,
+      "metrics": {
+        "torch_ms": null,
+        "gems_ms": null,
+        "speedup": null
+      },
+      "correct": null,
+      "max_abs_err": null,
+      "error": null,
+      "duration_s": null,
+      "queue_wait_s": null,
+      "finished_at": null,
+      "source_schema": "raw-v1",
+      "meta": {
+        "condition": null,
+        "attempt": null,
+        "writer": null
+      }
+    }
+  },
+  {
+    "kind": "from_raw",
+    "args": [
+      {
+        "schema": "raw-v1",
+        "writer": "ev-v1",
+        "condition": "KOPE",
+        "kind": "timing-final",
+        "op": "mm",
+        "shape": "384,512",
+        "dtype": "float32",
+        "attempt": 1,
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py",
+        "job_id": "j-t1",
+        "state": "done",
+        "evald_ts": "2026-10-07T09:58:26+08:00",
+        "evald_host": "k3",
+        "queue_wait_s": 0.4,
+        "duration_s": 80.0,
+        "shape_sent": "384,512",
+        "shape_warn": null,
+        "result": {
+          "torch_ms": 1.2,
+          "gems_ms": 0.6,
+          "speedup": 2.0,
+          "correct": true,
+          "max_abs_err": 0.0
+        },
+        "kope_mem": {
+          "speedup": 2.0,
+          "pass_rate": 1.0
+        },
+        "stdout_tail": "lots of output",
+        "stderr_tail": "",
+        "error": null
+      }
+    ],
+    "kwargs": {},
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.2,
+        "gems_ms": 0.6,
+        "speedup": 2.0
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 80.0,
+      "queue_wait_s": 0.4,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "raw-v1",
+      "meta": {
+        "condition": "KOPE",
+        "attempt": 1,
+        "writer": "ev-v1",
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py"
+      }
+    }
+  },
+  {
+    "kind": "from_raw",
+    "args": [
+      {
+        "schema": "raw-v1",
+        "writer": "ev-v1",
+        "condition": "KOPE",
+        "kind": "timing-final",
+        "op": "mm",
+        "shape": "384,512",
+        "dtype": "float32",
+        "attempt": 1,
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py",
+        "job_id": "j-t1",
+        "state": "done",
+        "evald_ts": "2026-10-07T09:58:26+08:00",
+        "evald_host": "k3",
+        "queue_wait_s": 0.4,
+        "duration_s": 80.0,
+        "shape_sent": "384,512",
+        "shape_warn": null,
+        "result": {
+          "torch_ms": 1.2,
+          "gems_ms": 0.6,
+          "speedup": 2.0,
+          "correct": true,
+          "max_abs_err": 0.0
+        },
+        "kope_mem": {
+          "speedup": 2.0,
+          "pass_rate": 1.0
+        },
+        "stdout_tail": "lots of output",
+        "stderr_tail": "",
+        "error": null
+      }
+    ],
+    "kwargs": {},
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.2,
+        "gems_ms": 0.6,
+        "speedup": 2.0
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 80.0,
+      "queue_wait_s": 0.4,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "raw-v1",
+      "meta": {
+        "condition": "KOPE",
+        "attempt": 1,
+        "writer": "ev-v1",
+        "candidate_sha256": "abababababababababababababababababababababababababababababababab",
+        "candidate_path": "candidates/mm.py",
+        "deploy_path": "flag_gems/ops/mm.py"
+      }
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-t1",
+        "seq": 7,
+        "state": "done",
+        "submitted_at": "2026-10-07T09:57:00+08:00",
+        "started_at": "2026-10-07T09:57:01+08:00",
+        "finished_at": "2026-10-07T09:58:26+08:00",
+        "queue_wait_s": 0.3,
+        "duration_s": 85.2,
+        "request": {
+          "op": "mm",
+          "shape": "384,512",
+          "dtype": "float32"
+        },
+        "result": {
+          "torch_ms": 1.23,
+          "gems_ms": 0.61,
+          "speedup": 2.01,
+          "correct": true,
+          "max_abs_err": 0.0,
+          "psr": 16
+        },
+        "kope_mem": {
+          "speedup": 2.01,
+          "pass_rate": 1.0
+        },
+        "logs": {
+          "stdout_tail": "...",
+          "stderr_tail": ""
+        },
+        "error": null
+      }
+    ],
+    "kwargs": {
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.23,
+        "gems_ms": 0.61,
+        "speedup": 2.01
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 85.2,
+      "queue_wait_s": 0.3,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {}
+    ],
+    "kwargs": {
+      "backend": "sg2042",
+      "host_tag": "sg2042",
+      "lane": "timing"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "sg2042",
+      "host_tag": "sg2042",
+      "lane": "timing",
+      "job_id": null,
+      "op": null,
+      "shape": null,
+      "dtype": null,
+      "metrics": {
+        "torch_ms": null,
+        "gems_ms": null,
+        "speedup": null
+      },
+      "correct": null,
+      "max_abs_err": null,
+      "error": null,
+      "duration_s": null,
+      "queue_wait_s": null,
+      "finished_at": null,
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-c1",
+        "state": "done",
+        "finished_at": "2026-10-07T10:10:00+08:00",
+        "queue_wait_s": 0.2,
+        "duration_s": 9.5,
+        "request": {
+          "op": "add",
+          "shape": "64,512,512",
+          "dtype": "float32",
+          "lane": "correctness"
+        },
+        "result": {
+          "correct": true,
+          "max_abs_err": 1e-07,
+          "psr": 2
+        },
+        "kope_mem": {
+          "speedup": null,
+          "pass_rate": 1.0
+        },
+        "logs": {
+          "stdout_tail": "",
+          "stderr_tail": ""
+        },
+        "error": null
+      }
+    ],
+    "kwargs": {
+      "backend": "k3",
+      "host_tag": "k3-acc",
+      "lane": "correctness"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3-acc",
+      "lane": "correctness",
+      "job_id": "j-c1",
+      "op": "add",
+      "shape": "64,512,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": null,
+        "gems_ms": null,
+        "speedup": null
+      },
+      "correct": true,
+      "max_abs_err": 1e-07,
+      "error": null,
+      "duration_s": 9.5,
+      "queue_wait_s": 0.2,
+      "finished_at": "2026-10-07T10:10:00+08:00",
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-f1",
+        "state": "failed",
+        "finished_at": "2026-10-07T10:20:00+08:00",
+        "queue_wait_s": 0.1,
+        "duration_s": 3.0,
+        "request": {
+          "op": "softmax",
+          "shape": "8,4096",
+          "dtype": "float32"
+        },
+        "result": null,
+        "kope_mem": null,
+        "logs": {
+          "stdout_tail": "boom",
+          "stderr_tail": "traceback"
+        },
+        "error": "candidate raised: name 'x' is not defined"
+      }
+    ],
+    "kwargs": {
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-f1",
+      "op": "softmax",
+      "shape": "8,4096",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": null,
+        "gems_ms": null,
+        "speedup": null
+      },
+      "correct": null,
+      "max_abs_err": null,
+      "error": "candidate raised: name 'x' is not defined",
+      "duration_s": 3.0,
+      "queue_wait_s": 0.1,
+      "finished_at": "2026-10-07T10:20:00+08:00",
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-t1",
+        "seq": 7,
+        "state": "done",
+        "submitted_at": "2026-10-07T09:57:00+08:00",
+        "started_at": "2026-10-07T09:57:01+08:00",
+        "finished_at": null,
+        "queue_wait_s": 0.3,
+        "duration_s": 85.2,
+        "request": {
+          "op": "mm",
+          "shape": "384,512",
+          "dtype": "float32"
+        },
+        "result": {
+          "torch_ms": 1.23,
+          "gems_ms": 0.61,
+          "speedup": 2.01,
+          "correct": true,
+          "max_abs_err": 0.0,
+          "psr": 16
+        },
+        "kope_mem": {
+          "speedup": 2.01,
+          "pass_rate": 1.0
+        },
+        "logs": {
+          "stdout_tail": "...",
+          "stderr_tail": ""
+        },
+        "error": null,
+        "ts": "2026-10-07T10:00:00+08:00"
+      }
+    ],
+    "kwargs": {
+      "backend": "k1",
+      "host_tag": "k1",
+      "lane": "timing"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k1",
+      "host_tag": "k1",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.23,
+        "gems_ms": 0.61,
+        "speedup": 2.01
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 85.2,
+      "queue_wait_s": 0.3,
+      "finished_at": "2026-10-07T10:00:00+08:00",
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-t1",
+        "seq": 7,
+        "state": "done",
+        "submitted_at": "2026-10-07T09:57:00+08:00",
+        "started_at": "2026-10-07T09:57:01+08:00",
+        "finished_at": "2026-10-07T09:58:26+08:00",
+        "queue_wait_s": 0.3,
+        "duration_s": 85.2,
+        "request": {
+          "op": "mm",
+          "shape": "384,512",
+          "dtype": "float32"
+        },
+        "result": {
+          "torch_ms": 1.23,
+          "gems_ms": 0.61,
+          "speedup": 2.01,
+          "correct": true,
+          "max_abs_err": 0.0,
+          "psr": 16
+        },
+        "kope_mem": {
+          "speedup": 2.01,
+          "pass_rate": 1.0
+        },
+        "logs": {
+          "stdout_tail": "...",
+          "stderr_tail": ""
+        },
+        "error": null
+      }
+    ],
+    "kwargs": {
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "meta": {
+        "stem": "ev-120000",
+        "attempt": 2
+      }
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.23,
+        "gems_ms": 0.61,
+        "speedup": 2.01
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 85.2,
+      "queue_wait_s": 0.3,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "evald-job-v1",
+      "meta": {
+        "stem": "ev-120000",
+        "attempt": 2
+      }
+    }
+  },
+  {
+    "kind": "to_result",
+    "args": [
+      {
+        "job_id": "j-t1",
+        "seq": 7,
+        "state": "done",
+        "submitted_at": "2026-10-07T09:57:00+08:00",
+        "started_at": "2026-10-07T09:57:01+08:00",
+        "finished_at": "2026-10-07T09:58:26+08:00",
+        "queue_wait_s": 0.3,
+        "duration_s": 85.2,
+        "request": {
+          "op": "mm",
+          "shape": "384,512",
+          "dtype": "float32"
+        },
+        "result": {
+          "torch_ms": 1.23,
+          "gems_ms": 0.61,
+          "speedup": 2.01,
+          "correct": true,
+          "max_abs_err": 0.0,
+          "psr": 16
+        },
+        "kope_mem": {
+          "speedup": 2.01,
+          "pass_rate": 1.0
+        },
+        "logs": {
+          "stdout_tail": "...",
+          "stderr_tail": ""
+        },
+        "error": null
+      }
+    ],
+    "kwargs": {
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing"
+    },
+    "expected": {
+      "schema": "result-v2",
+      "backend": "k3",
+      "host_tag": "k3",
+      "lane": "timing",
+      "job_id": "j-t1",
+      "op": "mm",
+      "shape": "384,512",
+      "dtype": "float32",
+      "metrics": {
+        "torch_ms": 1.23,
+        "gems_ms": 0.61,
+        "speedup": 2.01
+      },
+      "correct": true,
+      "max_abs_err": 0.0,
+      "error": null,
+      "duration_s": 85.2,
+      "queue_wait_s": 0.3,
+      "finished_at": "2026-10-07T09:58:26+08:00",
+      "source_schema": "evald-job-v1"
+    }
+  },
+  {
+    "kind": "base_label",
+    "args": [
+      "http://10.18.60.241:8788"
+    ],
+    "kwargs": {},
+    "expected": "http://10.18.60.241:8788"
+  },
+  {
+    "kind": "base_label",
+    "args": [
+      "k1-proxy"
+    ],
+    "kwargs": {},
+    "expected": "k1-proxy"
+  },
+  {
+    "kind": "base_label",
+    "args": [
+      "http://10.18.60.100:8788"
+    ],
+    "kwargs": {},
+    "expected": "k3"
+  },
+  {
+    "kind": "base_label",
+    "args": [
+      "http://10.18.60.100:8788/"
+    ],
+    "kwargs": {},
+    "expected": "k3"
+  },
+  {
+    "kind": "base_label",
+    "args": [
+      "http://10.18.60.100:8791"
+    ],
+    "kwargs": {},
+    "expected": "k3-acc"
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "k3",
+      "k3-acc"
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "k3",
+      "k1"
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      null,
+      "k3"
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "k3",
+      null
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "",
+      ""
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      null,
+      null
+    ],
+    "kwargs": {},
+    "expected": false
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "k3",
+      "k3"
+    ],
+    "kwargs": {},
+    "expected": true
+  },
+  {
+    "kind": "comparable",
+    "args": [
+      "k1",
+      "k1"
+    ],
+    "kwargs": {},
+    "expected": true
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "KOPE",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "KOPE/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "SOMETHING_NEW",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "KOPE/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "kope",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "astra/kope/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "full",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "astra/full/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "mask_random",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "astra/mask_random/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "r1/E",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "expand_late/r1/E/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "base",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "expand_late/base/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "r5/H",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "astra5/r5/H/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "r5/full",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "astra5/r5/full/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "r1/F",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "astra6/r1/F/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "_heldout",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "astra6/_heldout/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "r3/E",
+      "mm"
+    ],
+    "kwargs": {},
+    "expected": "astra7/r3/E/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "retime",
+      "add"
+    ],
+    "kwargs": {},
+    "expected": "astra7/retime/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "KOPE",
+      "add",
+      "k1"
+    ],
+    "kwargs": {},
+    "expected": "b:k1/KOPE/add"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "full",
+      "mm",
+      "sg2042"
+    ],
+    "kwargs": {},
+    "expected": "b:sg2042/full/mm"
+  },
+  {
+    "kind": "registry",
+    "args": [
+      "KOPE",
+      "add"
+    ],
+    "kwargs": {
+      "backend": "rvv_general"
+    },
+    "expected": "b:rvv_general/KOPE/add"
+  }
+]

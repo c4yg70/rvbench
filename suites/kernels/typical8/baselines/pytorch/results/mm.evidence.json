@@ -1,0 +1,224 @@
+{
+  "purpose": "measured",
+  "case_id": "typical8.mm.C01",
+  "production_health_before": {
+    "8788": {
+      "ok": true,
+      "queued": 0,
+      "running": 0,
+      "lanes": {
+        "timing": {
+          "queued": 0,
+          "running": 0
+        },
+        "correctness": {
+          "queued": 0,
+          "running": 0
+        },
+        "func": {
+          "queued": 0,
+          "running": 0
+        }
+      },
+      "loadavg": [
+        "2.70",
+        "2.29",
+        "2.34"
+      ]
+    },
+    "8791": {
+      "ok": true,
+      "queued": 0,
+      "running": 0,
+      "lanes": {
+        "timing": {
+          "queued": 0,
+          "running": 0
+        },
+        "correctness": {
+          "queued": 0,
+          "running": 0
+        },
+        "func": {
+          "queued": 0,
+          "running": 0
+        }
+      },
+      "loadavg": [
+        "2.70",
+        "2.29",
+        "2.34"
+      ]
+    }
+  },
+  "timer_source": "    def timeit(self, number: int = 1000000) -> common.Measurement:\n        \"\"\"Mirrors the semantics of timeit.Timer.timeit().\n\n        Execute the main statement (`stmt`) `number` times.\n        https://docs.python.org/3/library/timeit.html#timeit.Timer.timeit\n        \"\"\"\n        with common.set_torch_threads(self._task_spec.num_threads):\n            # Warmup\n            self._timeit(number=max(int(number // 100), 2))\n\n            return common.Measurement(\n                number_per_run=number,\n                raw_times=[self._timeit(number=number)],\n                task_spec=self._task_spec\n            )\n",
+  "torch_config": "PyTorch built with:\n  - GCC 4.2\n  - C++ Version: 201703\n  - clang 18.1.8\n  - Intel(R) MKL-DNN v3.11.0 (Git Hash 73682ecd7f1c8c0b7817bab9b589ce14c68896c5)\n  - OpenMP 202011\n  - CPU capability usage: NO AVX\n  - Build settings: BUILD_TYPE=Release, COMMIT_SHA=7048dc190335b64a61c105a549e9b52f3ea6c71f, CXX_COMPILER=/usr/bin/clang++, CXX_FLAGS=-march=rv64gcv_zfh_zvfh_zba_zicbop_zihintpause -mabi=lp64d -fvisibility-inlines-hidden -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=braced-scalar-init -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wvla-extension -Wsuggest-override -Wnewline-eof -Winconsistent-missing-override -Winconsistent-missing-destructor-override -Wno-pass-failed -Wno-error=old-style-cast -Wconstant-conversion -Qunused-arguments -faligned-new -fno-math-errno -fno-trapping-math -Werror=format, TORCH_VERSION=2.8.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_EIGEN_FOR_BLAS=ON, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=OFF, USE_MKLDNN=1, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=OFF, USE_OPENMP=1, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+  "tensor_hash_contract": "little-endian logical row-major CPU tensor bytes v1",
+  "implementation_sha256": "c37477f3ae0284ee06265bea6a2b144302c5acda2790edd6578ac6a984f28268",
+  "inputs": [
+    {
+      "name": "a",
+      "kind": "tensor",
+      "shape": [
+        15,
+        160
+      ],
+      "dtype": "float16",
+      "strides": [
+        160,
+        1
+      ],
+      "storage_offset": 0,
+      "content_sha256": "cd4d18d667500759c519616a20a67fe18f305abc80b1c56a2653016072bb98ac",
+      "generator": {
+        "kind": "torch_cpu_uniform_v1",
+        "seed": 0,
+        "low": -1,
+        "high": 1
+      }
+    },
+    {
+      "name": "b",
+      "kind": "tensor",
+      "shape": [
+        160,
+        1024
+      ],
+      "dtype": "float16",
+      "strides": [
+        1024,
+        1
+      ],
+      "storage_offset": 0,
+      "content_sha256": "0daf199f204c88d675316719e897728e8ea47b0bea0b9c3e1cf9aaee631e033f",
+      "generator": {
+        "kind": "torch_cpu_uniform_v1",
+        "seed": 1,
+        "low": -1,
+        "high": 1
+      }
+    }
+  ],
+  "attrs": {},
+  "environment": {
+    "id": "HUMAN-K3-pytorch-cpu",
+    "architecture": "rv64",
+    "worker_id": null,
+    "boot_id": "9942a1c2-bff2-4a5a-8ef6-67c61abf9c6b",
+    "cpu": {
+      "model": "Spacemit(R) A100",
+      "isa": "rv64imafdcv_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfbfmin_zfh_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbc_zbs_zkt_zvbb_zvbc_zve32f_zve32x_zve64d_zve64f_zve64x_zvfbfmin_zvfbfwma_zvfh_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ssaia_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt_sdtrig",
+      "logical_cpus": 16,
+      "affinity": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    "runtime": {
+      "python": "3.12.13",
+      "torch": "2.8.0+spacemit.0",
+      "triton": "3.6.0+spacemit.a5",
+      "flag_gems": "5.3.2.post1.dev57+g75cf3ea55.d20260804",
+      "runner": "rvbench-pytorch-baseline/1.1.0",
+      "adapter": "torch-native8-per-op/1.1.0",
+      "generator": "torch_cpu_uniform_v1"
+    },
+    "isolation": {
+      "kind": "host_lock",
+      "description": "Exclusive k3_bench.lock, .0 and .1; AI CPU affinity; no FlagGems/Triton imports"
+    },
+    "backend": "spacemit",
+    "host_tag": "HUMAN-K3",
+    "omp_threads": 4,
+    "fingerprint_sha256": "1eec8af178cf402db98ada9432af0cceb0bb88b664fe459701aa9ccd6e015bea"
+  },
+  "baseline_module": {
+    "path": "mm.py",
+    "callable": "baseline",
+    "source": "def baseline(a, b):\n    return torch.mm(a, b)\n",
+    "sha256": "78b5e541a6a4ebffbb69bcb748110077144dc8bd57e7f139b0fda16706a98d51"
+  },
+  "correctness": {
+    "status": "unverifiable",
+    "reason": {
+      "code": "NUMERIC_CONTRACT_PENDING",
+      "message": "Native call completed; suite numerical tolerances are not yet resolved"
+    },
+    "checks": [
+      {
+        "id": "native-call",
+        "kind": "execution",
+        "outputs": [
+          "out"
+        ],
+        "status": "passed",
+        "reason": null,
+        "metrics": {},
+        "method": "pytorch_native_call_v1",
+        "contract_sha256": null,
+        "parameters": {}
+      },
+      {
+        "id": "numeric-out",
+        "kind": "numeric",
+        "outputs": [
+          "out"
+        ],
+        "status": "unverifiable",
+        "reason": {
+          "code": "NUMERIC_CONTRACT_PENDING",
+          "message": "Native call completed; suite numerical tolerances are not yet resolved"
+        },
+        "metrics": {},
+        "method": "allclose",
+        "contract_sha256": null,
+        "parameters": {}
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "out",
+      "shape": [
+        15,
+        1024
+      ],
+      "dtype": "float16",
+      "strides": [
+        1024,
+        1
+      ],
+      "content_sha256": "a0a9d6935287c8e46fbeae659f6fb20419a4e1aa2d22ab7028e0a0d7216df4d0"
+    }
+  ],
+  "samples_ms": [
+    113.02134000288788,
+    113.806843997736,
+    113.97737700099242,
+    113.90192199905869,
+    113.76051199840731,
+    113.93562800003565,
+    113.98875099985162,
+    113.77559399988968,
+    114.02916400038521,
+    113.96191799940425,
+    113.7815510010114,
+    114.01099799695658,
+    114.09211900172522,
+    113.7793009984307,
+    114.35656500179903,
+    114.11649199726526,
+    113.75421800039476,
+    114.18607199811959,
+    113.9807479994488,
+    113.80729799930123
+  ],
+  "input_unchanged": true,
+  "imported_vendor_modules": []
+}

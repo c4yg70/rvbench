@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+# 2026-09-10 起 K1 四板（10.18.60.230/233/241/243）整群下线交还，
+# boards/evald 的 K1 目标与 k1proxy job 全部撤除（恢复接入：把 :9100/:8788 目标加回即可）。
+# 本文件正本随 evald 仓库走（2026-09-10 深夜自 work/k1-monitor 迁入，
+# 该目录在邻会话文件架构重建中被删；容器挂载指向本目录）。
+scrape_configs:
+  # K3 主机（X100 簇 OS，cpu0-7）：node_exporter 用户态部署（~/ne/start.sh，@reboot 兜底拉起）
+  # clusters = 核簇划分（面板每核堆叠柱的数据来源；marchid 定案 cpu0-7=X100、cpu8-15=A100）
+  # workers  = evald worker↔核映射（按 8791 config-acc.json：acc=cpu0-5×6、func=cpu6-7×2，
+  #            lane_resources 按 index/total 均分 → 每 worker 独占 1 核；面板核段按此命名）
+  # 2026-09-10 起 8G /swapfile + vm.swappiness=10 内存防线在位 → 面板 swap 行 / swap 告警生效
+  - job_name: boards
+    static_configs:
+      - targets: ['10.18.60.100:9100']
+        labels: {board: 'K3', role: '主机 · X100 簇', clusters: 'X100:0-7,A100:8-15', workers: 'acc:0-5,func:6-7', fleet: k3}
+
+  # K3 双 evald 实例（原生 /metrics，免 token）。board 标签即面板卡片键，两实例必须不同名：
+  #   K3     = :8788 纯计时车道（A100 簇 cpu8-15，厂商 HMP/spine 栈托管）——正式计时唯一通道，绝对不碰
+  #   K3-ACC = :8791 acc+func 正确性正本（2026-09-10 分区重排：acc=cpu0-5×6 / func=cpu6-7×2，
+  #            守护运行于 systemd 瞬态单元 evald-acc.service：AllowedCPUs=0-7、MemoryHigh=10G、
+  #            MemoryMax=12G、Restart=no 未 enable——离线告警若伴随 swap 高压，疑触 MemoryMax，
+  #            拉起方法见 work/board-acc-repartition/RUNBOOK.md §7）
+  # cores = 实例绑定核段（面板"绑定核"迷你条的数据来源；K3-ACC 现为守护包络 0-7，车道拆分见角色标签）
+  - job_name: evald
+    static_configs:
+      - targets: ['10.18.60.100:8788']
+        labels: {board: 'K3', role: '纯计时 · A100 簇', accent: timing, cores: '8-15', fleet: k3}
+      - targets: ['10.18.60.100:8791']
+        labels: {board: 'K3-ACC', role: 'acc 0-5 / func 6-7 · evald-acc 单元', accent: acc, cores: '0-7', fleet: k3}

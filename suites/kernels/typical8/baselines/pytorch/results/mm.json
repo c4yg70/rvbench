@@ -1,0 +1,180 @@
+{
+  "$schema": "../../../../../../schemas/baseline_results.schema.json",
+  "schema_version": "1.0.0",
+  "purpose": "measured",
+  "suite_id": "typical8",
+  "baseline_id": "pytorch_mm",
+  "implementation_sha256": "c37477f3ae0284ee06265bea6a2b144302c5acda2790edd6578ac6a984f28268",
+  "environments": [
+    {
+      "id": "HUMAN-K3-pytorch-cpu",
+      "architecture": "rv64",
+      "worker_id": null,
+      "boot_id": "9942a1c2-bff2-4a5a-8ef6-67c61abf9c6b",
+      "cpu": {
+        "model": "Spacemit(R) A100",
+        "isa": "rv64imafdcv_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfbfmin_zfh_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbc_zbs_zkt_zvbb_zvbc_zve32f_zve32x_zve64d_zve64f_zve64x_zvfbfmin_zvfbfwma_zvfh_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ssaia_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt_sdtrig",
+        "logical_cpus": 16,
+        "affinity": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "runtime": {
+        "python": "3.12.13",
+        "torch": "2.8.0+spacemit.0",
+        "triton": "3.6.0+spacemit.a5",
+        "flag_gems": "5.3.2.post1.dev57+g75cf3ea55.d20260804",
+        "runner": "rvbench-pytorch-baseline/1.1.0",
+        "adapter": "torch-native8-per-op/1.1.0",
+        "generator": "torch_cpu_uniform_v1"
+      },
+      "isolation": {
+        "kind": "host_lock",
+        "description": "Exclusive k3_bench.lock, .0 and .1; AI CPU affinity; no FlagGems/Triton imports"
+      },
+      "backend": "spacemit",
+      "host_tag": "HUMAN-K3",
+      "omp_threads": 4,
+      "fingerprint_sha256": "1eec8af178cf402db98ada9432af0cceb0bb88b664fe459701aa9ccd6e015bea"
+    }
+  ],
+  "measurements": [
+    {
+      "case_id": "typical8.mm.C01",
+      "case_contract_sha256": "4cadab6520224784d9e56d9cf4587900ceb6f63aebaa28045b31d73c395ade40",
+      "inputs_sha256": "a35bb2ea1722fc1d6801ab1926ec6892079497aa5fd9f9b4ebfa8e5f6a7b69ec",
+      "inputs": [
+        {
+          "name": "a",
+          "kind": "tensor",
+          "shape": [
+            15,
+            160
+          ],
+          "dtype": "float16",
+          "strides": [
+            160,
+            1
+          ],
+          "storage_offset": 0,
+          "content_sha256": "cd4d18d667500759c519616a20a67fe18f305abc80b1c56a2653016072bb98ac",
+          "generator": {
+            "kind": "torch_cpu_uniform_v1",
+            "seed": 0,
+            "low": -1,
+            "high": 1
+          }
+        },
+        {
+          "name": "b",
+          "kind": "tensor",
+          "shape": [
+            160,
+            1024
+          ],
+          "dtype": "float16",
+          "strides": [
+            1024,
+            1
+          ],
+          "storage_offset": 0,
+          "content_sha256": "0daf199f204c88d675316719e897728e8ea47b0bea0b9c3e1cf9aaee631e033f",
+          "generator": {
+            "kind": "torch_cpu_uniform_v1",
+            "seed": 1,
+            "low": -1,
+            "high": 1
+          }
+        }
+      ],
+      "attrs": {},
+      "environment_id": "HUMAN-K3-pytorch-cpu",
+      "recorded_at": "2026-10-15T19:40:07.037483Z",
+      "correctness": {
+        "status": "unverifiable",
+        "reason": {
+          "code": "NUMERIC_CONTRACT_PENDING",
+          "message": "Native call completed; suite numerical tolerances are not yet resolved"
+        },
+        "checks": [
+          {
+            "id": "native-call",
+            "kind": "execution",
+            "outputs": [
+              "out"
+            ],
+            "status": "passed",
+            "reason": null,
+            "metrics": {},
+            "method": "pytorch_native_call_v1",
+            "contract_sha256": null,
+            "parameters": {}
+          },
+          {
+            "id": "numeric-out",
+            "kind": "numeric",
+            "outputs": [
+              "out"
+            ],
+            "status": "unverifiable",
+            "reason": {
+              "code": "NUMERIC_CONTRACT_PENDING",
+              "message": "Native call completed; suite numerical tolerances are not yet resolved"
+            },
+            "metrics": {},
+            "method": "allclose",
+            "contract_sha256": null,
+            "parameters": {}
+          }
+        ]
+      },
+      "timing": {
+        "unit": "ms",
+        "scope": "call",
+        "statistic": "median",
+        "preparation": "excluded",
+        "synchronization": "CPU synchronous; torch.utils.benchmark.Timer(time.perf_counter)",
+        "timing_contract_sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81",
+        "warmup": 45,
+        "repetitions": 20,
+        "samples_ms": [
+          113.02134000288788,
+          113.806843997736,
+          113.97737700099242,
+          113.90192199905869,
+          113.76051199840731,
+          113.93562800003565,
+          113.98875099985162,
+          113.77559399988968,
+          114.02916400038521,
+          113.96191799940425,
+          113.7815510010114,
+          114.01099799695658,
+          114.09211900172522,
+          113.7793009984307,
+          114.35656500179903,
+          114.11649199726526,
+          113.75421800039476,
+          114.18607199811959,
+          113.9807479994488,
+          113.80729799930123
+        ],
+        "median_ms": 113.94877299971995
+      },
+      "artifacts": [
+        {
+          "path": "mm.evidence.json",
+          "sha256": "00c95da64189034afefe4aac7444583bc8972246469d439ab43cb342acf6a096",
+          "size_bytes": 7509
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1752 @@
+{
+  "$schema": "../../../schemas/spec.schema.json",
+  "schema_version": "2.1.0",
+  "suite": {
+    "id": "typical8",
+    "title": "典型 8 算子 — 首批来源用例",
+    "status": "draft",
+    "target": {
+      "architecture": "riscv64",
+      "backend": "spacemit",
+      "device": "SpacemiT K3"
+    },
+    "coverage": {
+      "scope": "typical",
+      "planned_case_count": 80
+    }
+  },
+  "sources": [
+    {
+      "id": "source_document",
+      "kind": "document",
+      "title": "8 个典型算子：接口说明与典型用例（2026-09-25）",
+      "location": "docs/specs/2026-10-08-典型8算子评测集.md#附证据与来源",
+      "revision": null,
+      "revision_status": "not_applicable"
+    },
+    {
+      "id": "flaggems",
+      "kind": "repository",
+      "title": "FlagGems",
+      "location": "FlagGems master（来源文档绑定）",
+      "revision": "d17e23e48",
+      "revision_status": "abbreviated"
+    },
+    {
+      "id": "cannbench",
+      "kind": "repository",
+      "title": "CANNBench",
+      "location": "CANNBench tasks/level2 与 tasks/level3",
+      "revision": null,
+      "revision_status": "unresolved"
+    }
+  ],
+  "policies": {
+    "input_reuse": "same_materialized_inputs",
+    "implicit_shape_override": "forbidden",
+    "implicit_dtype_fallback": "forbidden",
+    "unknown_check": "not_passed",
+    "timing": {
+      "scope": "call",
+      "unit": "ms",
+      "statistic": "median",
+      "preparation": "excluded",
+      "contract": {
+        "status": "resolved",
+        "path": "baselines/pytorch/timing-contract.json",
+        "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+      }
+    }
+  },
+  "operators": [
+    {
+      "id": "abs",
+      "display_name": "abs",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "elementwise",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.abs"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.abs"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.abs.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -10,
+                "high": 10
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "exact_values",
+                "contract": null,
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_abs.py: POINTWISE_SHAPES[2] × float32",
+            "basis": "source_typical",
+            "note": "非原地实数 abs；C01 仅比较数值，不要求 ±0.0 位模式一致。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "aminmax",
+      "display_name": "aminmax",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "reduction",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          }
+        ],
+        "kwargs": {
+          "dim": {
+            "kind": "attr",
+            "name": "dim"
+          },
+          "keepdim": {
+            "kind": "attr",
+            "name": "keepdim"
+          }
+        },
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.aminmax"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.aminmax"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tuple",
+        "names": [
+          "min",
+          "max"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.aminmax.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                4096,
+                256
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            }
+          ],
+          "attrs": {
+            "dim": 1,
+            "keepdim": false
+          },
+          "outputs": [
+            {
+              "name": "min",
+              "kind": "tensor",
+              "shape": [
+                4096
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row"
+                ]
+              }
+            },
+            {
+              "name": "max",
+              "kind": "tensor",
+              "shape": [
+                4096
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "min",
+                "method": "exact_values",
+                "contract": null,
+                "reason": null
+              },
+              {
+                "output": "max",
+                "method": "exact_values",
+                "contract": null,
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_aminmax.py: REDUCTION_SHAPES[1] × float16",
+            "basis": "source_typical",
+            "note": "精确选择值；零符号的数值相等与位相等分开定义。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "softmax",
+      "display_name": "softmax",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "reduction",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          },
+          {
+            "kind": "attr",
+            "name": "dim"
+          },
+          {
+            "kind": "attr",
+            "name": "half_to_float"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.softmax"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.ops.aten._softmax.default"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.softmax.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            }
+          ],
+          "attrs": {
+            "dim": -1,
+            "half_to_float": false
+          },
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "allclose",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M2 采集误差后在 M3 裁决；未沿用服务端宽松默认容差。"
+                },
+                "reason": null
+              }
+            ],
+            "semantic_rules": [
+              {
+                "id": "softmax_probability_v1",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M3 裁决沿 dim 的归一化误差阈值。"
+                }
+              }
+            ]
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "cannbench"
+            ],
+            "locator": "tasks/level2/softmax/cases.yaml: case_id=1",
+            "basis": "source_typical",
+            "note": "half_to_float=false 为计划显式化的接口默认值。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mv",
+      "display_name": "mv",
+      "entry_ref": null,
+      "classification": {
+        "level": "L2",
+        "family": "blas2",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "matrix"
+          },
+          {
+            "kind": "input",
+            "name": "vector"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.mv"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.mv"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.mv.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "matrix",
+              "kind": "tensor",
+              "shape": [
+                160,
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "reduction"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            },
+            {
+              "name": "vector",
+              "kind": "tensor",
+              "shape": [
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "reduction"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 1,
+                "low": -1,
+                "high": 1
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                160
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "allclose",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M2 采集误差后在 M3 裁决；未沿用服务端宽松默认容差。"
+                },
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_mv.py: MN_SHAPES[1]",
+            "basis": "source_typical",
+            "note": "两个输入分别定义；禁止被服务端覆盖为 [512,512]。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mm",
+      "display_name": "mm",
+      "entry_ref": null,
+      "classification": {
+        "level": "L3",
+        "family": "blas3",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "a"
+          },
+          {
+            "kind": "input",
+            "name": "b"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.mm"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.mm"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.mm.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "a",
+              "kind": "tensor",
+              "shape": [
+                15,
+                160
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "reduction"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            },
+            {
+              "name": "b",
+              "kind": "tensor",
+              "shape": [
+                160,
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "reduction",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 1,
+                "low": -1,
+                "high": 1
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                15,
+                1024
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "allclose",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M2 采集误差后在 M3 裁决；未沿用服务端宽松默认容差。"
+                },
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_mm.py: MNK_SHAPES[1]",
+            "basis": "source_typical",
+            "note": "非方形矩阵乘；实际分发与累加方式在 M2 记录。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv2d",
+      "display_name": "conv2d",
+      "entry_ref": null,
+      "classification": {
+        "level": "L3",
+        "family": "convolution",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          },
+          {
+            "kind": "input",
+            "name": "weight"
+          },
+          {
+            "kind": "input",
+            "name": "bias"
+          }
+        ],
+        "kwargs": {
+          "stride": {
+            "kind": "attr",
+            "name": "stride"
+          },
+          "padding": {
+            "kind": "attr",
+            "name": "padding"
+          },
+          "dilation": {
+            "kind": "attr",
+            "name": "dilation"
+          },
+          "groups": {
+            "kind": "attr",
+            "name": "groups"
+          }
+        },
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.conv2d"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.nn.functional.conv2d"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.conv2d.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                2,
+                64,
+                32,
+                32
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "channel",
+                  "height",
+                  "width"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            },
+            {
+              "name": "weight",
+              "kind": "tensor",
+              "shape": [
+                64,
+                64,
+                3,
+                3
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "out_channel",
+                  "in_channel_per_group",
+                  "kernel_height",
+                  "kernel_width"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 1,
+                "low": -1,
+                "high": 1
+              }
+            },
+            {
+              "name": "bias",
+              "kind": "tensor",
+              "shape": [
+                64
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "out_channel"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 2,
+                "low": -0.1,
+                "high": 0.1
+              }
+            }
+          ],
+          "attrs": {
+            "stride": [
+              1,
+              1
+            ],
+            "padding": [
+              1,
+              1
+            ],
+            "dilation": [
+              1,
+              1
+            ],
+            "groups": 1
+          },
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                2,
+                64,
+                32,
+                32
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "channel",
+                  "height",
+                  "width"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "allclose",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M2 采集误差后在 M3 裁决；未沿用服务端宽松默认容差。"
+                },
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "cannbench"
+            ],
+            "locator": "tasks/level3/conv_2d/cases.yaml: case_id=1",
+            "basis": "source_typical",
+            "note": "来源对称 pads=[1,1,1,1] 归一为 padding=[1,1]；C01 明确包含 bias。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "topk",
+      "display_name": "topk",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "selection",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "x"
+          }
+        ],
+        "kwargs": {
+          "k": {
+            "kind": "attr",
+            "name": "k"
+          },
+          "dim": {
+            "kind": "attr",
+            "name": "dim"
+          },
+          "largest": {
+            "kind": "attr",
+            "name": "largest"
+          },
+          "sorted": {
+            "kind": "attr",
+            "name": "sorted"
+          }
+        },
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.topk"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.topk"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tuple",
+        "names": [
+          "values",
+          "indices"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8.topk.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "x",
+              "kind": "tensor",
+              "shape": [
+                1048576
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "element"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -1,
+                "high": 1
+              }
+            }
+          ],
+          "attrs": {
+            "k": 10,
+            "dim": -1,
+            "largest": true,
+            "sorted": true
+          },
+          "outputs": [
+            {
+              "name": "values",
+              "kind": "tensor",
+              "shape": [
+                10
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "selected"
+                ]
+              }
+            },
+            {
+              "name": "indices",
+              "kind": "tensor",
+              "shape": [
+                10
+              ],
+              "dtype": "int64",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "selected"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "values",
+                "method": "topk_values",
+                "contract": null,
+                "reason": null
+              },
+              {
+                "output": "indices",
+                "method": "topk_indices",
+                "contract": null,
+                "reason": "精确检查索引类型、范围和 gather 对应关系；平局不比较参考索引。"
+              }
+            ],
+            "semantic_rules": [
+              {
+                "id": "topk_selection_v1",
+                "contract": null
+              }
+            ]
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "cannbench"
+            ],
+            "locator": "tasks/level3/top_k/cases.yaml: case_id=1",
+            "basis": "source_typical",
+            "note": "sorted=true 是接口默认值的显式化；fp16 平局允许不同合法索引。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "_flash_attention_forward",
+      "display_name": "flash_attention_forward",
+      "entry_ref": null,
+      "classification": {
+        "level": "L4",
+        "family": "neural_network",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "query"
+          },
+          {
+            "kind": "input",
+            "name": "key"
+          },
+          {
+            "kind": "input",
+            "name": "value"
+          },
+          {
+            "kind": "attr",
+            "name": "cumulative_sequence_length_q"
+          },
+          {
+            "kind": "attr",
+            "name": "cumulative_sequence_length_k"
+          },
+          {
+            "kind": "attr",
+            "name": "max_q"
+          },
+          {
+            "kind": "attr",
+            "name": "max_k"
+          },
+          {
+            "kind": "attr",
+            "name": "dropout_p"
+          },
+          {
+            "kind": "attr",
+            "name": "is_causal"
+          },
+          {
+            "kind": "attr",
+            "name": "return_debug_mask"
+          }
+        ],
+        "kwargs": {
+          "scale": {
+            "kind": "attr",
+            "name": "scale"
+          },
+          "window_size_left": {
+            "kind": "attr",
+            "name": "window_size_left"
+          },
+          "window_size_right": {
+            "kind": "attr",
+            "name": "window_size_right"
+          },
+          "seqused_k": {
+            "kind": "attr",
+            "name": "seqused_k"
+          },
+          "alibi_slopes": {
+            "kind": "attr",
+            "name": "alibi_slopes"
+          }
+        },
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems._flash_attention_forward"
+          },
+          "reference": {
+            "kind": "adapter",
+            "id": "attention_math_v1"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tuple",
+        "names": [
+          "out",
+          "lse",
+          "philox_seed",
+          "philox_offset",
+          "p"
+        ]
+      },
+      "cases": [
+        {
+          "id": "typical8._flash_attention_forward.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "query",
+              "kind": "tensor",
+              "shape": [
+                2,
+                64,
+                4,
+                128
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "sequence",
+                  "head",
+                  "head_dim"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -0.05,
+                "high": 0.05
+              }
+            },
+            {
+              "name": "key",
+              "kind": "tensor",
+              "shape": [
+                2,
+                96,
+                4,
+                128
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "sequence",
+                  "head",
+                  "head_dim"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 1,
+                "low": -0.05,
+                "high": 0.05
+              }
+            },
+            {
+              "name": "value",
+              "kind": "tensor",
+              "shape": [
+                2,
+                96,
+                4,
+                128
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "sequence",
+                  "head",
+                  "head_dim"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 2,
+                "low": -0.05,
+                "high": 0.05
+              }
+            }
+          ],
+          "attrs": {
+            "cumulative_sequence_length_q": null,
+            "cumulative_sequence_length_k": null,
+            "max_q": 64,
+            "max_k": 96,
+            "dropout_p": 0,
+            "is_causal": false,
+            "return_debug_mask": false,
+            "scale": 0.0884,
+            "window_size_left": null,
+            "window_size_right": null,
+            "seqused_k": null,
+            "alibi_slopes": null
+          },
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                2,
+                64,
+                4,
+                128
+              ],
+              "dtype": "float16",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "batch",
+                  "sequence",
+                  "head",
+                  "head_dim"
+                ]
+              }
+            },
+            {
+              "name": "lse",
+              "kind": "pending",
+              "reason": "M2 固定目标版本的类型、shape、dtype、布局与有效性；不猜测辅助输出。"
+            },
+            {
+              "name": "philox_seed",
+              "kind": "pending",
+              "reason": "M2 固定目标版本的类型、shape、dtype、布局与有效性；不猜测辅助输出。"
+            },
+            {
+              "name": "philox_offset",
+              "kind": "pending",
+              "reason": "M2 固定目标版本的类型、shape、dtype、布局与有效性；不猜测辅助输出。"
+            },
+            {
+              "name": "p",
+              "kind": "pending",
+              "reason": "M2 固定目标版本的类型、shape、dtype、布局与有效性；不猜测辅助输出。"
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "allclose",
+                "contract": {
+                  "status": "pending",
+                  "reason": "M2 采集误差后在 M3 裁决；未沿用服务端宽松默认容差。"
+                },
+                "reason": null
+              },
+              {
+                "output": "lse",
+                "method": "pending",
+                "contract": null,
+                "reason": "必须补齐有效 lse 的数值合同和布局适配；不丢弃该输出。"
+              },
+              {
+                "output": "philox_seed",
+                "method": "pending",
+                "contract": null,
+                "reason": "无 dropout/debug mask 时需按固定版本确定占位或有效性合同。"
+              },
+              {
+                "output": "philox_offset",
+                "method": "pending",
+                "contract": null,
+                "reason": "无 dropout/debug mask 时需按固定版本确定占位或有效性合同。"
+              },
+              {
+                "output": "p",
+                "method": "pending",
+                "contract": null,
+                "reason": "无 dropout/debug mask 时需按固定版本确定占位或有效性合同。"
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未完成 M2：目标版本、调用适配器与板上支持性未验证。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "source_document",
+              "flaggems"
+            ],
+            "locator": "tests/test_flash_attention.py: FLASH_ATTENTION_FORWARD_CONFIGS[1]",
+            "basis": "source_typical",
+            "note": "定长非方形 Q/K；scale 使用来源字面值 0.0884；数学参照适配器尚未实现。"
+          }
+        }
+      ]
+    }
+  ],
+  "version": "0.3.1",
+  "baseline": {
+    "entries": [
+      {
+        "id": "pytorch_abs",
+        "operator_id": "abs",
+        "case_ids": [
+          "typical8.abs.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "abs.py",
+              "sha256": "5b92847a34534b5db991a9d46578da9e464a1e7ee91a85ea28b61d8f8c45391a"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "abs.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_abs",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/abs.json",
+            "sha256": "c1e72c0675597592c0c51cb1d39175c85f062139f4e9a5986fc9c57adacf3593"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_aminmax",
+        "operator_id": "aminmax",
+        "case_ids": [
+          "typical8.aminmax.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "aminmax.py",
+              "sha256": "c510735f01d893029d90173a6325a47282953a743f119e6fc37a7214e538b73d"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "aminmax.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_aminmax",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/aminmax.json",
+            "sha256": "ef2fd2c6a820316acf4b69282498c57ac1798e5b424a50bc8f2c9bb4012b7ddf"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_softmax",
+        "operator_id": "softmax",
+        "case_ids": [
+          "typical8.softmax.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "softmax.py",
+              "sha256": "c2526d38708c38e9610a230a113cce675c7fd322b6f03ebb4a206fbe1302574c"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "softmax.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_softmax",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/softmax.json",
+            "sha256": "df9e4248c39d262367d3e9483b4b4405b0992f9fa9942270f75d94b1cf7846e8"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_mv",
+        "operator_id": "mv",
+        "case_ids": [
+          "typical8.mv.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "mv.py",
+              "sha256": "42e8d54c155e4c6a49684074d9263d82b057eb026a16baa00ffbfa768e1376ed"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "mv.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_mv",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/mv.json",
+            "sha256": "c9d4c051bb23dcdbf30fc83f7e382d66c733efd4fac7bb6cdf2f4e0ee024bd6d"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_mm",
+        "operator_id": "mm",
+        "case_ids": [
+          "typical8.mm.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "mm.py",
+              "sha256": "78b5e541a6a4ebffbb69bcb748110077144dc8bd57e7f139b0fda16706a98d51"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "mm.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_mm",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/mm.json",
+            "sha256": "01c7431a6466b07fe84e51927cb20fd7e3bc92413f6dff70790ad44a15c47bd0"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_conv2d",
+        "operator_id": "conv2d",
+        "case_ids": [
+          "typical8.conv2d.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "conv2d.py",
+              "sha256": "ae7225089c1a782ac48908f3a4699d857c72ffc3507a4a99a99178cf6c5e2f30"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "conv2d.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_conv2d",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/conv2d.json",
+            "sha256": "9a231c5c55b4187dd1f14faebe55a060c00595adab0c8b51183aadec92097efb"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_topk",
+        "operator_id": "topk",
+        "case_ids": [
+          "typical8.topk.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "topk.py",
+              "sha256": "8b2a0f9c2f1de20bdec3ee9a27210bed319e7ab9305461a4741f5545532446f9"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "topk.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_topk",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/topk.json",
+            "sha256": "0e395194217de503e21c9c6cfb5b757c17e9470432c4c37fc4265851cd35ed07"
+          }
+        ]
+      },
+      {
+        "id": "pytorch_flash_attention_forward",
+        "operator_id": "_flash_attention_forward",
+        "case_ids": [
+          "typical8._flash_attention_forward.C01"
+        ],
+        "code": {
+          "root": "baselines/pytorch",
+          "files": [
+            {
+              "path": "flash_attention_forward.py",
+              "sha256": "087b4f0d6792927527ad633d185c12e6c59d2fa8fbcaee7d28252dd0a4b5670e"
+            },
+            {
+              "path": "runner.py",
+              "sha256": "951d350a1d7301d3d6622736229f8495236810623aa29d97c4b73f6f0829b34d"
+            },
+            {
+              "path": "timing-contract.json",
+              "sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81"
+            }
+          ]
+        },
+        "run": {
+          "cwd": ".",
+          "argv": [
+            "python",
+            "flash_attention_forward.py",
+            "--spec",
+            "{spec}",
+            "--case-id",
+            "{case_id}",
+            "--baseline-id",
+            "pytorch_flash_attention_forward",
+            "--output",
+            "{output}"
+          ],
+          "env": {
+            "OMP_NUM_THREADS": "4"
+          }
+        },
+        "reference_results": [
+          {
+            "path": "baselines/pytorch/results/flash_attention_forward.json",
+            "sha256": "be4f2c5d4f348c1ac1d8f826eb87071401e739a7d22b9341d3a7957387213ccb"
+          }
+        ]
+      }
+    ]
+  }
+}

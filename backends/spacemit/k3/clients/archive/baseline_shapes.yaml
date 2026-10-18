@@ -1,0 +1,35 @@
+# baseline 框架兜底专用代表 shape：每类单 shape，16.7M 元素档（与 core 主 shape 一致）
+Benchmark:
+  shapes: [[64, 512, 512]]
+GenericBenchmark:
+  shapes: [[64, 512, 512]]
+GenericBenchmarkFilterShapes:
+  shapes: [[64, 512, 512]]
+GenericBenchmarkExcluse1D:
+  shapes: [[64, 512, 512]]
+GenericBenchmarkExcluse3D:
+  shapes: [[64, 512, 512]]
+GenericBenchmark4DOnly:
+  shapes: [[1, 4, 256, 256]]
+GenericBenchmark2DOnly:
+  shapes: [[64, 512, 512]]
+UnaryPointwiseBenchmark:
+  shapes: [[64, 512, 512]]
+UnaryPointwiseOutBenchmark:
+  shapes: [[64, 512, 512]]
+BinaryPointwiseBenchmark:
+  shapes: [[64, 512, 512]]
+ScalarBinaryPointwiseBenchmark:
+  shapes: [[64, 512, 512]]
+UnaryReductionBenchmark:
+  shapes: [[4194304]]
+TexGluBenchmark:
+  shapes: [[64, 512, 512]]
+TexGluForwardBenchmark:
+  shapes: [[64, 512, 512]]
+TexGluBackwardBenchmark:
+  shapes: [[64, 512, 512]]
+MarginRankingLossBenchmark:
+  shapes: [[64, 512, 512]]
+BlasBenchmark:
+  shapes: [[512, 512, 512]]

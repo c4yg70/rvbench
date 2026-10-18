@@ -1,0 +1,181 @@
+{
+  "$schema": "../../../schemas/spec.schema.json",
+  "schema_version": "2.1.0",
+  "suite": {
+    "id": "hello-world",
+    "title": "Hello World — 最小 add 用例",
+    "status": "draft",
+    "target": {
+      "architecture": "riscv64",
+      "backend": "spacemit",
+      "device": "SpacemiT K3"
+    },
+    "coverage": {
+      "scope": "typical",
+      "planned_case_count": 1
+    }
+  },
+  "sources": [
+    {
+      "id": "flaggems",
+      "kind": "repository",
+      "title": "FlagGems",
+      "location": "FlagGems master（来源文档绑定）",
+      "revision": "d17e23e48",
+      "revision_status": "abbreviated"
+    }
+  ],
+  "policies": {
+    "input_reuse": "same_materialized_inputs",
+    "implicit_shape_override": "forbidden",
+    "implicit_dtype_fallback": "forbidden",
+    "unknown_check": "not_passed",
+    "timing": {
+      "scope": "call",
+      "unit": "ms",
+      "statistic": "median",
+      "preparation": "excluded",
+      "contract": {
+        "status": "pending",
+        "reason": "hello-world 只用于跑通提交与执行流程，尚未裁决计时合同的预热、重复次数与统计口径。"
+      }
+    }
+  },
+  "operators": [
+    {
+      "id": "add",
+      "display_name": "add",
+      "entry_ref": null,
+      "classification": {
+        "level": "L1",
+        "family": "elementwise",
+        "basis": "source_document"
+      },
+      "call": {
+        "args": [
+          {
+            "kind": "input",
+            "name": "a"
+          },
+          {
+            "kind": "input",
+            "name": "b"
+          }
+        ],
+        "kwargs": {},
+        "implementations": {
+          "candidate": {
+            "kind": "python_symbol",
+            "id": "flag_gems.add"
+          },
+          "reference": {
+            "kind": "python_symbol",
+            "id": "torch.add"
+          }
+        }
+      },
+      "returns": {
+        "kind": "tensor",
+        "names": [
+          "out"
+        ]
+      },
+      "cases": [
+        {
+          "id": "hello-world.add.C01",
+          "slot": "C01",
+          "inputs": [
+            {
+              "name": "a",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 0,
+                "low": -10,
+                "high": 10
+              }
+            },
+            {
+              "name": "b",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              },
+              "generator": {
+                "kind": "torch_cpu_uniform_v1",
+                "seed": 1,
+                "low": -10,
+                "high": 10
+              }
+            }
+          ],
+          "attrs": {},
+          "outputs": [
+            {
+              "name": "out",
+              "kind": "tensor",
+              "shape": [
+                1024,
+                1024
+              ],
+              "dtype": "float32",
+              "layout": {
+                "kind": "contiguous",
+                "axes": [
+                  "row",
+                  "column"
+                ]
+              }
+            }
+          ],
+          "verification": {
+            "output_checks": [
+              {
+                "output": "out",
+                "method": "exact_values",
+                "contract": null,
+                "reason": null
+              }
+            ],
+            "semantic_rules": []
+          },
+          "execution": {
+            "status": "pending_probe",
+            "reason": "尚未在目标板卡上验证 flag_gems.add 的调用适配与支持性。",
+            "evidence": []
+          },
+          "provenance": {
+            "source_refs": [
+              "flaggems"
+            ],
+            "locator": "hello-world 冒烟用例：a + b，逐元素二元运算",
+            "basis": "derived",
+            "note": "最小可运行用例，用于检查提交、编译、执行与结果落盘链路；不来自来源文档的典型档位。"
+          }
+        }
+      ]
+    }
+  ],
+  "version": "0.1.0"
+}

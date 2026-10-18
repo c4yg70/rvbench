@@ -1,0 +1,487 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "rvbench-worker",
+    "version": "1.1.0"
+  },
+  "security": [],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "workerHealth",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": []
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "operationId": "workerCapabilities",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/WorkerRegistration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": []
+      }
+    },
+    "/jobs": {
+      "post": {
+        "operationId": "submitWorkerJob",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/JobRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../../contract/openapi.json#/components/schemas/WorkerSubmission"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listWorkerJobs",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": []
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "operationId": "getWorkerJob",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/JobRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 25
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "cancelWorkerJob",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/attempts/{id}": {
+      "get": {
+        "operationId": "getWorkerAttempt",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/JobRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/ui": {
+      "get": {
+        "operationId": "workerHtml",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Identity, idempotency or lease conflict"
+          },
+          "503": {
+            "description": "Unavailable or backpressure"
+          },
+          "404": {
+            "description": "Unknown resource"
+          },
+          "429": {
+            "description": "Queue full"
+          }
+        },
+        "security": []
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "workerMetrics",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain; version=0.0.4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        }
+      }
+    },
+    "/observability/summary": {
+      "get": {
+        "operationId": "workerSummary",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/ObservationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        }
+      }
+    },
+    "/results": {
+      "get": {
+        "operationId": "workerResults",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/ResultsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/JobKind"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/JobState"
+            }
+          },
+          {
+            "name": "op",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 48
+            }
+          },
+          {
+            "name": "worker_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "operationId": "workerLeaderboard",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../../contract/openapi.json#/components/schemas/LeaderboardPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "503": {
+            "description": "Observation dependency unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+            }
+          },
+          {
+            "name": "op",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 48
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ]
+      }
+    }
+  }
+}

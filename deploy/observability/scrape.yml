@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 5s
+scrape_configs:
+  - job_name: rvbench_manager
+    static_configs:
+      - targets: ['127.0.0.1:18800']
+  - job_name: rvbench_vm
+    static_configs:
+      - targets: ['127.0.0.1:8428']
+  - job_name: rvbench_discovered
+    http_sd_configs:
+      - url: http://127.0.0.1:18800/observability/targets
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(rvbench_.*|node_.*|process_start_time_seconds)'
+        action: keep
+      - regex: 'exported_(worker_id|board_id|backend)'
+        action: labeldrop

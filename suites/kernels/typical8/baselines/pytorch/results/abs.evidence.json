@@ -1,0 +1,197 @@
+{
+  "purpose": "measured",
+  "case_id": "typical8.abs.C01",
+  "production_health_before": {
+    "8788": {
+      "ok": true,
+      "queued": 0,
+      "running": 0,
+      "lanes": {
+        "timing": {
+          "queued": 0,
+          "running": 0
+        },
+        "correctness": {
+          "queued": 0,
+          "running": 0
+        },
+        "func": {
+          "queued": 0,
+          "running": 0
+        }
+      },
+      "loadavg": [
+        "2.17",
+        "2.12",
+        "2.29"
+      ]
+    },
+    "8791": {
+      "ok": true,
+      "queued": 0,
+      "running": 0,
+      "lanes": {
+        "timing": {
+          "queued": 0,
+          "running": 0
+        },
+        "correctness": {
+          "queued": 0,
+          "running": 0
+        },
+        "func": {
+          "queued": 0,
+          "running": 0
+        }
+      },
+      "loadavg": [
+        "2.17",
+        "2.12",
+        "2.29"
+      ]
+    }
+  },
+  "timer_source": "    def timeit(self, number: int = 1000000) -> common.Measurement:\n        \"\"\"Mirrors the semantics of timeit.Timer.timeit().\n\n        Execute the main statement (`stmt`) `number` times.\n        https://docs.python.org/3/library/timeit.html#timeit.Timer.timeit\n        \"\"\"\n        with common.set_torch_threads(self._task_spec.num_threads):\n            # Warmup\n            self._timeit(number=max(int(number // 100), 2))\n\n            return common.Measurement(\n                number_per_run=number,\n                raw_times=[self._timeit(number=number)],\n                task_spec=self._task_spec\n            )\n",
+  "torch_config": "PyTorch built with:\n  - GCC 4.2\n  - C++ Version: 201703\n  - clang 18.1.8\n  - Intel(R) MKL-DNN v3.11.0 (Git Hash 73682ecd7f1c8c0b7817bab9b589ce14c68896c5)\n  - OpenMP 202011\n  - CPU capability usage: NO AVX\n  - Build settings: BUILD_TYPE=Release, COMMIT_SHA=7048dc190335b64a61c105a549e9b52f3ea6c71f, CXX_COMPILER=/usr/bin/clang++, CXX_FLAGS=-march=rv64gcv_zfh_zvfh_zba_zicbop_zihintpause -mabi=lp64d -fvisibility-inlines-hidden -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=braced-scalar-init -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wvla-extension -Wsuggest-override -Wnewline-eof -Winconsistent-missing-override -Winconsistent-missing-destructor-override -Wno-pass-failed -Wno-error=old-style-cast -Wconstant-conversion -Qunused-arguments -faligned-new -fno-math-errno -fno-trapping-math -Werror=format, TORCH_VERSION=2.8.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_EIGEN_FOR_BLAS=ON, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=OFF, USE_MKLDNN=1, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=OFF, USE_OPENMP=1, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+  "tensor_hash_contract": "little-endian logical row-major CPU tensor bytes v1",
+  "implementation_sha256": "13a81535aed54206e4a1f00605738c83de0f9dc4e6f15cba913f5f24abf62fa1",
+  "inputs": [
+    {
+      "name": "x",
+      "kind": "tensor",
+      "shape": [
+        1024,
+        1024
+      ],
+      "dtype": "float32",
+      "strides": [
+        1024,
+        1
+      ],
+      "storage_offset": 0,
+      "content_sha256": "ec3470f5ce4c191cf839d7b5ee6940f6493dccba53f516b84c80211bbc5320e0",
+      "generator": {
+        "kind": "torch_cpu_uniform_v1",
+        "seed": 0,
+        "low": -10,
+        "high": 10
+      }
+    }
+  ],
+  "attrs": {},
+  "environment": {
+    "id": "HUMAN-K3-pytorch-cpu",
+    "architecture": "rv64",
+    "worker_id": null,
+    "boot_id": "9942a1c2-bff2-4a5a-8ef6-67c61abf9c6b",
+    "cpu": {
+      "model": "Spacemit(R) A100",
+      "isa": "rv64imafdcv_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfbfmin_zfh_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbc_zbs_zkt_zvbb_zvbc_zve32f_zve32x_zve64d_zve64f_zve64x_zvfbfmin_zvfbfwma_zvfh_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ssaia_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt_sdtrig",
+      "logical_cpus": 16,
+      "affinity": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    "runtime": {
+      "python": "3.12.13",
+      "torch": "2.8.0+spacemit.0",
+      "triton": "3.6.0+spacemit.a5",
+      "flag_gems": "5.3.2.post1.dev57+g75cf3ea55.d20260804",
+      "runner": "rvbench-pytorch-baseline/1.1.0",
+      "adapter": "torch-native8-per-op/1.1.0",
+      "generator": "torch_cpu_uniform_v1"
+    },
+    "isolation": {
+      "kind": "host_lock",
+      "description": "Exclusive k3_bench.lock, .0 and .1; AI CPU affinity; no FlagGems/Triton imports"
+    },
+    "backend": "spacemit",
+    "host_tag": "HUMAN-K3",
+    "omp_threads": 4,
+    "fingerprint_sha256": "1eec8af178cf402db98ada9432af0cceb0bb88b664fe459701aa9ccd6e015bea"
+  },
+  "baseline_module": {
+    "path": "abs.py",
+    "callable": "baseline",
+    "source": "def baseline(x):\n    return torch.abs(x)\n",
+    "sha256": "5b92847a34534b5db991a9d46578da9e464a1e7ee91a85ea28b61d8f8c45391a"
+  },
+  "correctness": {
+    "status": "passed",
+    "reason": null,
+    "checks": [
+      {
+        "id": "native-call",
+        "kind": "execution",
+        "outputs": [
+          "out"
+        ],
+        "status": "passed",
+        "reason": null,
+        "metrics": {},
+        "method": "pytorch_native_call_v1",
+        "contract_sha256": null,
+        "parameters": {}
+      },
+      {
+        "id": "abs-values",
+        "kind": "numeric",
+        "outputs": [
+          "out"
+        ],
+        "status": "passed",
+        "reason": null,
+        "metrics": {},
+        "method": "exact_values",
+        "contract_sha256": null,
+        "parameters": {}
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "out",
+      "shape": [
+        1024,
+        1024
+      ],
+      "dtype": "float32",
+      "strides": [
+        1024,
+        1
+      ],
+      "content_sha256": "a1c7ab955bbba9598b048aa25a06994e92639d34bf78f939deceed5751a49b91"
+    }
+  ],
+  "samples_ms": [
+    0.6954659984330647,
+    0.6990500005485956,
+    0.7005500010563992,
+    0.6963830019230954,
+    0.6990919973759446,
+    0.6957579971640371,
+    0.6981330006965436,
+    0.6917999999132007,
+    0.6980920006753877,
+    0.6960499995329883,
+    0.7291729998541996,
+    0.7297980009752791,
+    0.7322149976971559,
+    0.730298001144547,
+    0.7254240008478519,
+    0.7415479994961061,
+    0.7283820013981313,
+    0.7297150004887953,
+    0.7315059992833994,
+    0.7360900017374661
+  ],
+  "input_unchanged": true,
+  "imported_vendor_modules": []
+}

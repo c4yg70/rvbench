@@ -1,0 +1,31 @@
+{
+  "host": "0.0.0.0",
+  "port": 8788,
+  "token": "CHANGE_ME__rvbench-evald_--gen-token",
+  "data_dir": "/home/c4y/autoke/evald",
+  "flag_gems_root": "/home/c4y/autoke/FlagGems/.venv/lib/python3.12/site-packages/flag_gems",
+  "scripts_root": "/home/c4y/autoke/scripts",
+  "run_env": "/home/c4y/autoke/scripts/run_env.sh",
+  "lock_file": "/tmp/k3_bench.lock",
+  "queue_max": 64,
+  "timeout_default_min": 15,
+  "timeout_max_min": 30,
+  "body_max_bytes": 8388608,
+  "history_mem": 1000,
+  "longpoll_max_s": 60,
+  "executor": "warmfork",
+  "correctness_workers": 3,
+  "correctness_cpus": "4-6",
+  "correctness_omp_threads": 1,
+  "correctness_executor": null,
+  "evaluators": {
+    "perf": {"enabled": true, "warmup_times": 5, "repeat_times": 5},
+    "acc":  {"enabled": true, "workers": 4, "cpus": "4-7", "omp_threads": 1},
+    "func": {"enabled": true, "workers": 2, "cpus": "4-7", "omp_threads": 1}
+  },
+  "perf": {
+    "perf": {"max_concurrency": 1, "max_queue": 32},
+    "acc":  {"cores": 4, "cpu_ids": "4-7", "max_concurrency": 4, "max_queue": 32, "omp_threads": 1, "timeout_min": 10},
+    "func": {"cores": 2, "cpu_ids": "4-5", "max_concurrency": 2, "max_queue": 16, "omp_threads": 1, "executor": "subprocess", "timeout_min": 5}
+  }
+}

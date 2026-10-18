@@ -1,0 +1,153 @@
+{
+  "$schema": "../../../../../../schemas/baseline_results.schema.json",
+  "schema_version": "1.0.0",
+  "purpose": "measured",
+  "suite_id": "typical8",
+  "baseline_id": "pytorch_abs",
+  "implementation_sha256": "13a81535aed54206e4a1f00605738c83de0f9dc4e6f15cba913f5f24abf62fa1",
+  "environments": [
+    {
+      "id": "HUMAN-K3-pytorch-cpu",
+      "architecture": "rv64",
+      "worker_id": null,
+      "boot_id": "9942a1c2-bff2-4a5a-8ef6-67c61abf9c6b",
+      "cpu": {
+        "model": "Spacemit(R) A100",
+        "isa": "rv64imafdcv_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfbfmin_zfh_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbc_zbs_zkt_zvbb_zvbc_zve32f_zve32x_zve64d_zve64f_zve64x_zvfbfmin_zvfbfwma_zvfh_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ssaia_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt_sdtrig",
+        "logical_cpus": 16,
+        "affinity": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "runtime": {
+        "python": "3.12.13",
+        "torch": "2.8.0+spacemit.0",
+        "triton": "3.6.0+spacemit.a5",
+        "flag_gems": "5.3.2.post1.dev57+g75cf3ea55.d20260804",
+        "runner": "rvbench-pytorch-baseline/1.1.0",
+        "adapter": "torch-native8-per-op/1.1.0",
+        "generator": "torch_cpu_uniform_v1"
+      },
+      "isolation": {
+        "kind": "host_lock",
+        "description": "Exclusive k3_bench.lock, .0 and .1; AI CPU affinity; no FlagGems/Triton imports"
+      },
+      "backend": "spacemit",
+      "host_tag": "HUMAN-K3",
+      "omp_threads": 4,
+      "fingerprint_sha256": "1eec8af178cf402db98ada9432af0cceb0bb88b664fe459701aa9ccd6e015bea"
+    }
+  ],
+  "measurements": [
+    {
+      "case_id": "typical8.abs.C01",
+      "case_contract_sha256": "f1f5a0eb897fd3a91da8c99e38ebd52a7313d7cf721922a65a5b3b8de6ccf049",
+      "inputs_sha256": "1d04342df7017e95a3c1c18bcdf28ef9c5222caeaab8fa88540cbb94d05c5da6",
+      "inputs": [
+        {
+          "name": "x",
+          "kind": "tensor",
+          "shape": [
+            1024,
+            1024
+          ],
+          "dtype": "float32",
+          "strides": [
+            1024,
+            1
+          ],
+          "storage_offset": 0,
+          "content_sha256": "ec3470f5ce4c191cf839d7b5ee6940f6493dccba53f516b84c80211bbc5320e0",
+          "generator": {
+            "kind": "torch_cpu_uniform_v1",
+            "seed": 0,
+            "low": -10,
+            "high": 10
+          }
+        }
+      ],
+      "attrs": {},
+      "environment_id": "HUMAN-K3-pytorch-cpu",
+      "recorded_at": "2026-10-15T19:39:02.930631Z",
+      "correctness": {
+        "status": "passed",
+        "reason": null,
+        "checks": [
+          {
+            "id": "native-call",
+            "kind": "execution",
+            "outputs": [
+              "out"
+            ],
+            "status": "passed",
+            "reason": null,
+            "metrics": {},
+            "method": "pytorch_native_call_v1",
+            "contract_sha256": null,
+            "parameters": {}
+          },
+          {
+            "id": "abs-values",
+            "kind": "numeric",
+            "outputs": [
+              "out"
+            ],
+            "status": "passed",
+            "reason": null,
+            "metrics": {},
+            "method": "exact_values",
+            "contract_sha256": null,
+            "parameters": {}
+          }
+        ]
+      },
+      "timing": {
+        "unit": "ms",
+        "scope": "call",
+        "statistic": "median",
+        "preparation": "excluded",
+        "synchronization": "CPU synchronous; torch.utils.benchmark.Timer(time.perf_counter)",
+        "timing_contract_sha256": "cbf631ef0ec32065593355468710e23fd5827703807296b4377793103cc4cc81",
+        "warmup": 45,
+        "repetitions": 20,
+        "samples_ms": [
+          0.6954659984330647,
+          0.6990500005485956,
+          0.7005500010563992,
+          0.6963830019230954,
+          0.6990919973759446,
+          0.6957579971640371,
+          0.6981330006965436,
+          0.6917999999132007,
+          0.6980920006753877,
+          0.6960499995329883,
+          0.7291729998541996,
+          0.7297980009752791,
+          0.7322149976971559,
+          0.730298001144547,
+          0.7254240008478519,
+          0.7415479994961061,
+          0.7283820013981313,
+          0.7297150004887953,
+          0.7315059992833994,
+          0.7360900017374661
+        ],
+        "median_ms": 0.7129870009521255
+      },
+      "artifacts": [
+        {
+          "path": "abs.evidence.json",
+          "sha256": "5f36674eafa43ab41ff0559745a3614009b178be7293c68d25d55697338f6010",
+          "size_bytes": 6797
+        }
+      ]
+    }
+  ]
+}
