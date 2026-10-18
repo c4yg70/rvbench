@@ -2,7 +2,7 @@
 
 Approved topology: manager and single-node VictoriaMetrics on 10.18.60.100;
 workers on .100/.18/.167, native node exporters on each physical board.
-Contract authority: ../../contract/observability.md and service OpenAPI files.
+Contract authority: rvbench-core-rust/observability.md and the service OpenAPI files.
 
 Upgrade manager first; accept old registrations without observability; then workers.
 Refuse to stop workers with unfinished jobs. Back up SQLite via its backup API before

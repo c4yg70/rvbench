@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../schemas/spec.schema.json",
+  "$schema": "../../schemas/spec.schema.json",
   "schema_version": "2.1.0",
   "suite": {
     "id": "hello-world",

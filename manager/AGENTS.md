@@ -1,7 +1,7 @@
 # Contract-first development
 
 用户要求新目录先创建 contract，并在整体方案审批后再实现。
-先阅读本目录 contract/README.md 和 ../contract/README.md。
+先阅读本目录 contract/README.md；共享 wire 合同在 rvbench-core-rust 仓。
 
 必须遵循：契约与正反例 -> 评审冻结 -> 生成 wire 类型 -> conformance 测试 -> 实现。
 2026-10-17 用户已明确批准实施。当前 v1 基线已建立并生成；接口变更仍必须先改 contract。

@@ -5,7 +5,9 @@
 覆盖目标仍为 80 条。定义仍为 draft，参照实现和数值合同的 pending 状态继续保留。
 
 本地 `spec.hidden.json` 引用公共算子与检查合同，默认不入版本控制。
-执行与结果合同分别由 core 与 schemas 维护。
+执行与结果合同由 `rvbench-protocol` 与本仓 `schemas/` 维护。
+
+hello-world 与 nano 已移入 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites)；hello-world 在本仓 `examples/hello-world/` 保留一份冒烟样例。
 
 spec 2.1.0 可在顶层声明可选 `baseline.entries[]`，提供基准代码清单、参考运行命令及历史测速文件引用；没有 baseline 的 2.0.0 定义继续有效。历史记录与当前通过状态分别管理，不自动写入 incumbent registry。
 

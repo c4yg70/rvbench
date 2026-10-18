@@ -6,15 +6,16 @@
 
 ## Contract-first
 
-人工权威为 `contract/openapi.json`（共享 schema）、`worker/contract/openapi.yaml`、
-`manager/contract/openapi.yaml`；后两份是 JSON 语法的合法 YAML，引用共享 schema。
+人工权威为协议仓 `rvbench-core-rust` 的 `openapi.json`（共享 schema）、worker 仓的 `contract/openapi.yaml`、
+本仓 `manager/contract/openapi.yaml`；后两份是 JSON 语法的合法 YAML，引用共享 schema。
 先编写 contract 和正反例，再使用锁定的 openapi-to-rust 0.15.0 生成类型。
 运行时校验原始 JSON 后反序列化生成类型。CLI、两端服务共用该类型和校验器。
 变更 wire 接口必须先改 contract，然后生成、校验与实现。
 
 ```sh
-openapi-to-rust generate -c contract/codegen.toml
-openapi-to-rust generate -c contract/codegen.toml --check
+# 在 rvbench-core-rust 仓执行
+openapi-to-rust generate -c codegen.toml
+openapi-to-rust generate -c codegen.toml --check
 cargo test -p rvbench-protocol -p rvbench-manager -p rvbench-worker
 ```
 
@@ -37,13 +38,13 @@ Triton 使用所选 worker 配置的 Python 及已安装 Torch / Triton / FlagGe
 `candidate(*inputs)`。源文件在独立作业目录导入，不覆盖安装树。
 支持 add/sub/mul/div/abs/exp/relu/sum/softmax/mm/mv/aminmax/topk/conv2d，
 float32/float16；mm/mv 要求二维，conv2d 使用 NCHW。
-其余输入构造和参数见 `worker/adapters/triton.py`。
+其余输入构造和参数见 worker 仓的 `adapters/triton.py`。
 Flash attention 不列入可用能力：完整辅助输出合同仍 pending，SDPA 与完整 Flash 接口不等价，
 且 SDPA 适配探测的 float32/float16 输入触发 SpacemiT 编译失败。注册环境明确保存 unavailable_ops。
 
 native C 在两种硬件上均使用配置的 `cc`（默认 gcc），支持 add/abs 和 float32。
 候选签名为 `void candidate(const float *a, const float *b, float *out, int n)`。
-编译参数为 `-O3 -fno-fast-math`，参照和计时见 `worker/adapters/native.c`。
+编译参数为 `-O3 -fno-fast-math`，参照和计时见 worker 仓的 `adapters/native.c`。
 
 启动时分别实际编译和 smoke 调用两种实现，在 `environment.implementations` 中保存
 各实现的 ready、ops、dtypes 和 probe_compilation，缺失环境记录 ready=false 与 error。
@@ -51,7 +52,7 @@ native C 在两种硬件上均使用配置的 `cc`（默认 gcc），支持 add/
 由板上配置的 Torch/Triton/FlagGems 环境探测通过，代码支持不会代替环境安装。
 manager 与直连准入按 implementation/op/dtype 匹配；排行榜按实现类型分别分组。
 旧 worker 没有 implementations 能力表，只接收省略新字段的原默认实现任务。
-请求示例见 `contract/examples/k3-native-c.json` 和 `contract/examples/k1-triton.json`。
+请求示例见协议仓 `examples/k3-native-c.json` 和 `examples/k1-triton.json`。
 
 一个 worker 广告一个执行槽；直连、Push、Pull 使用同一持久接收索引与执行循环。
 直连队列上限 32，另保留一个已授予 manager 作业的排队位置，以处理容量快照与直连提交的竞争。
@@ -118,12 +119,12 @@ K3 func/correctness 使用 CPU0–7，K1 使用 CPU0–7。
 ## 使用
 
 manager 页面 `http://10.18.60.100:18800/ui`，每块板 worker 页面 `http://板IP:18801/ui`。
-两端共用 `webui/console.html`，内联样式和脚本，无 CDN。
+两端共用 `rvbench-protocol` 内嵌的 `CONSOLE_HTML`，内联样式和脚本，无 CDN。
 四个标签页为系统状态、任务提交、任务结果、排行榜。观测、指标与部署见 [observability.md](observability.md)。
 
 ```sh
 rvbench --base http://10.18.60.100:18800 control workers
-rvbench --base http://10.18.60.100:18800 control submit contract/examples/job.json --wait
+rvbench --base http://10.18.60.100:18800 control submit examples/job.json --wait
 rvbench --base http://10.18.60.167:18801 control submit request-k1.json --direct --wait
 rvbench --base http://10.18.60.100:18800 control get JOB_UUID --wait
 rvbench --base http://10.18.60.100:18800 control drain WORKER_ID

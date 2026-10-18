@@ -25,6 +25,9 @@ enum Action {
     Bundle {
         #[arg(long)]
         output: PathBuf,
+        /// Checkout of the standalone rvbench-spacemit-worker repository.
+        #[arg(long)]
+        worker_root: PathBuf,
         #[arg(long)]
         binary: Option<PathBuf>,
     },
@@ -154,8 +157,12 @@ async fn main() -> Result<()> {
     let root = repo(&args.root);
     match args.command {
         Action::Check => check(&root)?,
-        Action::Bundle { output, binary } => {
-            let manifest = bundle::build_bundle(&root, &output, binary.as_deref())?;
+        Action::Bundle {
+            output,
+            worker_root,
+            binary,
+        } => {
+            let manifest = bundle::build_bundle(&root, &worker_root, &output, binary.as_deref())?;
             println!(
                 "Built {} files in {}",
                 manifest["files"].as_array().unwrap().len(),

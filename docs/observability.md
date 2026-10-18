@@ -1,12 +1,12 @@
 # manager / worker 可观测性与四标签页控制台
 
-2026-10-17 用户批准实施。人工权威见 `contract/observability.md`、
-`contract/metrics.json`、共享 OpenAPI 与两端 OpenAPI；wire 类型由生成器维护。
+2026-10-17 用户批准实施。人工权威见协议仓 `rvbench-core-rust` 的 `observability.md`、
+本仓 `deploy/observability/metrics.json`、共享 OpenAPI 与两端 OpenAPI；wire 类型由生成器维护。
 
 ## 页面与任务语义
 
 入口 `http://10.18.60.100:18800/ui`，独立 worker 使用 `http://板IP:18801/ui`。
-`webui/console.html` 是两端共同内嵌的自包含源码，无 CDN、前端构建或登录依赖。
+控制台是 `rvbench-protocol` 内嵌的自包含源码（`CONSOLE_HTML`），无 CDN、前端构建或登录依赖。
 
 - 系统状态：首页显示节点、逻辑队列、ACK、实际执行、回传、资源与历史趋势。
 - 任务提交：按实际能力选择后端 / 类型 / 算子 / dtype，支持候选代码、参数预览，

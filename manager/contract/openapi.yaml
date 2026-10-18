@@ -61,7 +61,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/JobRequest"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/JobRequest"
               }
             }
           }
@@ -226,7 +226,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/WorkerRegistration"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/WorkerRegistration"
               }
             }
           }
@@ -242,7 +242,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "../../contract/openapi.json#/components/schemas/Assignment"
+                  "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/Assignment"
                 }
               }
             }
@@ -272,7 +272,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/ClaimRequest"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/ClaimRequest"
               }
             }
           }
@@ -308,7 +308,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/Ack"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/Ack"
               }
             }
           }
@@ -354,7 +354,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/JobEvent"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/JobEvent"
               }
             }
           }
@@ -400,7 +400,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../../contract/openapi.json#/components/schemas/Ack"
+                "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/Ack"
               }
             }
           }
@@ -513,7 +513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "../../contract/openapi.json#/components/schemas/ObservationSummary"
+                  "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/ObservationSummary"
                 }
               }
             }
@@ -537,7 +537,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "../../contract/openapi.json#/components/schemas/ResultsPage"
+                  "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/ResultsPage"
                 }
               }
             }
@@ -555,7 +555,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+              "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/BackendId"
             }
           },
           {
@@ -563,7 +563,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "../../contract/openapi.json#/components/schemas/JobKind"
+              "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/JobKind"
             }
           },
           {
@@ -571,7 +571,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "../../contract/openapi.json#/components/schemas/JobState"
+              "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/JobState"
             }
           },
           {
@@ -633,7 +633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "../../contract/openapi.json#/components/schemas/LeaderboardPage"
+                  "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/LeaderboardPage"
                 }
               }
             }
@@ -651,7 +651,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "../../contract/openapi.json#/components/schemas/BackendId"
+              "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/BackendId"
             }
           },
           {
@@ -687,7 +687,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "../../contract/openapi.json#/components/schemas/DiscoveryTarget"
+                    "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/DiscoveryTarget"
                   }
                 }
               }
@@ -712,7 +712,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "../../contract/openapi.json#/components/schemas/MetricRange"
+                  "$ref": "https://raw.githubusercontent.com/rvbench/rvbench-core-rust/main/openapi.json#/components/schemas/MetricRange"
                 }
               }
             }

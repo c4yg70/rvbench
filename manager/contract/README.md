@@ -2,10 +2,10 @@
 
 状态：2026-10-17 用户已批准实施。本目录先于产品 Cargo.toml 和 src 建立。
 
-- HTTP 权威 `openapi.yaml`；共享 wire 引用 `../../contract/openapi.json`。
-- 状态机 `state-machine.md`；跨端约束 `../../contract/invariants.md`。
-- compiler / evaluator 边界见 `../../worker/contract/backend.md`。
-- 正反例和 codegen 见 `../../contract/`，实现与部署说明见 `../../docs/manager-worker.md`。
+- HTTP 权威 `openapi.yaml`；共享 wire 引用协议仓 `rvbench-core-rust` 的 `openapi.json`（raw URL）。
+- 状态机 `state-machine.md`；跨端约束见协议仓 `invariants.md`。
+- compiler / evaluator 边界见 worker 仓 `contract/backend.md`。
+- 正反例和 codegen 见协议仓，实现与部署说明见 `../../docs/manager-worker.md`。
 
 无认证、无 token 配置、无节点名单；任意 worker 可按 schema 注册。
 保留 job / attempt / lease / epoch 与幂等约束，它们承担一致性检查。

@@ -2,7 +2,7 @@ use rvbench_manager::{Config, Manager};
 use rvbench_protocol::*;
 use serde_json::{Value, json};
 fn request() -> JobRequest {
-    serde_json::from_str(include_str!("../../contract/examples/job.json")).unwrap()
+    serde_json::from_str(rvbench_protocol::EXAMPLE_JOB).unwrap()
 }
 fn registration() -> WorkerRegistration {
     serde_json::from_value(json!({"worker_id":"test","board_id":"board","instance_id":id(),"backend":"k3","kinds":["func","correctness"],"delivery":"hybrid","url":"http://127.0.0.1:18801","capacity":1,"direct_active":0,"ready":true,"environment":{"ops":["add","abs"],"dtypes":["float32"]},"protocol_version":"1.0.0"})).unwrap()

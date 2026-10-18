@@ -478,7 +478,7 @@ pub fn router(manager: Arc<Manager>) -> Router {
         .route("/cluster/leases/{id}/renew", post(renew))
         .route(
             "/ui",
-            get(|| async { Html(include_str!("../../webui/console.html")) }),
+            get(|| async { Html(rvbench_protocol::CONSOLE_HTML) }),
         )
         .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
         .layer(axum::middleware::from_fn_with_state(
@@ -634,8 +634,7 @@ mod tests {
         let server = tokio::spawn(axum::serve(listener, app).into_future());
         let worker:WorkerRegistration=serde_json::from_value(json!({"worker_id":"hybrid","board_id":"board","instance_id":id(),"backend":"k3","kinds":["correctness"],"delivery":"hybrid","url":url,"capacity":1,"direct_active":0,"ready":true,"environment":{"ops":["add"],"dtypes":["float32"]},"protocol_version":"1.0.0"})).unwrap();
         m.register(worker.clone()).await.unwrap();
-        let request: JobRequest =
-            serde_json::from_str(include_str!("../../contract/examples/job.json")).unwrap();
+        let request: JobRequest = serde_json::from_str(rvbench_protocol::EXAMPLE_JOB).unwrap();
         m.submit(request.clone()).await.unwrap();
         let claim = ClaimRequest {
             worker_id: worker.worker_id.clone(),

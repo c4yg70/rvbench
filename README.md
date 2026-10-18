@@ -1,8 +1,21 @@
+<p align="center">
+  <img src="assets/rvbench-logo.svg" alt="rvbench" width="720">
+</p>
+
 # rvbench
 
 RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上执行，结果自带可复核的证据。
 
 它要回答的不是「这个算子有多快」，而是「这次测量的代码、环境、输入、数值结论和样本，是否足以支撑一句可比较的话」。
+
+## 仓库
+
+| 仓库 | 内容 |
+|---|---|
+| `rvbench`（本仓） | manager、CLI、运维工具、typical8 评测集 |
+| [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：OpenAPI 正本、生成类型、校验、摘要、存储 |
+| [`rvbench-spacemit-worker`](https://github.com/rvbench/rvbench-spacemit-worker) | 板端执行服务：编译、验证、计时、能力探测 |
+| [`rvbench-official-suites`](https://github.com/rvbench/rvbench-official-suites) | 官方评测集：hello-world、nano |
 
 ## 设计原则
 
@@ -16,7 +29,7 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 
 ### 合同优先
 
-`schemas/` 的 JSON Schema 是 suite 与结果格式的正本，`contract/openapi.json` 是控制面 wire 的正本，worker / manager 各自的 OpenAPI 以 YAML 语法引用同一批 schema。
+`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是 [rvbench-core-rust](https://github.com/rvbench/rvbench-core-rust) 里的 `openapi.json`，manager 与 worker 各自的 OpenAPI 以 YAML 语法引用同一批 schema。
 
 wire 类型由 `openapi-to-rust` 0.15.0 生成，不手写平行 DTO。接口变更顺序固定：改合同 → 重新生成 → conformance 测试 → 实现 → 实机验证。运行时先校验原始 JSON，再反序列化为生成类型；CLI 与两端服务共用同一套校验器与规范 JSON 摘要。
 
@@ -60,22 +73,19 @@ worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager
 
 ```text
 rvbench/
-├── contract/               唯一共享 crate：OpenAPI 正本、生成类型、校验、摘要、事务存储
-├── worker/                 rvbench-worker，自包含：编译/评估、进程隔离、平台适配器（adapters/）
-├── manager/                rvbench-manager，自包含：提交、队列、调度、租约与观测汇总
+├── manager/                rvbench-manager：提交、队列、调度、租约与观测汇总
 ├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── schemas/                spec / results / baseline 的 JSON Schema 正本
-├── suites/kernels/         typical8、hello-world 评测集定义
-├── examples/               合成结果与 baseline 示例
-├── webui/                  manager / worker 共用的自包含控制台
+├── suites/kernels/         typical8 评测集定义
+├── examples/               合成结果、baseline 与 hello-world 冒烟用例
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
 ├── backends/spacemit/k3/   K3 板端资产：算子脚本、监控配置、平台档案
 ├── docs/                   格式 spec、ADR、运行手册
 └── artifacts/              本地构建、部署包与验收记录（不入库）
 ```
 
-`worker` 与 `manager` 互不依赖，各自只依赖 `contract`；拆分 worker 到独立仓库时只需带上 `contract`。`cli` 提供 lib（供 `tools` 复用离线校验）与 `control` 客户端；Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
+`cli` 提供 lib（供 `tools` 复用离线校验）与 `control` 客户端；Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
 
 ## 实现与硬件解耦
 
@@ -99,7 +109,6 @@ cargo build --workspace --locked
 cargo test  --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 
-openapi-to-rust generate -c contract/codegen.toml --check
 cargo run -p rvbench-cli   -- validate spec suites/kernels/typical8/spec.json
 cargo run -p rvbench-cli   -- validate results examples/eval_results.json --spec suites/kernels/typical8/spec.json
 cargo run -p rvbench-tools -- check
@@ -144,17 +153,17 @@ RVBENCH_TEST_PYTHON=/path/to/venv/bin/python cargo test -p rvbench-worker real_t
 ```sh
 rvbench --base http://10.18.60.100:18800 control workers
 rvbench --base http://10.18.60.100:18800 control capabilities
-rvbench --base http://10.18.60.100:18800 control submit contract/examples/job.json --wait
+rvbench --base http://10.18.60.100:18800 control submit examples/job.json --wait
 rvbench --base http://10.18.60.167:18801 control submit request-k1.json --direct --wait
 rvbench --base http://10.18.60.100:18800 control get JOB_UUID --wait
 rvbench --base http://10.18.60.100:18800 control drain WORKER_ID
 ```
 
-请求示例见 `contract/examples/job.json`（manager 提交）、`k3-native-c.json`、`k1-triton.json`（含候选源）。直连 HTTP 的 `POST /jobs` 使用 `{"request": JobRequest}` 包装；查询为 `GET /jobs/{id}?wait=25`。相同 `client_request_id` 与相同摘要复用作业，摘要不同返回 409。
+请求示例见 `examples/job.json`（manager 提交）；含候选源的 `k3-native-c.json`、`k1-triton.json` 在协议仓 `examples/` 下。直连 HTTP 的 `POST /jobs` 使用 `{"request": JobRequest}` 包装；查询为 `GET /jobs/{id}?wait=25`。相同 `client_request_id` 与相同摘要复用作业，摘要不同返回 409。
 
 ### 页面
 
-manager `http://10.18.60.100:18800/ui`，worker `http://板IP:18801/ui`，两端共用 `webui/console.html`。四个标签页为系统状态、任务提交、任务结果、排行榜；内联样式与脚本，无 CDN、无构建、无登录。
+manager `http://10.18.60.100:18800/ui`，worker `http://板IP:18801/ui`，两端共用同一页面（`rvbench-protocol` 内嵌的 `CONSOLE_HTML`）。四个标签页为系统状态、任务提交、任务结果、排行榜；内联样式与脚本，无 CDN、无构建、无登录。
 
 ## 三节点集群
 
@@ -189,7 +198,7 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 ## 评测集与结果合同
 
 - `suites/kernels/typical8/`：8 个算子、8 条 case，覆盖目标 80 条，状态 draft；含 7 项原生 PyTorch 基准与 1 项 SDPA out-only 采样。
-- `suites/kernels/hello-world/`：最小 add 用例，用于跑通提交、编译、执行与结果落盘链路。
+- `examples/hello-world/`：最小 add 用例，用于跑通提交、编译、执行与结果落盘链路；其余官方评测集见 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites)。
 - `suites/kernels/*/spec.hidden.json`：本地隐藏定义，引用公开算子与检查合同，默认不入库。
 - `examples/baseline/`：可选基准包（spec 2.1.0 的 `baseline.entries[]`）。
 

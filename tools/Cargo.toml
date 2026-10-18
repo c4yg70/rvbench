@@ -15,6 +15,7 @@ regex.workspace = true
 russh = { version = "0.63", default-features = false, features = ["ring", "flate2", "rsa"] }
 russh-sftp = "2"
 rvbench-cli = { path = "../cli" }
+rvbench-protocol = { git = "https://github.com/rvbench/rvbench-core-rust.git", rev = "52356fe8220762425b5b53926d84b5f118a5a304" }
 tokio.workspace = true
 uuid.workspace = true
 serde_json.workspace = true

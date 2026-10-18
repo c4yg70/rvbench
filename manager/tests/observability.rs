@@ -16,8 +16,7 @@ async fn metric_outage_does_not_block_jobs_and_invalid_queries_are_rejected() {
     let base = format!("http://{}", listener.local_addr().unwrap());
     let app = tokio::spawn(axum::serve(listener, rvbench_manager::router(m.clone())).into_future());
     let c = reqwest::Client::new();
-    let request: JobRequest =
-        serde_json::from_str(include_str!("../../contract/examples/job.json")).unwrap();
+    let request: JobRequest = serde_json::from_str(rvbench_protocol::EXAMPLE_JOB).unwrap();
     let j = m.submit(request).await.unwrap();
     let response = c
         .get(format!("{base}/observability/summary"))
