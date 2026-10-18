@@ -8,7 +8,8 @@
 fn shipped_spec_matches_contract() {
     let canonical = include_str!("../../contracts/openapi.json");
     assert_eq!(
-        canonical, rvbench_protocol::SPEC,
+        canonical,
+        rvbench_protocol::SPEC,
         "contracts/openapi.json 与 rvbench-protocol::SPEC 不一致：先跑 python tools/sync_contract.py，再在协议仓重新生成类型"
     );
 }
@@ -23,7 +24,8 @@ fn contract_is_canonical_json_without_crlf() {
     let parsed: serde_json::Value = serde_json::from_str(canonical).expect("contract must be JSON");
     assert_eq!(parsed["openapi"], "3.1.0");
     assert_eq!(
-        parsed["paths"], serde_json::json!({}),
+        parsed["paths"],
+        serde_json::json!({}),
         "共享合同只定义 components/schemas；HTTP paths 属于各服务的 openapi.yaml"
     );
 }

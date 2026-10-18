@@ -2,7 +2,7 @@
 
 公开 spec 格式新增 **2.1.0**，顶层 `baseline` 可选；仍接受没有该字段的 2.0.0。旧 `suite-v1` 不变。结构正本为 [spec.schema.json](../../schemas/spec.schema.json)，语义正本为 [core/src/baseline.rs](../../core/src/baseline.rs)。
 
-已实现定义、文件及摘要校验、历史记录格式和 CLI；Rust CLI 不自动执行声明的命令，不改动 pipeline 的 incumbent registry。[examples/baseline](../../examples/baseline) 保留 Abs 探针与 synthetic 教学示例；典型 8 算子的 [PyTorch baseline](../../suites/kernels/typical8/baselines/pytorch/README.md) 提供原生算子代码和真实 baseline-results 采集入口。
+已实现定义、文件及摘要校验、历史记录格式和 CLI；Rust CLI 不自动执行声明的命令，不改动 pipeline 的 incumbent registry。[examples/baseline](../../examples/baseline) 保留 Abs 探针与 synthetic 教学示例，是公开仓内唯一的 baseline 样例；完整算子评测集的基准代码随 rvbench-official-suites 发布。
 
 ## 1. 可选声明
 

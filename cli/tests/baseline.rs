@@ -94,7 +94,7 @@ fn rejects_bad_declarations_commands_paths_and_code_identity() {
     for (pointer, value) in [
         ("/baseline", Value::Null),
         ("/baseline/entries/0/operator_id", json!("missing")),
-        ("/baseline/entries/0/case_ids", json!(["typical8.mm.C01"])),
+        ("/baseline/entries/0/case_ids", json!(["missing.mm.C01"])),
         ("/baseline/entries/0/code/root", json!("../outside")),
         (
             "/baseline/entries/0/code/files/0/path",
@@ -190,33 +190,6 @@ fn historical_bindings_have_no_digest_cycle_and_track_effective_contracts() {
         original,
         implementation_digest(&spec["baseline"]["entries"][0])
     );
-}
-
-#[test]
-fn typical8_has_an_independent_pytorch_source_and_command_for_every_operator() {
-    let spec = load_json(root().join("suites/kernels/typical8/spec.json")).unwrap();
-    let entries = spec["baseline"]["entries"].as_array().unwrap();
-    for op in spec["operators"].as_array().unwrap() {
-        let entry = entries
-            .iter()
-            .find(|e| e["operator_id"] == op["id"])
-            .unwrap();
-        let filename = format!("{}.py", op["id"].as_str().unwrap().trim_start_matches('_'));
-        assert_eq!(entry["run"]["argv"][1], filename);
-        let file = entry["code"]["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|f| f["path"] == filename)
-            .unwrap();
-        let path = root()
-            .join("suites/kernels/typical8")
-            .join(entry["code"]["root"].as_str().unwrap())
-            .join(&filename);
-        let bytes = fs::read(path).unwrap();
-        assert_eq!(file["sha256"], sha256(&bytes));
-        assert!(String::from_utf8(bytes).unwrap().contains("def baseline("));
-    }
 }
 
 #[test]

@@ -12,7 +12,7 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 
 | 仓库 | 内容 |
 |---|---|
-| `rvbench`（本仓） | manager、CLI、运维工具、typical8 评测集 |
+| `rvbench`（本仓） | manager、CLI、运维工具、hello-world 示例评测集 |
 | [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：OpenAPI 正本、生成类型、校验、摘要、存储 |
 | [`rvbench-spacemit-worker`](https://github.com/rvbench/rvbench-spacemit-worker) | 板端执行服务：编译、验证、计时、能力探测 |
 | [`rvbench-official-suites`](https://github.com/rvbench/rvbench-official-suites) | 官方评测集：hello-world、nano |
@@ -78,7 +78,7 @@ rvbench/
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── schemas/                spec / results / baseline 的 JSON Schema 正本
 ├── contracts/              控制面 wire 正本：共享 OpenAPI schema，两端 OpenAPI 以 $ref 引用
-├── suites/kernels/         typical8 评测集定义
+├── suites/                 评测集体系的定义说明（具体用例在 official-suites）
 ├── examples/               合成结果、baseline 与 hello-world 冒烟用例
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
 ├── backends/spacemit/k3/   K3 板端资产：算子脚本、监控配置、平台档案
@@ -110,8 +110,8 @@ cargo build --workspace --locked
 cargo test  --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 
-cargo run -p rvbench-cli   -- validate spec suites/kernels/typical8/spec.json
-cargo run -p rvbench-cli   -- validate results examples/eval_results.json --spec suites/kernels/typical8/spec.json
+cargo run -p rvbench-cli   -- validate spec examples/hello-world/spec.json
+cargo run -p rvbench-cli   -- validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
 cargo run -p rvbench-tools -- check
 ```
 
@@ -198,9 +198,8 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 
 ## 评测集与结果合同
 
-- `suites/kernels/typical8/`：8 个算子、8 条 case，覆盖目标 80 条，状态 draft；含 7 项原生 PyTorch 基准与 1 项 SDPA out-only 采样。
-- `examples/hello-world/`：最小 add 用例，用于跑通提交、编译、执行与结果落盘链路；其余官方评测集见 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites)。
-- `suites/kernels/*/spec.hidden.json`：本地隐藏定义，引用公开算子与检查合同，默认不入库。
+- `examples/hello-world/`：最小 add 用例与配套 synthetic 结果，用于跑通提交、编译、执行与结果落盘链路。公开仓只内置这一个示例。
+- `suites/`：评测集体系的定义说明；完整算子评测集随 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites) 开源。
 - `examples/baseline/`：可选基准包（spec 2.1.0 的 `baseline.entries[]`）。
 
 历史测速与当前通过状态分别管理：基准数据不自动裁决 case 是否 ready，也不写入 incumbent 记录。

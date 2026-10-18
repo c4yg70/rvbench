@@ -4,7 +4,7 @@
 
 - 结构正本：[eval_results.schema.json](../../schemas/eval_results.schema.json)，JSON Schema Draft 2020-12，`$id=urn:rvbench:eval-results:1.1.0`，兼容 1.0.0。
 - 语义校验：[core/src/results.rs](../../core/src/results.rs)，不加载 torch、不执行算子。
-- 示例：[examples/eval_results.json](../../examples/eval_results.json)，`run.purpose=synthetic`，其中时间、摘要、环境及指标均为测试夹具，不是实际评测证据。
+- 示例：[examples/hello-world/eval_results.json](../../examples/hello-world/eval_results.json)，`run.purpose=synthetic`，其中时间、摘要、环境及指标均为测试夹具，不是实际评测证据。
 
 ## 1. 版本与职责
 
@@ -67,8 +67,8 @@ perf 必须引用计时合同；perf passed 有成对有效样本。样本必须
 ## 6. 校验与服务集成
 
 ```powershell
-cargo run -p rvbench-cli -- validate results examples/eval_results.json
-cargo run -p rvbench-cli -- validate results examples/eval_results.json --spec suites/kernels/typical8/spec.json
+cargo run -p rvbench-cli -- validate results examples/hello-world/eval_results.json
+cargo run -p rvbench-cli -- validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
 cargo test --workspace --locked
 ```
 

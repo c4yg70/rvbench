@@ -137,4 +137,4 @@ rvbench --base http://10.18.60.100:18800 control drain WORKER_ID
 v1 API 返回 manifest，不提供任意文件路径下载。
 
 两端互不依赖，各自只依赖 `rvbench-protocol`；`rvbench-worker` 与 `rvbench-manager` 都没有共享的运行时 crate。
-公开 typical8 suite 的 draft/readiness 状态保持原有证据要求；服务上线并不自动使 suite ready。
+公开仓内置的 hello-world 示例保持 draft/readiness 状态，服务上线并不自动使 suite ready。

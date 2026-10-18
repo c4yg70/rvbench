@@ -5,7 +5,7 @@ fn contract_commands_work_outside_repository_and_reject_duplicate_keys() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let temp = tempfile::tempdir().unwrap();
     let cli = env!("CARGO_BIN_EXE_rvbench");
-    let public = root.join("suites/kernels/typical8/spec.json");
+    let public = root.join("examples/hello-world/spec.json");
     let result = Command::new(cli)
         .current_dir(temp.path())
         .args(["validate", "spec"])
@@ -40,7 +40,7 @@ fn contract_commands_work_outside_repository_and_reject_duplicate_keys() {
     let results = Command::new(cli)
         .current_dir(temp.path())
         .args(["validate", "results"])
-        .arg(root.join("examples/eval_results.json"))
+        .arg(root.join("examples/hello-world/eval_results.json"))
         .arg("--spec")
         .arg(&public)
         .output()

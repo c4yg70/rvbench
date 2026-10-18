@@ -1,16 +1,18 @@
 # 评测集
 
 评测集保存可分发的用例定义与来源，不存放某次运行的通过状态。
-`kernels/` 是算子评测领域，当前 `kernels/typical8/spec.json` 收录 8 个典型用例，
-覆盖目标仍为 80 条。定义仍为 draft，参照实现和数值合同的 pending 状态继续保留。
 
-本地 `spec.hidden.json` 引用公共算子与检查合同，默认不入版本控制。
+公开仓只内置一个最小示例：`examples/hello-world/spec.json`（1 个 `add` 算子、1 条 `hello-world.add.C01`），
+用于跑通提交、编译、执行与结果落盘链路，配套 synthetic 结果见 `examples/hello-world/eval_results.json`。
+它不是性能评测集：`suite.status` 为 draft，计时合同仍为 pending。
+
+完整的算子评测集、基准代码与历史测速随 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites) 开源；
+本仓 `suites/` 只保留评测集体系的定义说明，不再存放具体用例。
+
+隐藏定义（`spec.hidden.json`）引用公开算子与检查合同，默认不入版本控制。
+
 执行与结果合同由 `rvbench-protocol` 与本仓 `schemas/` 维护。
-
-hello-world 与 nano 已移入 [rvbench-official-suites](https://github.com/rvbench/rvbench-official-suites)；hello-world 在本仓 `examples/hello-world/` 保留一份冒烟样例。
 
 spec 2.1.0 可在顶层声明可选 `baseline.entries[]`，提供基准代码清单、参考运行命令及历史测速文件引用；没有 baseline 的 2.0.0 定义继续有效。历史记录与当前通过状态分别管理，不自动写入 incumbent registry。
 
 详见 [baseline 格式](../docs/specs/2026-10-16-suite-baseline格式.md) 与 [完整示例](../examples/baseline/spec.json)。
-
-typical8 已接入 [PyTorch 原生 baseline](kernels/typical8/baselines/pytorch/README.md)：7 项完整接口延迟、1 项独立 SDPA out-only 采样均来自 HUMAN-K3。Abs/Aminmax/TopK 检查通过，待定数值合同与完整 Attention 接口仍保留未验证状态。

@@ -119,20 +119,16 @@ fn check(root: &Path) -> Result<()> {
             "cargo check failed"
         );
     }
-    let public = rvbench_cli::load_json(root.join("suites/kernels/typical8/spec.json"))?;
+    let public_base = root.join("examples/hello-world");
+    let public = rvbench_cli::load_json(public_base.join("spec.json"))?;
     ensure!(
-        rvbench_cli::validate_spec(&public, Some(&root.join("suites/kernels/typical8"))).is_empty(),
+        rvbench_cli::validate_spec(&public, Some(&public_base)).is_empty(),
         "public spec invalid"
     );
-    let result = rvbench_cli::load_json(root.join("examples/eval_results.json"))?;
+    let result = rvbench_cli::load_json(public_base.join("eval_results.json"))?;
     ensure!(
-        rvbench_cli::validate_eval_results(
-            &result,
-            Some(&public),
-            None,
-            Some(&root.join("suites/kernels/typical8"))
-        )
-        .is_empty(),
+        rvbench_cli::validate_eval_results(&result, Some(&public), None, Some(&public_base))
+            .is_empty(),
         "synthetic result invalid"
     );
     let baseline_base = root.join("examples/baseline");

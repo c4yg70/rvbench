@@ -18,13 +18,14 @@ rvbench control drain WORKER_ID             # 排空节点
 离线工具不访问网络：
 
 ```sh
-rvbench validate spec suites/kernels/typical8/spec.json
-rvbench validate hidden suites/kernels/typical8/spec.hidden.json
-rvbench validate results out.json --spec suites/kernels/typical8/spec.json
+rvbench validate spec examples/hello-world/spec.json
+rvbench validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
 rvbench validate baseline-results results.json --spec examples/baseline/spec.json
-rvbench digest suites/kernels/typical8/spec.json
-rvbench digest suites/kernels/typical8/spec.json --baseline pytorch
+rvbench digest examples/hello-world/spec.json
+rvbench digest examples/baseline/spec.json --baseline torch_abs
 ```
+
+`validate hidden` 针对评测集的 `spec.hidden.json`；公开仓不含隐藏定义，完整集随 rvbench-official-suites 开源。
 
 `validate spec|hidden` 的 `--require-ready` 在仍有 readiness blocker 时返回 2；合同合法与完成板上验证是两件事。
 
