@@ -12,7 +12,8 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 
 | 仓库 | 内容 |
 |---|---|
-| `rvbench`（本仓） | manager、CLI、运维工具、hello-world 示例评测集 |
+| `rvbench`（本仓） | CLI、运维工具、JSON Schema 与 wire 正本、hello-world 示例评测集 |
+| [`rvbench-official-manager`](https://github.com/rvbench/rvbench-official-manager) | 控制面服务：提交、队列、准入、授予、账本与观测汇总 |
 | [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：wire 合同副本、生成类型、校验、摘要、存储 |
 | `rvbench-spacemit-worker` | 板端执行服务：编译、验证、计时、能力探测 · *暂未公开* |
 | `rvbench-official-suites` | 完整官方评测集 · *后续开源* |
@@ -29,7 +30,7 @@ RISC-V 算子评测基础设施。合同定义实验，worker 在真实板卡上
 
 ### 合同优先
 
-`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/openapi.json`](contracts/README.md)，manager 与 worker 各自的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
+`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/openapi.json`](contracts/README.md)，manager 与 worker 各自仓内的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
 
 wire 类型由 `openapi-to-rust` 0.15.0 生成，不手写平行 DTO。接口变更顺序固定：改合同 → 重新生成 → conformance 测试 → 实现 → 实机验证。运行时先校验原始 JSON，再反序列化为生成类型；CLI 与两端服务共用同一套校验器与规范 JSON 摘要。
 
@@ -73,7 +74,6 @@ worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager
 
 ```text
 rvbench/
-├── manager/                rvbench-manager：提交、队列、调度、租约与观测汇总
 ├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── schemas/                spec / results / baseline 的 JSON Schema 正本
@@ -115,7 +115,7 @@ cargo run -p rvbench-cli   -- validate results examples/hello-world/eval_results
 cargo run -p rvbench-tools -- check
 ```
 
-构建产出 `rvbench`、`rvbench-worker`、`rvbench-manager`、`rvbench-tools`。公开 spec 仍为 draft，`validate spec ... --require-ready` 返回非零是预期状态：合同合法与完成板上验证是两件事。
+构建产出 `rvbench`、`rvbench-tools`。`rvbench-worker` 在 worker 仓、`rvbench-manager` 在 manager 仓各自构建。公开 spec 仍为 draft，`validate spec ... --require-ready` 返回非零是预期状态：合同合法与完成板上验证是两件事。
 
 需要真实 Triton 环境的回归默认跳过：
 
@@ -175,7 +175,9 @@ manager `http://10.18.60.100:18800/ui`，worker `http://板IP:18801/ui`，两端
 | K1 10.18.60.167 | worker :18801 | func、correctness、performance | pull |
 
 ```sh
-cargo zigbuild -p rvbench-worker -p rvbench-manager --release --target riscv64gc-unknown-linux-gnu.2.38
+# 两个服务各自在所属仓交叉编译
+(cd ../rvbench-official-manager && cargo zigbuild --release --target riscv64gc-unknown-linux-gnu.2.38)
+cargo zigbuild -p rvbench-worker --release --target riscv64gc-unknown-linux-gnu.2.38
 python tools/deploy_cluster.py
 python tools/cluster_smoke.py
 python tools/cluster_recovery_smoke.py

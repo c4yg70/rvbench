@@ -1,24 +1,34 @@
 """Deploy the approved three-board topology over existing SSH keys (no service auth).
 
-Build first: cargo zigbuild -p rvbench-worker -p rvbench-manager --release
-  --target riscv64gc-unknown-linux-gnu.2.38
+Build first, in two checkouts:
+  cd rvbench-official-manager && cargo zigbuild --release
+    --target riscv64gc-unknown-linux-gnu.2.38
+  cd rvbench && cargo zigbuild -p rvbench-worker --release
+    --target riscv64gc-unknown-linux-gnu.2.38
 Run from repository root: python tools/deploy_cluster.py [--standalone-k1]
+The manager checkout is found at RVBENCH_MANAGER_ROOT or ../rvbench-official-manager.
 Existing legacy production evald ports/services are not touched.
 """
 import argparse
 import json
+import os
 import pathlib
 import shlex
 import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+MANAGER_ROOT = pathlib.Path(os.environ.get("RVBENCH_MANAGER_ROOT") or ROOT.parent / "rvbench-official-manager")
 KEY = pathlib.Path.home() / ".ssh/c4y-dev.key"
 NODES = [
     dict(host="10.18.60.100", user="c4y", backend="k3", worker="human-k3-func", board="HUMAN-K3", kinds=["func", "correctness"], delivery="hybrid", root="/home/c4y/.local/share/rvbench-v1", manager=True),
     dict(host="10.18.60.18", user="root", backend="k3", worker="k3-performance", board="K3-018", kinds=["performance"], delivery="push", root="/opt/rvbench-v1", manager=False),
     dict(host="10.18.60.167", user="c4y", backend="k1", worker="human-k1", board="HUMAN-Musebook-K1", kinds=["func", "correctness", "performance"], delivery="pull", root="/home/c4y/.local/share/rvbench-v1", manager=False),
 ]
+
+def component_root(name):
+    """Board binaries live in the checkout that owns each service."""
+    return MANAGER_ROOT if name=="rvbench-manager" else ROOT
 
 def ssh(node, command):
     return subprocess.run(["ssh", "-o", "BatchMode=yes", "-i", str(KEY), f"{node['user']}@{node['host']}", command], check=True, text=True, encoding="utf-8", errors="replace", capture_output=True).stdout
@@ -50,7 +60,7 @@ def deploy(node, standalone=False):
         for name in names:
             filename=td/(name+".json");filename.write_text(json.dumps(configs[name],indent=2),encoding="utf-8")
             put(node,filename,root+"/"+filename.name)
-            binary=ROOT/"target/riscv64gc-unknown-linux-gnu/release"/name
+            binary=component_root(name)/"target/riscv64gc-unknown-linux-gnu/release"/name
             put(node,binary,root+"/bin/"+name+".next")
             ssh(node, f"{ctl} stop {name}.service 2>/dev/null || true")
             ssh(node, "chmod 755 "+shlex.quote(root+"/bin/"+name+".next")+" && mv "+shlex.quote(root+"/bin/"+name+".next")+" "+shlex.quote(root+"/bin/"+name))

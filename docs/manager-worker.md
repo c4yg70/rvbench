@@ -6,8 +6,8 @@
 
 ## Contract-first
 
-人工权威为本仓 `contracts/openapi.json`（共享 schema），worker 仓的 `contract/openapi.yaml` 与本仓
-`manager/contract/openapi.yaml` 以 YAML 语法引用它；后两份是 JSON 语法的合法 YAML，共享 schema 走 `$ref`。
+人工权威为本仓 `contracts/openapi.json`（共享 schema），worker 仓的 `contract/openapi.yaml` 与
+manager 仓 `rvbench-official-manager` 的 `contract/openapi.yaml` 以 YAML 语法引用它；后两份是 JSON 语法的合法 YAML，共享 schema 走指向本仓 `main` 的 raw URL `$ref`。
 协议仓 `rvbench-core-rust` 内的 `openapi.json` 是随 crate 发布的副本，正本改动后用 `python tools/sync_contract.py` 同步。
 先编写 contract 和正反例，再使用锁定的 openapi-to-rust 0.15.0 生成类型。
 运行时校验原始 JSON 后反序列化生成类型。CLI、两端服务共用该类型和校验器。
@@ -17,7 +17,10 @@
 # 在 rvbench-core-rust 仓执行
 openapi-to-rust generate -c codegen.toml
 openapi-to-rust generate -c codegen.toml --check
-cargo test -p rvbench-protocol -p rvbench-manager -p rvbench-worker
+# 两个服务各自在所属仓回归
+(cd ../rvbench-official-manager && cargo test --locked)
+(cd ../rvbench-spacemit-worker && cargo test --locked)
+cargo test -p rvbench-protocol
 ```
 
 ## 组件和执行
@@ -93,7 +96,9 @@ manager 重启继续读取原 epoch 和授予；无需把既有在途执行重�
 | K1 10.18.60.167 | worker :18801 | func、correctness、performance | pull |
 
 ```sh
-cargo zigbuild -p rvbench-worker -p rvbench-manager --release --target riscv64gc-unknown-linux-gnu.2.38
+# manager 与 worker 分属两个仓，各自交叉编译
+(cd ../rvbench-official-manager && cargo zigbuild --release --target riscv64gc-unknown-linux-gnu.2.38)
+(cd ../rvbench-spacemit-worker && cargo zigbuild --release --target riscv64gc-unknown-linux-gnu.2.38)
 python tools/deploy_cluster.py
 python tools/cluster_smoke.py
 python tools/cluster_recovery_smoke.py

@@ -26,6 +26,27 @@ fn worker_root() -> Option<PathBuf> {
     .find(|path| path.join("adapters/triton.py").is_file())
 }
 
+/// The manager lives in its own checkout; a worker-only bundle is valid without it.
+fn manager_root() -> Option<PathBuf> {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    [
+        std::env::var_os("RVBENCH_MANAGER_ROOT").map(PathBuf::from),
+        // Local layout: <workspace>/rvbench-official-manager
+        Some(
+            repo.parent()?
+                .parent()?
+                .parent()?
+                .parent()?
+                .join("rvbench-official-manager"),
+        ),
+        // CI layout: manager checked out next to this repository
+        Some(repo.parent()?.parent()?.join("../rvbench-official-manager")),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|path| path.join("contract/openapi.yaml").is_file())
+}
+
 #[test]
 fn traces_keep_d4_policy_and_detect_cross_root_evidence() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
@@ -57,7 +78,16 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
     let temp = tempfile::tempdir().unwrap();
     let binary = temp.path().join("rvbench-worker");
     fs::write(&binary, b"MZ").unwrap();
-    assert!(build_bundle(root, &worker, &temp.path().join("wrong"), Some(&binary)).is_err());
+    assert!(
+        build_bundle(
+            root,
+            &worker,
+            None,
+            &temp.path().join("wrong"),
+            Some(&binary)
+        )
+        .is_err()
+    );
     let mut elf = vec![0u8; 64];
     elf[..4].copy_from_slice(b"\x7fELF");
     elf[4] = 2;
@@ -65,8 +95,9 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
     elf[18..20].copy_from_slice(&243u16.to_le_bytes());
     fs::write(&binary, elf).unwrap();
     let output = temp.path().join("bundle");
-    let manifest = build_bundle(root, &worker, &output, Some(&binary)).unwrap();
+    let manifest = build_bundle(root, &worker, None, &output, Some(&binary)).unwrap();
     assert_eq!(manifest["control_plane"], "rust");
+    assert_eq!(manifest["manager_included"], false);
     for item in manifest["files"].as_array().unwrap() {
         let path = item["path"].as_str().unwrap();
         assert!(!path.ends_with("/config.json") && !path.contains("spec.hidden"));
@@ -77,6 +108,21 @@ fn bundle_verifies_target_excludes_private_data_and_refuses_overwrite() {
     assert!(output.join("bin/rvbench-worker").is_file());
     assert!(output.join("worker/adapters/triton.py").is_file());
     assert!(output.join("worker/adapters/native.c").is_file());
+    assert!(!output.join("manager").exists());
     assert!(!output.join("evald/config.example.json").exists());
-    assert!(build_bundle(root, &worker, &output, Some(&binary)).is_err());
+    assert!(build_bundle(root, &worker, None, &output, Some(&binary)).is_err());
+    if let Some(manager) = manager_root() {
+        // Without a cross-built manager binary the bundle must fail loudly
+        // instead of silently shipping a worker-only payload.
+        assert!(
+            build_bundle(
+                root,
+                &worker,
+                Some(&manager),
+                &temp.path().join("manager-bundle"),
+                Some(&binary)
+            )
+            .is_err()
+        );
+    }
 }

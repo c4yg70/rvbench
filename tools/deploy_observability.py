@@ -12,7 +12,7 @@ import shlex
 import subprocess
 import tempfile
 import time
-from deploy_cluster import NODES,ROOT,KEY,ssh,put
+from deploy_cluster import NODES,ROOT,KEY,ssh,put,component_root
 from cluster_smoke import call
 
 STAMP=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
@@ -40,7 +40,7 @@ def upgrade(n,name):
     else:cfg['host_metrics_url']='http://'+n['host']+':9100/metrics'
     with tempfile.TemporaryDirectory() as td:
         p=pathlib.Path(td)/(name+'.json.next');p.write_text(json.dumps(cfg,indent=2),encoding='utf-8');put(n,p,root+'/'+p.name)
-    put(n,ROOT/'target/riscv64gc-unknown-linux-gnu/release'/name,root+'/bin/'+name+'.next')
+    put(n,component_root(name)/'target/riscv64gc-unknown-linux-gnu/release'/name,root+'/bin/'+name+'.next')
     # Recheck just before stopping; never deliberately interrupt known active work.
     idle(n);ssh(n,ctl+' stop '+name)
     try:

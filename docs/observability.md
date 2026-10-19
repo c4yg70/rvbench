@@ -51,12 +51,17 @@ exporter 会在 cgo sysconf 调用中 SIGILL；纯 Go 构建经过真实启动 /
 
 ```bash
 bash tools/build_monitoring.sh
-cargo zigbuild -p rvbench-worker -p rvbench-manager --release --target riscv64gc-unknown-linux-gnu.2.38
+# manager 与 worker 分属两个仓，各自交叉编译
+(cd ../rvbench-official-manager && cargo zigbuild --release --target riscv64gc-unknown-linux-gnu.2.38)
+(cd ../rvbench-spacemit-worker && cargo zigbuild --release --target riscv64gc-unknown-linux-gnu.2.38)
 python tools/deploy_observability.py --vm-binary artifacts/monitoring-binaries/victoria-metrics --exporter-binary artifacts/monitoring-binaries/node_exporter
 python tools/cluster_smoke.py --output artifacts/observability-check/cluster
 python tools/cluster_recovery_smoke.py --output artifacts/observability-check/recovery
 python tools/observability_smoke.py --output artifacts/observability-check/monitoring
 ```
+
+部署脚本按 `RVBENCH_MANAGER_ROOT`（默认同级 `../rvbench-official-manager`）取 manager 二进制，
+worker 二进制仍取本仓 `target/`。
 
 构建脚本先加载 x-cmd，源码位于 `~/.x-repo/github.com/`，校验 pinned commit，不覆盖其他分支。
 SHA256SUMS 随构建输出。部署先检查空闲并通过 SQLite backup API 保存账本、配置和旧二进制。

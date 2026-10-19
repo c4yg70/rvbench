@@ -10,7 +10,7 @@
 
 | 消费方 | 方式 |
 |---|---|
-| `manager/contract/openapi.yaml` | `$ref: ../../contracts/openapi.json#/components/schemas/...`，本地相对路径，离线可解析 |
+| `rvbench-official-manager` 仓 `contract/openapi.yaml` | raw URL 指向本仓 `main` 的该文件 |
 | worker 仓 `contract/openapi.yaml` | raw URL 指向本仓 `main` 的该文件 |
 | [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `openapi-to-rust` 的输入；`SPEC` 常量在编译期嵌入该文档 |
 

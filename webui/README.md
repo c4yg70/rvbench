@@ -14,5 +14,5 @@
 
 后续评测集选择、提交、状态、结果与证据页面，以及共用资源和构建配置，统一归入本目录；当前 dashboard 的功能是监控。
 
-`rvbench-tools bundle` 从协议 crate 生成控制台与 OpenAPI，再从 worker 仓取适配器，与本仓的监控配置、部署脚本一起打包。
+`rvbench-tools bundle` 从协议 crate 生成控制台与 OpenAPI，从 worker 仓取适配器、从 manager 仓取配置与接口定义，与本仓的监控配置、部署脚本一起打包。
 当前 VictoriaMetrics 配置位于 `deploy/observability/`；旧 Prometheus 配置位于 `backends/spacemit/k3/monitor/`。

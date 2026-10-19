@@ -3,7 +3,8 @@
 原生 Rust 维护程序，无 Python 控制包装。
 
 - `check`：Cargo fmt/test/clippy 和公开合同检查。
-- `bundle --output DIR [--binary FILE]`：RISC-V K3 部署包及摘要清单。
+- `bundle --output DIR --worker-root DIR [--manager-root DIR] [--binary FILE]`：RISC-V K3 部署包及摘要清单。
+  `--manager-root` 指向独立 manager 仓检出，省略时打包 worker-only；给出时缺 RISC-V manager 二进制即报错。
 - `trace --root DIR --json`：harness trace 的 D2/D3/D4 与跨根污染检查。
 - `pssh HOST 'COMMAND'`：原生 SSH；`--put LOCAL REMOTE` / `--get REMOTE LOCAL` 使用 SFTP。
 - `precompile HOST CANDIDATE --op OP --shape SHAPE`：上传候选和 Python 算子 JIT 桥接、执行并清理临时文件。
