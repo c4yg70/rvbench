@@ -28,7 +28,7 @@
 | BackendProfile 类型 | core/backend_profile.py；具体档案仍由后端维护 |
 | server/dashboard.html | webui/dashboard.html |
 | server/specs.html | webui/design/k3-evald-specs.html |
-| server/docs、CHANGELOG、CONTEXT、requirements | docs/backends/spacemit-k3/ |
+| server/docs、CHANGELOG、CONTEXT、requirements | docs/backends/spacemit-k3/（2026-10-19 已迁至 `rvbench-spacemit-worker` 仓 `docs/`） |
 | 原 README 与项目元数据 | docs/history/ |
 | 原报告、归档与构建产物 | artifacts/ 下保留本地文件 |
 

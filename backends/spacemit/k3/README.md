@@ -37,4 +37,4 @@ rvbench-tools precompile --help
 
 ## 历史文档
 
-原 evald 技术文档保留在 `docs/backends/spacemit-k3/`，仅作设计参考。
+原 evald 技术文档已迁至 `rvbench-spacemit-worker` 仓的 `docs/`（ADR、总体设计、架构图、规格、变更史），仅作设计参考。
