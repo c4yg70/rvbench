@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/spec.schema.json",
+  "$schema": "../../contracts/schemas/spec.schema.json",
   "schema_version": "2.1.0",
   "suite": {
     "id": "baseline_abs_demo",
@@ -205,7 +205,7 @@
         "reference_results": [
           {
             "path": "baseline-results.json",
-            "sha256": "e8132d8d9539db120212113f7335a5aff12f9ea8b62281b48cf13955ceb8d1ac"
+            "sha256": "c4962cacd10c088f5f170e3950db70f47d40cf6176ea61ac4875c9c95a070ca1"
           }
         ]
       }

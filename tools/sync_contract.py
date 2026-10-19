@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""把 contracts/openapi.json 同步到协议仓副本，并打印两侧 sha256。
+"""把 contracts/api/openapi.json 同步到协议仓副本，并打印两侧 sha256。
 
 用法：
     python tools/sync_contract.py [协议仓路径]
 
 默认协议仓路径为 ../rvbench-core-rust。协议仓的 openapi.json 是随 crate 发布的副本，
-正本在主仓 contracts/openapi.json；本脚本只做单向同步，不反向写入。
+正本在主仓 contracts/api/openapi.json；本脚本只做单向同步，不反向写入。
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "contracts" / "openapi.json"
+SOURCE = ROOT / "contracts" / "api" / "openapi.json"
 
 
 def digest(path: Path) -> str:

@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/baseline_results.schema.json",
+  "$schema": "../../contracts/schemas/baseline_results.schema.json",
   "schema_version": "1.0.0",
   "purpose": "synthetic",
   "suite_id": "baseline_abs_demo",

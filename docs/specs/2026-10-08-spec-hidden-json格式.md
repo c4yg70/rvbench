@@ -1,6 +1,6 @@
 # spec.hidden.json — 仅引用公开算子的私有测试用例
 
-- 状态：格式初版已落仓（2026-10-08）。隐藏定义使用独立 [spec.hidden.schema.json](../../schemas/spec.hidden.schema.json)，不使用公开集合的 Schema。
+- 状态：格式初版已落仓（2026-10-08）。隐藏定义使用独立 [spec.hidden.schema.json](../../contracts/schemas/spec.hidden.schema.json)，不使用公开集合的 Schema。
 - 本地实例：`<suite>/spec.hidden.json`，与同目录的公开 `spec.json` 配对；公开仓不含隐藏定义，完整集随 rvbench-official-suites 发布。具体 shape、属性组合与 seed 只保存在私有文件中，不列入本文或公开测试夹具。
 - 公开算子与检查合同由同目录 `spec.json` 定义（公开仓示例为 [`examples/hello-world/spec.json`](../../examples/hello-world/spec.json)），参见 [公开格式说明](2026-10-08-spec-json格式.md)。
 

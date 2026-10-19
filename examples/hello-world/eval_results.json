@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/eval_results.schema.json",
+  "$schema": "../../contracts/schemas/eval_results.schema.json",
   "schema_version": "1.1.0",
   "version": "0.1.0",
   "run": {
@@ -17,7 +17,7 @@
       "suite_id": "hello-world",
       "schema_version": "2.1.0",
       "version": "0.1.0",
-      "sha256": "49118ea045ebee3ddf20e01acfeedeea4e5ab4098d787e1eb11919ebf25a2f22"
+      "sha256": "b466feef57b73349673639f8f358e8ed41fcd0e39d5385810aeee981ed75586d"
     },
     "hidden": null
   },

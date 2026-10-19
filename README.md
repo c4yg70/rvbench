@@ -30,7 +30,7 @@ RISC-V 软硬协同评测基础设施。合同定义实验，worker 在真实板
 
 ### 合同优先
 
-`schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/openapi.json`](contracts/README.md)，manager 与 worker 各自仓内的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
+`contracts/schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/api/openapi.json`](contracts/README.md)，manager 与 worker 各自仓内的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
 
 wire 类型由 `openapi-to-rust` 0.15.0 生成，不手写平行 DTO。接口变更顺序固定：改合同 → 重新生成 → conformance 测试 → 实现 → 实机验证。运行时先校验原始 JSON，再反序列化为生成类型；CLI 与两端服务共用同一套校验器与规范 JSON 摘要。
 
@@ -76,8 +76,9 @@ worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager
 rvbench/
 ├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
-├── schemas/                spec / results / baseline 的 JSON Schema 正本
-├── contracts/              控制面 wire 正本：共享 OpenAPI schema，两端 OpenAPI 以 $ref 引用
+├── contracts/              合同正本：api/ 存控制面 wire，schemas/ 存 spec / results / baseline
+│   ├── api/                共享 OpenAPI schema，两端 OpenAPI 以 $ref 引用
+│   └── schemas/            JSON Schema 正本
 ├── suites/                 评测集体系的定义说明（具体用例在 official-suites）
 ├── examples/               合成结果、baseline 与 hello-world 冒烟用例
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
@@ -213,6 +214,6 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 - [manager / worker 运行手册](docs/manager-worker.md)
 - [可观测性与控制台](docs/observability.md)
 - [spec 格式](docs/specs/2026-10-08-spec-json格式.md) · [结果格式](docs/specs/2026-10-08-eval-results-json格式.md) · [baseline 格式](docs/specs/2026-10-16-suite-baseline格式.md)
-- [评测集说明](suites/README.md) · [控制台](webui/README.md)
+- [评测集说明](suites/README.md) · [控制台](https://github.com/rvbench/rvbench-official-manager/blob/main/webui/README.md)（manager 仓）
 - [ADR 0001 合仓](docs/adr/0001-monorepo.md) · [ADR 0002 Rust 控制面](docs/adr/0002-rust-control-plane.md)
 - [架构图](docs/architecture.html)

@@ -2,7 +2,7 @@
 
 状态：Schema、语义校验器与 synthetic 示例已落仓（2026-10-08）；Rust manager/worker 和 Python runner 的结果写入尚未实现。
 
-- 结构正本：[eval_results.schema.json](../../schemas/eval_results.schema.json)，JSON Schema Draft 2020-12，`$id=urn:rvbench:eval-results:1.1.0`，兼容 1.0.0。
+- 结构正本：[eval_results.schema.json](../../contracts/schemas/eval_results.schema.json)，JSON Schema Draft 2020-12，`$id=urn:rvbench:eval-results:1.1.0`，兼容 1.0.0。
 - 语义校验：[core/src/results.rs](../../core/src/results.rs)，不加载 torch、不执行算子。
 - 示例：[examples/hello-world/eval_results.json](../../examples/hello-world/eval_results.json)，`run.purpose=synthetic`，其中时间、摘要、环境及指标均为测试夹具，不是实际评测证据。
 

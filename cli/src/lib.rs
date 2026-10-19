@@ -64,22 +64,22 @@ pub fn schema_errors(value: &Value, kind: &str) -> Vec<String> {
     let (cell, text, formats) = match kind {
         "spec" => (
             &PUBLIC,
-            include_str!("../../schemas/spec.schema.json"),
+            include_str!("../../contracts/schemas/spec.schema.json"),
             false,
         ),
         "hidden" => (
             &HIDDEN,
-            include_str!("../../schemas/spec.hidden.schema.json"),
+            include_str!("../../contracts/schemas/spec.hidden.schema.json"),
             false,
         ),
         "results" => (
             &RESULTS,
-            include_str!("../../schemas/eval_results.schema.json"),
+            include_str!("../../contracts/schemas/eval_results.schema.json"),
             true,
         ),
         "baseline-results" => (
             &BASELINE_RESULTS,
-            include_str!("../../schemas/baseline_results.schema.json"),
+            include_str!("../../contracts/schemas/baseline_results.schema.json"),
             true,
         ),
         _ => return vec!["unknown schema".into()],

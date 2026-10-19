@@ -25,7 +25,7 @@ manager 拆为独立仓 `rvbench-official-manager`，单 crate 包，`Cargo.toml
 
 ## 影响
 
-- wire 正本仍在主仓 `contracts/openapi.json`；manager 仓的 `contract/openapi.yaml` 以
+- wire 正本仍在主仓 `contracts/api/openapi.json`；manager 仓的 `contract/openapi.yaml` 以
   raw URL `$ref` 指向它，与 worker 仓同构，跨仓不复刻 schema 副本。
 - `rvbench-tools bundle` 增加 `--manager-root`；省略时输出 worker-only 包，给出时缺
   RISC-V manager 二进制直接报错，不静默降级。
@@ -38,4 +38,4 @@ manager 拆为独立仓 `rvbench-official-manager`，单 crate 包，`Cargo.toml
 
 - 新仓：`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets -- -D warnings`、`cargo build --release --locked`。
 - 主仓：`cargo fmt --check`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets -- -D warnings`。
-- 契约一致性：主仓 `cli/tests/contracts.rs` 仍逐字节比对 `contracts/openapi.json` 与 `rvbench_protocol::SPEC`。
+- 契约一致性：主仓 `cli/tests/contracts.rs` 仍逐字节比对 `contracts/api/openapi.json` 与 `rvbench_protocol::SPEC`。
