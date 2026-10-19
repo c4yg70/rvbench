@@ -67,8 +67,8 @@ perf 必须引用计时合同；perf passed 有成对有效样本。样本必须
 ## 6. 校验与服务集成
 
 ```powershell
-cargo run -p rvbench-cli -- validate results examples/hello-world/eval_results.json
-cargo run -p rvbench-cli -- validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
+rvbench validate results examples/hello-world/eval_results.json
+rvbench validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
 cargo test --workspace --locked
 ```
 

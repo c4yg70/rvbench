@@ -60,8 +60,8 @@ v1 要求私有输入名称、kind、dtype 对应所引用的公开合同。允�
 ## 5. 使用
 
 ```powershell
-cargo run -p rvbench-cli -- validate hidden <suite>/spec.hidden.json
-cargo run -p rvbench-cli -- validate hidden <suite>/spec.hidden.json --require-ready
+rvbench validate hidden <suite>/spec.hidden.json
+rvbench validate hidden <suite>/spec.hidden.json --require-ready
 cargo test --workspace --locked
 ```
 

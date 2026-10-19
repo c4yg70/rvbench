@@ -38,4 +38,4 @@ manager 拆为独立仓 `rvbench-official-manager`，单 crate 包，`Cargo.toml
 
 - 新仓：`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets -- -D warnings`、`cargo build --release --locked`。
 - 主仓：`cargo fmt --check`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets -- -D warnings`。
-- 契约一致性：主仓 `cli/tests/contracts.rs` 仍逐字节比对 `contracts/api/openapi.json` 与 `rvbench_protocol::SPEC`。
+- 契约一致性：`rvbench-cli` 仓（2026-10-19 起独立）的 `tests/contracts.rs` 逐字节比对仓内 `contracts/api/openapi.json` 副本与 `rvbench_protocol::SPEC`。

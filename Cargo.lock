@@ -2479,6 +2479,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 [[package]]
 name = "rvbench-cli"
 version = "0.1.0"
+source = "git+https://github.com/rvbench/rvbench-cli.git?rev=31a43fc516244bb216aa54579a05150186d41549#31a43fc516244bb216aa54579a05150186d41549"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2487,7 +2488,6 @@ dependencies = [
  "reqwest",
  "rvbench-protocol",
  "serde_json",
- "tempfile",
  "uuid",
 ]
 

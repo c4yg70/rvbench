@@ -12,7 +12,8 @@ RISC-V 软硬协同评测基础设施。合同定义实验，worker 在真实板
 
 | 仓库 | 内容 |
 |---|---|
-| `rvbench`（本仓） | CLI、运维工具、JSON Schema 与 wire 正本、hello-world 示例评测集 |
+| `rvbench`（本仓） | 运维工具、JSON Schema 与 wire 正本、hello-world 示例评测集 |
+| [`rvbench-cli`](https://github.com/rvbench/rvbench-cli) | `rvbench` CLI（`rvbench` / `rb-cli` 两个命令）与离线校验库 |
 | [`rvbench-official-manager`](https://github.com/rvbench/rvbench-official-manager) | 控制面服务：提交、队列、准入、授予、账本与观测汇总 |
 | [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) | `rvbench-protocol`：wire 合同副本、生成类型、校验、摘要、存储 |
 | `rvbench-spacemit-worker` | 板端执行服务：编译、验证、计时、能力探测 · *暂未公开* |
@@ -30,7 +31,7 @@ RISC-V 软硬协同评测基础设施。合同定义实验，worker 在真实板
 
 ### 合同优先
 
-`contracts/schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/api/openapi.json`](contracts/README.md)，manager 与 worker 各自仓内的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，`cli/tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
+`contracts/schemas/` 的 JSON Schema 是 suite 与结果格式的正本；控制面 wire 的正本是本仓 [`contracts/api/openapi.json`](contracts/README.md)，manager 与 worker 各自仓内的 OpenAPI 以 YAML 语法引用同一批 schema。协议仓 [`rvbench-core-rust`](https://github.com/rvbench/rvbench-core-rust) 内保存一份随 crate 发布的副本，[`rvbench-cli`](https://github.com/rvbench/rvbench-cli) 的 `tests/contracts.rs` 逐字节比对两侧，不同步即测试失败。
 
 wire 类型由 `openapi-to-rust` 0.15.0 生成，不手写平行 DTO。接口变更顺序固定：改合同 → 重新生成 → conformance 测试 → 实现 → 实机验证。运行时先校验原始 JSON，再反序列化为生成类型；CLI 与两端服务共用同一套校验器与规范 JSON 摘要。
 
@@ -74,12 +75,10 @@ worker 在 `manager: null` 时完全独立工作；接上 manager 后由 manager
 
 ```text
 rvbench/
-├── cli/                    rvbench（lib + bin）：control 客户端、validate / digest 与离线校验
 ├── tools/                  rvbench-tools 与集群部署 / 冒烟 / 验收脚本
 ├── contracts/              合同正本：api/ 存控制面 wire，schemas/ 存 spec / results / baseline
 │   ├── api/                共享 OpenAPI schema，两端 OpenAPI 以 $ref 引用
 │   └── schemas/            JSON Schema 正本
-├── suites/                 评测集体系的定义说明（具体用例在 official-suites）
 ├── examples/               合成结果、baseline 与 hello-world 冒烟用例
 ├── deploy/observability/   VictoriaMetrics 抓取配置与约定
 ├── backends/spacemit/k3/   K3 板端资产：算子脚本、监控配置、平台档案
@@ -87,7 +86,7 @@ rvbench/
 └── artifacts/              本地构建、部署包与验收记录（不入库）
 ```
 
-`cli` 提供 lib（供 `tools` 复用离线校验）与 `control` 客户端；Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
+CLI 在 [`rvbench-cli`](https://github.com/rvbench/rvbench-cli) 仓独立构建，`tools` 以 git 依赖固定其 rev 复用同一套离线校验；Python 只承担算子执行、原生参照、计时与 Triton JIT 编译，不参与控制流程。
 
 ## 可灵活定义的硬件后端与软件前端匹配机制
 
@@ -113,12 +112,10 @@ cargo build --workspace --locked
 cargo test  --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 
-cargo run -p rvbench-cli   -- validate spec examples/hello-world/spec.json
-cargo run -p rvbench-cli   -- validate results examples/hello-world/eval_results.json --spec examples/hello-world/spec.json
 cargo run -p rvbench-tools -- check
 ```
 
-构建产出 `rvbench`、`rvbench-tools`。`rvbench-worker` 在 worker 仓、`rvbench-manager` 在 manager 仓各自构建。公开 spec 仍为 draft，`validate spec ... --require-ready` 返回非零是预期状态：合同合法与完成板上验证是两件事。
+构建产出 `rvbench-tools`；`rvbench` 与别名 `rb-cli` 在 [`rvbench-cli`](https://github.com/rvbench/rvbench-cli) 仓构建，`cargo install --path . --locked` 一次装齐。`rvbench-worker` 在 worker 仓、`rvbench-manager` 在 manager 仓各自构建。公开 spec 仍为 draft，`validate spec ... --require-ready` 返回非零是预期状态：合同合法与完成板上验证是两件事。
 
 需要真实 Triton 环境的回归默认跳过：
 
@@ -204,7 +201,7 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 ## 评测集与结果合同
 
 - `examples/hello-world/`：最小 add 用例与配套 synthetic 结果，用于跑通提交、编译、执行与结果落盘链路。公开仓只内置这一个示例。
-- `suites/`：评测集体系的定义说明；完整算子评测集随 `rvbench-official-suites` 后续开源。
+- 完整算子评测集随 `rvbench-official-suites` 后续开源；本仓不存放具体用例。
 - `examples/baseline/`：可选基准包（spec 2.1.0 的 `baseline.entries[]`）。
 
 历史测速与当前通过状态分别管理：基准数据不自动裁决 case 是否 ready，也不写入 incumbent 记录。
@@ -214,6 +211,6 @@ VictoriaMetrics v1.154.0 与 node_exporter v1.10.2 均为 `CGO_ENABLED=0`、`GOR
 - [manager / worker 运行手册](docs/manager-worker.md)
 - [可观测性与控制台](docs/observability.md)
 - [spec 格式](docs/specs/2026-10-08-spec-json格式.md) · [结果格式](docs/specs/2026-10-08-eval-results-json格式.md) · [baseline 格式](docs/specs/2026-10-16-suite-baseline格式.md)
-- [评测集说明](suites/README.md) · [控制台](https://github.com/rvbench/rvbench-official-manager/blob/main/webui/README.md)（manager 仓）
+- [控制台](https://github.com/rvbench/rvbench-official-manager/blob/main/webui/README.md)（manager 仓）
 - [ADR 0001 合仓](docs/adr/0001-monorepo.md) · [ADR 0002 Rust 控制面](docs/adr/0002-rust-control-plane.md)
 - [架构图](docs/architecture.html)
