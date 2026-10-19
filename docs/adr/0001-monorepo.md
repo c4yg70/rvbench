@@ -26,8 +26,8 @@
 | server/clients、ops、monitor、tools、tests | backends/spacemit/k3/ 下同名目录 |
 | server/clients/result_schema.py 实现 | core/compat/result_schema.py；原导入位置保留桥接 |
 | BackendProfile 类型 | core/backend_profile.py；具体档案仍由后端维护 |
-| server/dashboard.html | webui/dashboard.html |
-| server/specs.html | webui/design/k3-evald-specs.html |
+| server/dashboard.html | webui/dashboard.html（2026-10-19 已随 `webui/` 迁至 `rvbench-official-manager` 仓） |
+| server/specs.html | webui/design/k3-evald-specs.html（同上） |
 | server/docs、CHANGELOG、CONTEXT、requirements | docs/backends/spacemit-k3/（2026-10-19 已迁至 `rvbench-spacemit-worker` 仓 `docs/`） |
 | 原 README 与项目元数据 | docs/history/ |
 | 原报告、归档与构建产物 | artifacts/ 下保留本地文件 |

@@ -1,7 +1,7 @@
 # K3 评估服务器监控（面板 prometheus.yml 正本）
 
 K3 评估服务器（10.18.60.100）＋双 evald 实例的网页监控。面板零依赖单文件
-[`webui/dashboard.html`](../../../../webui/dashboard.html)（file:// 双击直开），本目录存放 Prometheus 配置与说明。
+[`webui/dashboard.html`](https://github.com/rvbench/rvbench-official-manager/blob/main/webui/dashboard.html)（manager 仓，file:// 双击直开），本目录存放 Prometheus 配置与说明。
 
 > **2026-09-10 深夜迁址**：原 `work/k1-monitor/`（README、prometheus.yml、eval-probe/、attic/）
 > 在邻会话文件架构重建中被删除且无搬迁映射，本目录为按上下文重建的正本。
@@ -11,7 +11,7 @@ K3 评估服务器（10.18.60.100）＋双 evald 实例的网页监控。面板�
 
 ## 面板
 
-- 从主仓根打开 `webui/dashboard.html`（file:// 直开，Prometheus CORS 对 null origin 放行）；
+- 从 manager 仓根打开 `webui/dashboard.html`（file:// 直开，Prometheus CORS 对 null origin 放行）；
   `?prom=<url>` 可覆盖数据源（记忆于 localStorage）。
 - 刷新节奏（2026-09-10 起）：**即时值 5s**；重查询（query_range 火花线＋5m/1m 窗口统计）
   每 9 轮＝45s 一次（`dashboard.html` 顶部 `TICK_MS` / `RANGE_EVERY`）。

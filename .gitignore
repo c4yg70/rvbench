@@ -11,6 +11,4 @@ jobs/
 .archify/
 artifacts/
 .venv/
-webui/node_modules/
-webui/dist/
 target/
